@@ -16,6 +16,7 @@
  *   gate(doc, host) — C10, the Needs-you section with defer removed
  *   derivation(a)   — C11, how Marque got here
  *   receipt(doc)    — C12, the audit receipt (what the engine will attest)
+ *   (help, vocabulary lookup and the citation chip are in src/help.js)
  *   mount(root, o)  — the pane wired to the kit's state (src/state.js): the
  *                     one call a host needs; it keeps the open card, announces
  *                     new questions and hands every act back to the host
@@ -24,7 +25,7 @@
  * no colour, size or shape is set here. Plain DOM, no framework.
  *
  * `host` is the thing the kit never decides: { moment, engine, readOnly,
- * onAct, onHelp, onJump, onGate, onReceipt, onRetry, onReport }. Every
+ * vocab, onAct, onHelp, onJump, onGate, onLookup, onReceipt, onRetry, onReport }. Every
  * callback is optional; a missing one makes its control inert rather than
  * absent, so the layout is the same in every host and the person can still
  * see what is possible. `doc` is a view (src/state.js docView) or the
@@ -33,6 +34,7 @@
 
 import { render as mark, settle } from './marking.js';
 import { empty, record, see, docView } from './state.js';
+import { cite, hasTip, tips } from './help.js';
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 const el = (tag, cls, text) => {
@@ -111,16 +113,6 @@ export function markClass(f, moment = 'editing') {
   return r === 'action' || r === 'blocking' ? 'mq-must-act' : r === 'advisory' ? 'mq-can-act' : r === 'noticeable' ? 'mq-changed' : '';
 }
 
-/* ── C13 · citation link ─────────────────────────────────────────────── */
-function cite(c, host) {
-  if (!c) return null;
-  const a = el('a', 'mq-cite', `${c.source === 'capco_2016' ? 'CAPCO' : c.source} §${c.section} p${c.page}`);
-  a.href = '#';
-  a.title = c.short || '';
-  a.addEventListener('click', (e) => { e.preventDefault(); host.onHelp?.({ kind: 'citation', citation: c }); });
-  return a;
-}
-
 /* ── C4 · the asks renderer ──────────────────────────────────────────── */
 function asks(f, host, r) {
   const a = f.asks; if (!a) return null;
@@ -175,6 +167,8 @@ function asks(f, host, r) {
 export function card(f, host = {}) {
   const moment = host.moment;
   const r = rung(f, moment);
+  // Tokens the engine says have help, and the vocabulary can explain (tier 1).
+  const help = host.vocab ? (f.says.help || []).filter((k) => hasTip(host.vocab, k)) : [];
   const c = el('article', `mq-card ${shapeOf(f, r, moment)}`.trim());
   c.dataset.finding = f.id; c.dataset.rung = r;
 
@@ -203,8 +197,8 @@ export function card(f, host = {}) {
   // As written → result, when there is a result and it differs.
   if (f.marking?.as_written && f.outcome?.result && f.outcome.kind !== 'choices' && !f.overridden) {
     const was = el('div', 'mq-was');
-    was.append(el('span', null, 'Was'), placed(mark(f.marking.as_written, { size: 'sm' })), el('span', null, '→'));
-    was.append(placed(mark(f.outcome.result, { size: 'sm', state: r === 'noticeable' || r === 'quiet' ? 'changed' : undefined })));
+    was.append(el('span', null, 'Was'), placed(mark(f.marking.as_written, { size: 'sm', help })), el('span', null, '→'));
+    was.append(placed(mark(f.outcome.result, { size: 'sm', help, state: r === 'noticeable' || r === 'quiet' ? 'changed' : undefined })));
     c.append(was);
   } else if (!f.marking?.as_written && settled(f) && f.outcome?.result) {
     const now = el('div', 'mq-was');
@@ -234,7 +228,7 @@ export function card(f, host = {}) {
 
   const foot = el('div', 'mq-foot');
   const why = el('a', 'mq-why', 'Why?'); why.href = '#';
-  why.addEventListener('click', (e) => { e.preventDefault(); host.onHelp?.({ kind: 'why', finding: f }); });
+  why.addEventListener('click', (e) => { e.preventDefault(); host.onHelp?.({ kind: 'why', finding: f, rung: r, anchor: why }); });
   foot.append(why);
   const ct = cite(f.says.citation, host); if (ct) foot.append(ct);
   // Back to what Marque said: "Change my answer", "Undo" on a choice the
@@ -426,7 +420,7 @@ export function pane(doc, host = {}) {
   }
 
   const foot = el('div', 'mq-pane-foot');
-  foot.append(button('ghost', 'Check before sending', () => host.onGate?.()), button('ghost', 'Receipt', () => host.onReceipt?.()));
+  foot.append(button('ghost', 'Check before sending', () => host.onGate?.()), button('ghost', 'Look up a code', (e) => host.onLookup?.(e.currentTarget)), button('ghost', 'Receipt', () => host.onReceipt?.()));
   p.append(foot);
   return p;
 }
@@ -481,7 +475,7 @@ export function artifact(a, host = {}) {
   }
   const foot = el('div', 'mq-foot');
   const why = el('a', 'mq-why', a.derivation ? 'How Marque got here' : 'Why?'); why.href = '#';
-  why.addEventListener('click', (e) => { e.preventDefault(); host.onHelp?.({ kind: a.derivation ? 'derivation' : 'why', artifact: a }); });
+  why.addEventListener('click', (e) => { e.preventDefault(); host.onHelp?.({ kind: a.derivation ? 'derivation' : 'why', artifact: a, anchor: why }); });
   foot.append(why);
   const ct = cite(a.says.citation, host); if (ct) foot.append(ct);
   c.append(foot);
@@ -574,6 +568,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   const live = el('div', 'mq-sr'); live.setAttribute('aria-live', 'polite');
   const body = el('div');
   root.replaceChildren(body, live);
+  if (host.vocab) tips(body, host.vocab, host);
 
   const h = {
     ...host,
@@ -589,12 +584,33 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     },
     onAct(f, act, value = null) {
       cur.state = record(cur.state, f.id, act, value);
+      // The card stays open where the finding now lives, and keeps focus if it had it.
+      const inPane = body.contains(document.activeElement);
+      cur.open = f.id;
       host.onChange?.(cur.state, { id: f.id, act, value });
-      draw();
+      draw(inPane ? f.id : null);
     },
   };
 
-  function draw() {
+  /** A redraw replaces the pane; put focus back on the same finding's card,
+   *  or its row when the card is closed, so a keyboard user isn't sent to the top. */
+  function refocus(id) {
+    if (!id) return;
+    queueMicrotask(() => {
+      const sel = `[data-finding="${CSS.escape(id)}"], [data-artifact="${CSS.escape(id)}"]`;
+      const target = body.querySelector(`.mq-row-detail :is(${sel})`) || body.querySelector(`.mq-row-item:is(${sel})`);
+      if (!target) return;
+      if (!target.hasAttribute('tabindex')) target.tabIndex = -1;
+      target.focus();
+    });
+  }
+
+  const focusedId = () => {
+    const n = body.contains(document.activeElement) && document.activeElement.closest('[data-finding], [data-artifact]');
+    return n ? n.dataset.finding ?? n.dataset.artifact : null;
+  };
+
+  function draw(focusId = focusedId()) {
     const v = cur.doc && docView(cur.doc, cur.state);
     if (v && cur.engine === 'ok') {
       const now = sections(v, cur.moment).must;
@@ -605,6 +621,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
       said = new Set(now.map((f) => f.id));
     }
     body.replaceChildren(pane(v, h));
+    refocus(focusId);
   }
   draw();
 

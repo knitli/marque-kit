@@ -19,20 +19,25 @@ src/kit.css        the components, built only on theme.css
 src/marking.js     the marking primitive: layers, tokens, four forms, never breaks inside a token
 src/render.js      finding JSON → DOM: rung(), markClass(), card(), row(), pane(), status(), artifact(), gate(),
                    derivation(), receipt(), and mount(): the pane wired to the kit's state, the one call a host needs
+src/help.js        help in three tiers (tooltip, Why?, the manual section) and the vocabulary lookup;
+                   writes no help text of its own, it renders the engine's
 src/state.js       the kit's half of the ladder: what the person did (answered, changed, kept as written,
                    deferred, declined), keyed by finding id, append-only, plain JSON the host persists
 fixtures/memo.txt            a six-paragraph memo with five things wrong
 fixtures/memo.findings.json  what Marque should say about it, in the contract's shape
+fixtures/memo.vocab.json     the engine's vocab and help JSON (ISMCAT + help_anchors.toml), for tiers 1–2 and lookup
+fixtures/memo.manual.json    the CAPCO-2016 sections the memo cites, for tier 3
+fixtures/extract.py          regenerates the two above from a marque-dev checkout; fails if a quote doesn't land
 demo/index.html    the memo on the left, the pane on the right; answer ¶3 and watch the banner move
 docs/              the design, extracted from the canvas: CONTRACT, DERIVATION, MODEL, THEME,
                    COMPONENTS, DECISIONS, ENGINE-ASKS
-test/              the parser, the rung table and the state layer under plain node
+test/              the parser, the rung table, the state layer, lookup and citation landing under plain node
 ```
 
 ## Run it
 
 ```sh
-npm run check      # syntax + the parser, rung and state tests (node ≥ 20)
+npm run check      # syntax + the parser, rung, state and help tests (node ≥ 20)
 npm run demo       # then open http://localhost:8765/demo/
 ```
 
@@ -40,7 +45,7 @@ A host mounts the pane and listens:
 
 ```js
 import { mount } from '@marque/kit';
-const p = mount(el, { doc, state, moment: 'editing', onChange: (state, act) => save(state), onHelp, onJump });
+const p = mount(el, { doc, state, vocab, moment: 'editing', onChange: (state, act) => save(state), onHelp, onJump });
 p.update({ doc });              // after a re-lint
 p.update({ moment: 'finalize' }); // the host's moment; the kit never guesses it
 ```

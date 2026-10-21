@@ -60,6 +60,8 @@ export function tokens(layer) {
 }
 
 const isCode = (t) => /^\/?[A-Z]{3,4},? ?\)?$/.test(t);
+/** A token without its separators: "//REL TO " → "REL TO", "FVEY)" → "FVEY". */
+export const bare = (t) => t.replace(/^[(/]+|[),\s]+$/g, '');
 
 /** Parse a string into the layered form the engine should emit. */
 export function parse(text) {
@@ -93,6 +95,7 @@ function el(tag, cls, text) {
  * @param {number} [o.fold=3]     codes shown before a fold
  * @param {number[]} [o.differs]  layer indexes that differ between readings (diff form)
  * @param {string} [o.foldLabel]  e.g. "9 more · same in every reading"
+ * @param {string[]} [o.help]     tokens with a help entry (says.help[]); each becomes a tier-1 target
  * @returns {HTMLSpanElement}
  */
 export function render(marking, o = {}) {
@@ -120,7 +123,8 @@ export function render(marking, o = {}) {
       if (i > 0) L.appendChild(document.createElement('wbr'));
       const text = (hidden.length && i === shown.length - 1) ? t.t.replace(/[, ]+$/, '') : t.t;
       const span = el('span', 'mq-i', text);
-      if (t.help) { span.classList.add('mq-tok'); span.tabIndex = 0; span.dataset.help = t.help; }
+      const help = t.help || (o.help?.includes(bare(t.t)) ? bare(t.t) : null);
+      if (help) { span.classList.add('mq-tok'); span.tabIndex = 0; span.dataset.help = help; }
       L.appendChild(span);
     });
     if (hidden.length) {
@@ -186,7 +190,7 @@ export function spoken(marking, vocab = {}) {
   const m = normalise(marking);
   const words = [];
   for (const layer of m.layers) for (const { t } of layer.tokens) {
-    const tok = t.replace(/^[(/]+|[),\s]+$/g, '');
+    const tok = bare(t);
     if (!tok) continue;
     words.push(vocab[tok] || (/^[A-Z]{3,4}$/.test(tok) ? tok.split('').join('-') : tok));
   }

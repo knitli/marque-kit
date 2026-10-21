@@ -21,10 +21,7 @@
   .side { overflow: auto; border-left: var(--mq-border, 1.5px) solid var(--mq-rule-strong); background: var(--mq-ground); }
   .bar { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--mq-rule); font-size: 12px; }
   .bar select, .bar button { font: inherit; }
-  #help { position: fixed; right: 400px; bottom: 24px; width: 360px; max-width: calc(100vw - 48px); padding: 16px; display: none; }
-  #help.on { display: block; }
-  #help .mq-h { margin: 0 0 8px; }
-  @media (max-width: 760px) { .demo { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } .side { border-left: 0; border-top: 1.5px solid var(--mq-rule-strong); max-height: 50vh; } #help { right: 24px; } }
+  @media (max-width: 760px) { .demo { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } .side { border-left: 0; border-top: 1.5px solid var(--mq-rule-strong); max-height: 50vh; } }
 </style>
 </head>
 <body class="mq">
@@ -43,15 +40,17 @@
     <div id="receipt" style="padding:14px"></div>
   </aside>
 </div>
-<div id="help" class="mq-pop" role="dialog" aria-label="Help"></div>
 
 <script type="module">
 import { render as mark, settle } from '../src/marking.js';
 import { mount, gate, receipt, derivation, markClass } from '../src/render.js';
+import { why, explain, passage, lookup, float } from '../src/help.js';
 
 const $ = (s) => document.querySelector(s);
 const doc = await (await fetch('../fixtures/memo.findings.json')).json();
 const memo = await (await fetch('../fixtures/memo.txt')).text();
+const vocab = await (await fetch('../fixtures/memo.vocab.json')).json();
+const manual = await (await fetch('../fixtures/memo.manual.json')).json();
 const bytes = new TextEncoder().encode(memo);
 const dec = new TextDecoder();
 
@@ -60,6 +59,8 @@ const dec = new TextDecoder();
    state and apply the edit, then re-lint and call p.update({ doc }). */
 const p = mount($('#pane'), {
   doc,
+  vocab,
+  onLookup(anchor) { openLookup(anchor); },
   onChange() { draw(); },
   onHelp(req) { help(req); },
   onJump(f) { document.querySelector(`[data-anchor="${f.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }); },
@@ -114,26 +115,39 @@ function page(v) {
   root.querySelectorAll('.mq-mark').forEach(settle);
 }
 
+/* Help is the kit's (src/help.js); where it opens is the host's. Tier 2 is a
+   popover by its anchor, tier 3 a window beside the pane; neither is modal. */
+let tier2 = null;
 function help(req) {
-  const h = $('#help'); h.replaceChildren(); h.classList.add('on');
-  const close = document.createElement('button'); close.className = 'mq-btn ghost'; close.textContent = 'Close'; close.style.float = 'right';
-  close.addEventListener('click', () => h.classList.remove('on'));
-  h.append(close);
-  if (req.kind === 'citation') {
-    const c = req.citation;
-    h.append(Object.assign(document.createElement('div'), { className: 'mq-h', textContent: `CAPCO 2016 §${c.section}, page ${c.page}` }));
-    h.append(Object.assign(document.createElement('blockquote'), { className: 'mq-quote', textContent: c.short }));
-    h.append(Object.assign(document.createElement('p'), { className: 'mq-keep', textContent: 'Verified against the vendored manual (crates/capco/docs/CAPCO-2016.md). A citation that cannot be traced to a real passage is removed, never left pending.' }));
-  } else if (req.kind === 'derivation') {
-    h.append(Object.assign(document.createElement('div'), { className: 'mq-h', textContent: 'How Marque got here' }));
-    h.append(derivation(req.artifact, p.view(), p.host));
-  } else {
-    const f = req.finding || req.artifact;
-    h.append(Object.assign(document.createElement('div'), { className: 'mq-h', textContent: 'Why' }));
-    h.append(Object.assign(document.createElement('p'), { className: 'mq-p', textContent: f.says.text }));
-    if (f.says.citation) h.append(Object.assign(document.createElement('blockquote'), { className: 'mq-quote', textContent: f.says.citation.short }));
-    if (f.outcome?.because) h.append(Object.assign(document.createElement('p'), { className: 'mq-p', textContent: `Marque chose this because it is the ${f.outcome.because.replace(/_/g, ' ')} reading. You can take the other one; the audit records either way.` }));
+  const h = { ...p.host, onHelp: help, onClose: () => win?.(), onLookup: (code) => openLookup(req.anchor, code) };
+  if (req.kind === 'section' || req.kind === 'citation') {
+    win?.();
+    win = float(passage(req.citation, manual, h, { plain: req.plain }), req.anchor || $('#pane'), { kind: 'window', onClose: () => { win = null; } });
+    return;
   }
+  if (req.kind === 'derivation') {
+    const box = Object.assign(document.createElement('div'), { className: 'mq-pop' });
+    box.append(Object.assign(document.createElement('div'), { className: 'mq-h', textContent: 'How Marque got here' }), derivation(req.artifact, p.view(), h));
+    tier2?.(); tier2 = float(box, req.anchor, { onClose: () => { tier2 = null; } });
+    return;
+  }
+  const content = req.kind === 'token' ? explain(req.code, vocab, h) : why(req.finding || req.artifact, h, req.rung);
+  if (!content) return;
+  tier2?.(); tier2 = float(content, req.anchor, { onClose: () => { tier2 = null; } });
+}
+let win = null;
+function openLookup(anchor, code = '') {
+  win?.();
+  const w = Object.assign(document.createElement('div'), { className: 'mq-window' });
+  const head = Object.assign(document.createElement('div'), { className: 'mq-window-head' });
+  head.append(Object.assign(document.createElement('span'), { className: 'mq-src', textContent: 'Vocabulary' }));
+  const close = Object.assign(document.createElement('button'), { className: 'mq-btn ghost', type: 'button', textContent: 'Close' });
+  close.addEventListener('click', () => win?.());
+  head.append(close);
+  const body = Object.assign(document.createElement('div'), { className: 'mq-window-body' });
+  body.append(lookup(vocab, { onHelp: help }, code));
+  w.append(head, body);
+  win = float(w, anchor || $('#pane'), { kind: 'window', onClose: () => { win = null; } });
 }
 
 /* Everything outside the pane is the host's: the page, the gate it calls at
