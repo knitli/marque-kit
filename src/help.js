@@ -138,7 +138,8 @@ export function why(f, host = {}, rung = null) {
   if (f.says.caveat) p.append(el('p', 'mq-p', f.says.caveat));
   if (rung === 'advisory') {
     p.append(el('p', 'mq-keep', 'Both readings are ones you wrote. Choosing between them is yours, and neither is recorded as an override.'));
-  } else if (rung === 'noticeable' || rung === 'quiet') {
+  } else if ((rung === 'noticeable' || rung === 'quiet') && f.marking?.as_written && f.person?.value == null && !f.overridden) {
+    // Only Marque's own fix can be overridden: never a person's answer, and never a mark nobody wrote.
     const k = el('div', 'mq-keep');
     k.append(button('ghost', 'Keep it as written', () => host.onAct?.(f, 'kept_as_written')), ' Marque still reports it in the audit.');
     p.append(k);
@@ -188,12 +189,13 @@ function highlight(block, start, end) {
   const texts = []; for (let n; (n = walk.nextNode());) texts.push(n);
   let at = 0;
   for (const t of texts) {
-    const a = Math.max(start, at), b = Math.min(end, at + t.length);
+    const len = t.length; // splitText shortens t
+    const a = Math.max(start, at), b = Math.min(end, at + len);
     if (a < b) {
       const piece = t.splitText(a - at); piece.splitText(b - a);
       const m = el('mark'); piece.replaceWith(m); m.append(piece);
     }
-    at += t.length;
+    at += len;
   }
 }
 

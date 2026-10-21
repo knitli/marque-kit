@@ -50,6 +50,8 @@ p.update({ doc });              // after a re-lint
 p.update({ moment: 'finalize' }); // the host's moment; the kit never guesses it
 ```
 
+`act` is null when only the seen list changed. An answer shows on its card at once but stays in `document.pending`, and the document is not ready, until the host applies it, re-lints and calls `p.update({ doc })`. `@marque/kit/help` has what a host needs to answer `onHelp` and `onLookup`.
+
 The demo is static files over any HTTP server; it needs one only because ES modules won't load from `file://`.
 
 ## The idea in one paragraph

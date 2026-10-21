@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { rung, sections } from '../src/render.js';
-import { empty, record, see, view, docView, ACTS } from '../src/state.js';
+import { empty, record, see, linted, view, docView, ACTS } from '../src/state.js';
 
 /* Table 2, row by row. */
 const T = [
@@ -40,7 +40,7 @@ const f = (k) => doc.findings.find((x) => x.id === k);
 
 let g = sections(docView(doc, empty()), 'editing');
 assert.deepEqual(g.must.map(id), [P3]);
-assert.deepEqual(g.can.map(id), [P5]);
+assert.deepEqual(g.can.map(id), [P5, 'a-banner'], 'the derived banner is a card, not a receipt line');
 assert.deepEqual(g.later.map(id), [P4, 'a-cab'], 'absent mark and CAB wait for finalize');
 g = sections(docView(doc, empty()), 'finalize');
 assert.deepEqual(g.must.map(id), [P3, P4, 'a-cab'], 'at finalize they all block');
@@ -67,8 +67,9 @@ s = record(empty(), P3, 'deferred');
 g = sections(docView(doc, s), 'editing');
 assert.ok(g.later.some((x) => x.id === P3) && !g.must.some((x) => x.id === P3));
 assert.ok(docView(doc, s).document.blocking.includes(P3), 'deferral never answers for the person');
-// Declined ("not my call") is still open too.
+// Declined ("not my call") is still open too, and stays in Needs you for whoever gets it.
 assert.ok(docView(doc, record(empty(), P3, 'declined')).document.blocking.includes(P3));
+assert.ok(sections(docView(doc, record(empty(), P3, 'declined')), 'editing').must.some((x) => x.id === P3));
 
 // Taking ¶5's alternative moves the banner (if_taken); undo moves it back.
 s = record(empty(), P5, 'changed', { reading: f(P5).outcome.readings[0], index: 0 });
@@ -107,11 +108,27 @@ s = record(s, P4, 'answered', { free: '(U)' });
 assert.equal(docView(doc, s).document.ready, false);
 assert.ok(sections(docView(doc, s), 'editing').done.some((x) => x.id === P4), 'an answered missing mark is done, not waiting');
 s = record(s, 'a-cab', 'answered', { fields: { derived_from: 'Multiple Sources', declassify_on: '20490115' } });
-const done = docView(doc, s);
+let done = docView(doc, s);
 assert.deepEqual(done.document.blocking, []);
+assert.deepEqual(done.document.pending, [P3, P4, 'a-cab'], 'answered is not applied');
+assert.equal(done.document.ready, false, 'not ready until the host applies the answers and re-lints');
+// The host re-lints: the new findings carry the answers; the old ones are never replayed.
+const strip = ({ person, history, ...x }) => x;
+const relint = { ...done, findings: done.findings.map(strip), document: { ...done.document, artifacts: done.document.artifacts.map(strip) } };
+s = linted(s);
+done = docView(relint, s);
+assert.deepEqual(done.document.pending, []);
 assert.equal(done.document.ready, true);
+// A same-id finding that asks again after the lint is not settled by the old answer.
+assert.equal(view(f(P3), s).needs_person, 'required', 'an answer before the lint is the engine\'s to report');
+assert.ok(docView(doc, s).document.blocking.includes(P3));
 // The engine's document is untouched.
 assert.equal(doc.document.ready, false);
 assert.equal(f(P3).needs_person, 'required');
+
+// A derived field counts as filled.
+const derivedCab = { ...cab, fields: { ...cab.fields, derived_from: { state: 'derived', value: 'DIA SCG 2024-01' } } };
+assert.equal(view(derivedCab, empty()).fields.declassify_on.state, 'blank');
+assert.equal(view(derivedCab, record(empty(), 'a-cab', 'answered', { fields: { declassify_on: '20490115' } })).needs_person, 'none');
 
 console.log('state: ok');

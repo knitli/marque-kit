@@ -46,6 +46,7 @@
 import { render as mark, settle } from '../src/marking.js';
 import { mount, gate, receipt, derivation, markClass } from '../src/render.js';
 import { why, explain, passage, lookup, float } from '../src/help.js';
+import { docView } from '../src/state.js';
 
 const $ = (s) => document.querySelector(s);
 const doc = await (await fetch('../fixtures/memo.findings.json')).json();
@@ -56,13 +57,23 @@ const bytes = new TextEncoder().encode(memo);
 const dec = new TextDecoder();
 
 /* The host: what the kit never decides. The kit keeps the person's acts
-   (src/state.js) and hands each one here; a real host would persist the
-   state and apply the edit, then re-lint and call p.update({ doc }). */
+   (src/state.js) and hands each one here; a real host persists the state,
+   applies the edit, re-lints and calls p.update({ doc }). There is no engine
+   here, so the stand-in re-lint is the kit's own overlay on the fixture. */
+const strip = ({ person, history, ...x }) => x;
+const relint = (s) => {
+  const v = docView(doc, { ...s, linted: 0 });
+  return { ...v, findings: v.findings.map(strip), document: { ...v.document, artifacts: v.document.artifacts.map(strip), pending: [] } };
+};
 const p = mount($('#pane'), {
   doc,
   vocab,
   onLookup(anchor) { openLookup(anchor); },
-  onChange() { draw(); },
+  onChange(s, act) {
+    if (!act) return; // only the seen list moved
+    if (!$('#ro').checked) p.update({ doc: relint(s) }); // read-only: answers wait
+    draw();
+  },
   onHelp(req) { help(req); },
   onJump(f) { document.querySelector(`[data-anchor="${f.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }); },
   onGate() { setMoment('finalize'); $('#gate').scrollIntoView({ behavior: 'smooth' }); },
