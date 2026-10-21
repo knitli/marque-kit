@@ -26,8 +26,9 @@
 </head>
 <body class="mq">
 <div class="demo">
-  <main class="doc" id="doc" aria-label="The memo"></main>
-  <aside class="side">
+  <main class="doc" aria-label="The memo"><h1 class="mq-sr">Marque kit demo</h1><div id="doc"></div></main>
+  <aside class="side" aria-label="Marque">
+    <h2 class="mq-sr">Findings</h2>
     <div class="bar">
       <label>Theme <select id="theme"><option value="">light (default)</option><option value="dark">dark</option><option value="auto">auto</option></select></label>
       <label>Moment <select id="moment"><option value="editing">editing</option><option value="finalize">finalize</option><option value="send">send</option></select></label>
@@ -139,6 +140,7 @@ let win = null;
 function openLookup(anchor, code = '') {
   win?.();
   const w = Object.assign(document.createElement('div'), { className: 'mq-window' });
+  w.setAttribute('role', 'dialog'); w.setAttribute('aria-label', 'Vocabulary lookup');
   const head = Object.assign(document.createElement('div'), { className: 'mq-window-head' });
   head.append(Object.assign(document.createElement('span'), { className: 'mq-src', textContent: 'Vocabulary' }));
   const close = Object.assign(document.createElement('button'), { className: 'mq-btn ghost', type: 'button', textContent: 'Close' });

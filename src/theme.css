@@ -239,7 +239,7 @@
 .mq-fold  { font-family: var(--mq-font-body); font-size: var(--mq-size-xs); font-weight: 600; letter-spacing: 0;
             color: var(--mq-act-ink); text-decoration: underline dotted; text-decoration-thickness: 2px;
             text-underline-offset: 3px; cursor: pointer; white-space: nowrap; text-indent: 0; }
-.mq-fold:hover { color: var(--mq-act-hover); }
+.mq-fold:hover { text-decoration-style: solid; }  /* hover changes the shape; act-hover is a fill, not a text colour */
 .mq-count { font-family: var(--mq-font-body); font-size: var(--mq-size-xs); font-weight: 600; letter-spacing: 0; text-indent: 0;
             color: var(--mq-text-muted); border: var(--mq-border-hair) solid var(--mq-rule-strong);
             border-radius: var(--mq-radius); padding: 1px 6px; white-space: nowrap; vertical-align: 1px; }
@@ -331,7 +331,7 @@
 
 /* Links: act-ink, underlined, thicker on hover. Never colour alone.        */
 .mq a, .mq-link { color: var(--mq-act-ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
-.mq a:hover, .mq-link:hover { color: var(--mq-act-hover); text-decoration-thickness: 2px; }
+.mq a:hover, .mq-link:hover { text-decoration-thickness: 2px; }
 
 /* Layers. Three, fixed. A popover sits on its card, a tooltip on
    everything in the pane, the section window above the pane. The only
@@ -373,6 +373,8 @@
         --mq-error-ink: CanvasText; --mq-focus: Highlight; --mq-shadow-overlay: none; }
   .mq-card, .mq-card.must-act, .mq-card.can-act, .mq-card.absent, .mq-opt { forced-color-adjust: none; }
   .mq-mark { forced-color-adjust: auto; }
+  /* An inverted fill loses to the text backplate; the tip becomes an outlined box. */
+  .mq-tip { background: Canvas; color: CanvasText; border: 1px solid CanvasText; }
 }
 
 @media (prefers-reduced-motion: reduce) {

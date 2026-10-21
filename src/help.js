@@ -205,9 +205,10 @@ export function passage(c, manual, host = {}, { plain } = {}) {
   w.setAttribute('role', 'dialog'); w.setAttribute('aria-label', `CAPCO-2016 §${c.section}`);
   const head = el('div', 'mq-window-head');
   const pages = s ? (s.pages[0] === s.pages[1] ? `p${s.pages[0]}` : `p${s.pages[0]}–${s.pages[1]}`) : `p${c.page}`;
-  head.append(el('span', 'mq-src', `CAPCO-2016 · §${c.section}${s ? ` · ${s.title}` : ''} · ${pages}`));
+  head.append(el('h3', 'mq-src', `CAPCO-2016 · §${c.section}${s ? ` · ${s.title}` : ''} · ${pages}`)); // the manual's own headings follow as h4
   head.append(button('ghost', 'Close', () => host.onClose?.()));
   const body = el('div', 'mq-window-body');
+  body.tabIndex = 0; // it scrolls; a keyboard has to be able to scroll it
   w.append(head, body);
   if (plain) { const r = el('div', 'mq-txt'); r.append(el('div', 'mq-src', 'Marque’s reading'), el('p', 'mq-p', plain)); body.append(r); }
   if (!s) {
@@ -348,6 +349,7 @@ function onEsc(e) {
 export function float(content, anchor, { kind = 'pop', onClose } = {}) {
   const root = anchor?.closest?.('.mq') || document.querySelector('.mq') || document.body;
   content.classList.add('mq-float', kind);
+  if (!content.hasAttribute('role')) content.setAttribute('role', 'dialog'); // non-modal: no aria-modal
   root.append(content);
   const r = anchor?.getBoundingClientRect?.();
   const vw = document.documentElement.clientWidth;
@@ -398,7 +400,8 @@ export function tips(root, vocab, host = {}) {
     hide();
     const t = tip(tok.dataset.help, vocab); if (!t) return;
     t.id = id; t.classList.add('mq-float');
-    (tok.closest('.mq') || document.body).append(t);
+    // Inside the token's landmark, so a screen reader finds it where the token is.
+    (tok.closest('[role=dialog], main, aside, section') || tok.closest('.mq') || document.body).append(t);
     const r = tok.closest('.mq-mark')?.getBoundingClientRect() || tok.getBoundingClientRect();
     const vw = document.documentElement.clientWidth;
     t.style.top = `${r.bottom + 6}px`;

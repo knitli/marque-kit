@@ -154,7 +154,7 @@
 /* ── Vocabulary lookup ──────────────────────────────────────────────────── */
 .mq-vocab { display: flex; flex-direction: column; gap: calc(var(--mq-unit) * 3); }
 .mq-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.mq-chip  { font-family: var(--mq-font-mark), ui-monospace, monospace; font-size: var(--mq-size-xs); letter-spacing: .04em; padding: 4px 8px;
+.mq-chip  { background: transparent; cursor: pointer; font-family: var(--mq-font-mark), ui-monospace, monospace; font-size: var(--mq-size-xs); letter-spacing: .04em; padding: 4px 8px;
             border: var(--mq-border-hair) solid var(--mq-rule-strong); border-radius: var(--mq-radius); color: var(--mq-text); white-space: nowrap; }
 .mq-chip.us { border-color: var(--mq-act-ink); color: var(--mq-act-ink); }
 .mq-chip .n { font-family: var(--mq-font-body); letter-spacing: 0; color: var(--mq-text-muted); font-weight: 500; margin-left: 6px; }
@@ -176,6 +176,7 @@
             display: flex; flex-direction: column; min-width: 0; }
 .mq-window-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: calc(var(--mq-unit) * 2.5) calc(var(--mq-unit) * 4);
             border-bottom: var(--mq-border-hair) solid var(--mq-rule); }
+.mq-window-head h3.mq-src { margin: 0; font-weight: 500; flex: 1; min-width: 0; }  /* a long title wraps; Close stays inside */
 .mq-window-body { padding: calc(var(--mq-unit) * 4); overflow: auto; display: flex; flex-direction: column; gap: 12px; }
 .mq-manual { font-family: var(--mq-font-body); font-size: var(--mq-size-base); line-height: 1.6; color: var(--mq-text); max-width: 62ch; }
 .mq-manual h4 { font-family: var(--mq-font-display); font-variation-settings: 'wdth' var(--mq-display-width); font-size: var(--mq-size-md); font-weight: 600; margin: 0 0 6px; letter-spacing: -0.02em; }
