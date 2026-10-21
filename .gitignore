@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+
+node_modules/
+dist/
+*.local.*
+*.env
+.DS_Store
+# screenshots and scratch from local runs
+/shots/

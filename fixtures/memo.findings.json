@@ -1,0 +1,880 @@
+{
+  "schema": "marque-kit-contract/0.1",
+  "note": "Hand-written in the shape the kit wants (docs/CONTRACT.md). Rule predicate ids are illustrative until wired to the catalog. Spans are byte offsets into fixtures/memo.txt. This is the oracle the kit renders until the engine emits it (knitli/marque-dev#2633).",
+  "source": "fixtures/memo.txt",
+  "document": {
+    "ready": false,
+    "blocking": [
+      "f-p3-ownership",
+      "f-p4-portion-mark-absent",
+      "a-cab"
+    ],
+    "artifacts": [
+      {
+        "id": "a-banner",
+        "kind": "front_marking",
+        "scope": "document",
+        "state": "absent_but_required",
+        "fixability": "fixable",
+        "placement": "every_page",
+        "derived_value": {
+          "text": "SECRET//FGI AUS GBR//NOFORN",
+          "layers": [
+            {
+              "tokens": [
+                {
+                  "t": "SECRET"
+                }
+              ]
+            },
+            {
+              "tokens": [
+                {
+                  "t": "//FGI "
+                },
+                {
+                  "t": "AUS "
+                },
+                {
+                  "t": "GBR"
+                }
+              ]
+            },
+            {
+              "tokens": [
+                {
+                  "t": "//NOFORN"
+                }
+              ]
+            }
+          ],
+          "masks": []
+        },
+        "says": {
+          "text": "The document has no banner. Marque derived one from the portions.",
+          "citation": {
+            "source": "capco_2016",
+            "section": "H.3",
+            "page": 57,
+            "short": "Highest classification level of all portions, expressed as a US classification marking. … The FGI marking including all trigraph/tetragraph codes identified in the JOINT portion(s). REL TO … unless a portion is marked NOFORN, in which case the NOFORN marking must appear in the banner line."
+          }
+        },
+        "derivation": [
+          {
+            "axis": "classification",
+            "inputs": [
+              "f-p2-rel-to-separator",
+              "f-p3-ownership",
+              "f-p5-noforn-rel-conflict",
+              "f-p6-rel-to-separator"
+            ],
+            "output": "SECRET",
+            "citation": {
+              "source": "capco_2016",
+              "section": "H.3",
+              "page": 57,
+              "short": "Highest classification level of all portions, expressed as a US classification marking."
+            }
+          },
+          {
+            "axis": "fgi",
+            "inputs": [
+              "f-p3-ownership"
+            ],
+            "output": "//FGI AUS GBR",
+            "citation": {
+              "source": "capco_2016",
+              "section": "H.3",
+              "page": 57,
+              "short": "The FGI marking including all trigraph/tetragraph codes identified in the JOINT portion(s)."
+            }
+          },
+          {
+            "axis": "dissem",
+            "inputs": [
+              "f-p5-noforn-rel-conflict"
+            ],
+            "output": "//NOFORN",
+            "citation": {
+              "source": "capco_2016",
+              "section": "H.3",
+              "page": 57,
+              "short": "unless a portion is marked NOFORN, in which case the NOFORN marking must appear in the banner line"
+            }
+          }
+        ],
+        "needs_person": "none",
+        "blocks": "finalize",
+        "depends_on": [
+          "f-p5-noforn-rel-conflict"
+        ],
+        "if_taken": {
+          "f-p5-noforn-rel-conflict": {
+            "text": "SECRET//FGI AUS GBR//REL TO USA, GBR",
+            "layers": [
+              {
+                "tokens": [
+                  {
+                    "t": "SECRET"
+                  }
+                ]
+              },
+              {
+                "tokens": [
+                  {
+                    "t": "//FGI "
+                  },
+                  {
+                    "t": "AUS "
+                  },
+                  {
+                    "t": "GBR"
+                  }
+                ]
+              },
+              {
+                "tokens": [
+                  {
+                    "t": "//REL TO "
+                  },
+                  {
+                    "t": "USA, "
+                  },
+                  {
+                    "t": "GBR"
+                  }
+                ]
+              }
+            ],
+            "masks": []
+          }
+        }
+      },
+      {
+        "id": "a-cab",
+        "kind": "authority_block",
+        "scope": "document",
+        "state": "absent_but_required",
+        "fixability": "flag_only",
+        "placement": "first_page",
+        "says": {
+          "text": "The authority block needs one thing only you know.",
+          "citation": {
+            "source": "capco_2016",
+            "section": "E.2",
+            "page": 32,
+            "short": "Classified By … Derived From … Declassify On …"
+          }
+        },
+        "fields": {
+          "classified_by": {
+            "state": "known",
+            "source": "identity",
+            "value": "J. Doe, Analyst, DIA/XX",
+            "hint": "From your Marque identity. Change it only if someone else made this classification decision."
+          },
+          "derived_from": {
+            "state": "blank",
+            "hint": "Source document or guide, agency, date. More than one source? Write \"Multiple Sources\"."
+          },
+          "declassify_on": {
+            "state": "waiting",
+            "waits_on": "derived_from",
+            "format": "YYYYMMDD | event | 25X#/50X#/75X#",
+            "hint": "Carried forward from the source — the longest duration if there are several."
+          }
+        },
+        "needs_person": "required",
+        "blocks": "finalize",
+        "depends_on": []
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "f-p2-rel-to-separator",
+      "rule": {
+        "scheme": "capco",
+        "predicate": "portion.dissem.rel-to-list-separator"
+      },
+      "severity": "error",
+      "basis": "guidance_binding",
+      "anchor": {
+        "kind": "span",
+        "portion": 2,
+        "span": [
+          119,
+          139
+        ]
+      },
+      "marking": {
+        "as_written": {
+          "text": "(S//REL TO USA FVEY)",
+          "layers": [
+            {
+              "tokens": [
+                {
+                  "t": "(S"
+                }
+              ]
+            },
+            {
+              "tokens": [
+                {
+                  "t": "//REL TO "
+                },
+                {
+                  "t": "USA "
+                },
+                {
+                  "t": "FVEY)"
+                }
+              ]
+            }
+          ],
+          "masks": []
+        },
+        "shape": "recognized"
+      },
+      "says": {
+        "text": "Added a comma to paragraph 2's marking.",
+        "template": "rel_to_list_separator",
+        "citation": {
+          "source": "capco_2016",
+          "section": "H.8",
+          "page": 151,
+          "short": "Each code is separated by a comma and a space."
+        },
+        "help": [
+          "REL TO",
+          "FVEY"
+        ]
+      },
+      "outcome": {
+        "kind": "applied",
+        "result": {
+          "text": "(S//REL TO USA, FVEY)",
+          "layers": [
+            {
+              "tokens": [
+                {
+                  "t": "(S"
+                }
+              ]
+            },
+            {
+              "tokens": [
+                {
+                  "t": "//REL TO "
+                },
+                {
+                  "t": "USA, "
+                },
+                {
+                  "t": "FVEY)"
+                }
+              ]
+            }
+          ],
+          "masks": []
+        },
+        "because": null,
+        "readings": [],
+        "reason": null
+      },
+      "asks": null,
+      "needs_person": "none",
+      "blocks": "never",
+      "depends_on": []
+    },
+    {
+      "id": "f-p3-ownership",
+      "rule": {
+        "scheme": "capco",
+        "predicate": "portion.fgi.joint-owner-list"
+      },
+      "severity": "error",
+      "basis": "guidance_binding",
+      "anchor": {
+        "kind": "span",
+        "portion": 3,
+        "span": [
+          244,
+          280
+        ]
+      },
+      "marking": {
+        "as_written": {
+          "text": "(//JOINT S AUS GBR//REL TO USA, GBR)",
+          "layers": [
+            {
+              "tokens": [
+                {
+                  "t": "(//JOINT "
+                },
+                {
+                  "t": "S "
+                },
+                {
+                  "t": "AUS "
+                },
+                {
+                  "t": "GBR"
+                }
+              ]
+            },
+            {
+              "tokens": [
+                {
+                  "t": "//REL TO "
+                },
+                {
+                  "t": "USA, "
+                },
+                {
+                  "t": "GBR)"
+                }
+              ]
+            }
+          ],
+          "masks": []
+        },
+        "shape": "recognized"
+      },
+      "says": {
+        "text": "Paragraph 3 can't be right as written: a joint marking always includes the U.S., and every joint producer must be able to receive it.",
+        "template": "joint_owner_list",
+        "citation": {
+          "source": "capco_2016",
+          "section": "H.3",
+          "page": 55,
+          "short": "USA is always included in the JOINT marking [LIST], as USA is always a co-owner/producer."
+        },
+        "help": [
+          "JOINT",
+          "REL TO"
+        ]
+      },
+      "outcome": {
+        "kind": "choices",
+        "result": null,
+        "because": null,
+        "readings": [
+          {
+            "asserts": {
+              "ownership": "jointly_owned",
+              "owners": [
+                "AUS",
+                "GBR",
+                "USA"
+              ]
+            },
+            "reading": "The U.S., the UK and Australia produced it together",
+            "result": {
+              "text": "(//JOINT S AUS GBR USA//REL TO USA, AUS, GBR)",
+              "layers": [
+                {
+                  "tokens": [
+                    {
+                      "t": "(//JOINT "
+                    },
+                    {
+                      "t": "S "
+                    },
+                    {
+                      "t": "AUS "
+                    },
+                    {
+                      "t": "GBR "
+                    },
+                    {
+                      "t": "USA"
+                    }
+                  ]
+                },
+                {
+                  "tokens": [
+                    {
+                      "t": "//REL TO "
+                    },
+                    {
+                      "t": "USA, "
+                    },
+                    {
+                      "t": "AUS, "
+                    },
+                    {
+                      "t": "GBR)"
+                    }
+                  ]
+                }
+              ],
+              "masks": []
+            },
+            "changes": [
+              "classification"
+            ]
+          },
+          {
+            "asserts": {
+              "ownership": "foreign_owned",
+              "owners": [
+                "AUS",
+                "GBR"
+              ]
+            },
+            "reading": "The UK and Australia, without the U.S.",
+            "result": {
+              "text": "(//AUS GBR S//REL TO USA, AUS, GBR)",
+              "layers": [
+                {
+                  "tokens": [
+                    {
+                      "t": "(//AUS "
+                    },
+                    {
+                      "t": "GBR "
+                    },
+                    {
+                      "t": "S"
+                    }
+                  ]
+                },
+                {
+                  "tokens": [
+                    {
+                      "t": "//REL TO "
+                    },
+                    {
+                      "t": "USA, "
+                    },
+                    {
+                      "t": "AUS, "
+                    },
+                    {
+                      "t": "GBR)"
+                    }
+                  ]
+                }
+              ],
+              "masks": []
+            },
+            "changes": [
+              "classification"
+            ]
+          },
+          {
+            "asserts": {
+              "ownership": "foreign_owned_with_foreign_content",
+              "owners": [
+                "GBR"
+              ],
+              "fgi": [
+                "AUS"
+              ]
+            },
+            "reading": "It's British, with some Australian information",
+            "result": {
+              "text": "(//GBR S//FGI AUS//REL TO USA, GBR)",
+              "layers": [
+                {
+                  "tokens": [
+                    {
+                      "t": "(//GBR "
+                    },
+                    {
+                      "t": "S"
+                    }
+                  ]
+                },
+                {
+                  "tokens": [
+                    {
+                      "t": "//FGI "
+                    },
+                    {
+                      "t": "AUS"
+                    }
+                  ]
+                },
+                {
+                  "tokens": [
+                    {
+                      "t": "//REL TO "
+                    },
+                    {
+                      "t": "USA, "
+                    },
+                    {
+                      "t": "GBR)"
+                    }
+                  ]
+                }
+              ],
+              "masks": []
+            },
+            "changes": [
+              "classification",
+              "fgi"
+            ]
+          }
+        ],
+        "fallback": {
+          "result": {
+            "text": "(S//FGI AUS GBR//NF)",
+            "layers": [
+              {
+                "tokens": [
+                  {
+                    "t": "(S"
+                  }
+                ]
+              },
+              {
+                "tokens": [
+                  {
+                    "t": "//FGI "
+                  },
+                  {
+                    "t": "AUS "
+                  },
+                  {
+                    "t": "GBR"
+                  }
+                ]
+              },
+              {
+                "tokens": [
+                  {
+                    "t": "//NF)"
+                  }
+                ]
+              }
+            ],
+            "masks": []
+          },
+          "basis": "most_restrictive_preserving_equities"
+        },
+        "reason": "plural_unranked"
+      },
+      "asks": {
+        "kind": "options",
+        "text": "Who collected or produced this information?",
+        "options": "outcome.readings",
+        "field": null,
+        "free_answer": true
+      },
+      "needs_person": "required",
+      "blocks": "finalize",
+      "depends_on": []
+    },
+    {
+      "id": "f-p4-portion-mark-absent",
+      "rule": {
+        "scheme": "capco",
+        "predicate": "portion.classification.portion-mark-absent"
+      },
+      "severity": "error",
+      "basis": "guidance_binding",
+      "anchor": {
+        "kind": "portion",
+        "portion": 4,
+        "span": [
+          415,
+          494
+        ]
+      },
+      "marking": {
+        "as_written": null,
+        "shape": "absent"
+      },
+      "says": {
+        "text": "Paragraph 4 has no portion marking. Marque can't derive one — only you know what the paragraph holds.",
+        "template": "portion_mark_absent",
+        "citation": {
+          "source": "capco_2016",
+          "section": "C",
+          "page": 25,
+          "short": "each portion of a document … must be marked to indicate which portions are classified and unclassified"
+        },
+        "help": []
+      },
+      "outcome": {
+        "kind": "needs_fact",
+        "result": null,
+        "because": null,
+        "readings": [],
+        "reason": "classifier_judgment"
+      },
+      "asks": {
+        "kind": "field",
+        "text": "What is paragraph 4's marking?",
+        "options": [
+          {
+            "asserts": {
+              "classification": "U"
+            },
+            "reading": "It's unclassified",
+            "result": {
+              "text": "(U)",
+              "layers": [
+                {
+                  "tokens": [
+                    {
+                      "t": "(U)"
+                    }
+                  ]
+                }
+              ],
+              "masks": []
+            },
+            "changes": [
+              "classification"
+            ]
+          }
+        ],
+        "field": {
+          "type": "marking",
+          "format": "portion",
+          "hint": "Type the portion marking, e.g. (S//REL TO USA, GBR)",
+          "waits_on": null
+        },
+        "free_answer": true
+      },
+      "needs_person": "required",
+      "blocks": "finalize",
+      "depends_on": []
+    },
+    {
+      "id": "f-p5-noforn-rel-conflict",
+      "rule": {
+        "scheme": "capco",
+        "predicate": "portion.dissem.noforn-with-rel-to"
+      },
+      "severity": "error",
+      "basis": "guidance_binding",
+      "anchor": {
+        "kind": "span",
+        "portion": 5,
+        "span": [
+          499,
+          522
+        ]
+      },
+      "marking": {
+        "as_written": {
+          "text": "(S//NF/REL TO USA, GBR)",
+          "layers": [
+            {
+              "tokens": [
+                {
+                  "t": "(S"
+                }
+              ]
+            },
+            {
+              "tokens": [
+                {
+                  "t": "//NF"
+                },
+                {
+                  "t": "/REL TO "
+                },
+                {
+                  "t": "USA, "
+                },
+                {
+                  "t": "GBR)"
+                }
+              ]
+            }
+          ],
+          "masks": []
+        },
+        "shape": "recognized"
+      },
+      "says": {
+        "text": "Paragraph 5 makes the whole document NOFORN. It was marked both NOFORN and releasable to the UK, which the manual doesn't allow; Marque kept NOFORN, the safe reading.",
+        "template": "noforn_with_rel_to",
+        "citation": {
+          "source": "capco_2016",
+          "section": "H.8",
+          "page": 145,
+          "short": "Cannot be used with REL TO, RELIDO, EYES ONLY, or DISPLAY ONLY."
+        },
+        "help": [
+          "NF",
+          "REL TO"
+        ]
+      },
+      "outcome": {
+        "kind": "chosen_over",
+        "result": {
+          "text": "(S//NF)",
+          "layers": [
+            {
+              "tokens": [
+                {
+                  "t": "(S"
+                }
+              ]
+            },
+            {
+              "tokens": [
+                {
+                  "t": "//NF)"
+                }
+              ]
+            }
+          ],
+          "masks": []
+        },
+        "because": "most_restrictive",
+        "readings": [
+          {
+            "asserts": {
+              "dissem": "rel_to",
+              "rel": [
+                "USA",
+                "GBR"
+              ]
+            },
+            "reading": "Releasable to the UK, as you also wrote",
+            "result": {
+              "text": "(S//REL TO USA, GBR)",
+              "layers": [
+                {
+                  "tokens": [
+                    {
+                      "t": "(S"
+                    }
+                  ]
+                },
+                {
+                  "tokens": [
+                    {
+                      "t": "//REL TO "
+                    },
+                    {
+                      "t": "USA, "
+                    },
+                    {
+                      "t": "GBR)"
+                    }
+                  ]
+                }
+              ],
+              "masks": []
+            },
+            "changes": [
+              "dissem"
+            ]
+          }
+        ],
+        "reason": null
+      },
+      "asks": null,
+      "needs_person": "optional",
+      "blocks": "never",
+      "depends_on": []
+    },
+    {
+      "id": "f-p6-rel-to-separator",
+      "rule": {
+        "scheme": "capco",
+        "predicate": "portion.dissem.rel-to-list-separator"
+      },
+      "severity": "warn",
+      "basis": "guidance_binding",
+      "anchor": {
+        "kind": "span",
+        "portion": 6,
+        "span": [
+          579,
+          600
+        ]
+      },
+      "marking": {
+        "as_written": {
+          "text": "(C//REL TO USA,  GBR)",
+          "layers": [
+            {
+              "tokens": [
+                {
+                  "t": "(C"
+                }
+              ]
+            },
+            {
+              "tokens": [
+                {
+                  "t": "//REL TO "
+                },
+                {
+                  "t": "USA, "
+                },
+                {
+                  "t": " "
+                },
+                {
+                  "t": "GBR)"
+                }
+              ]
+            }
+          ],
+          "masks": []
+        },
+        "shape": "recognized"
+      },
+      "says": {
+        "text": "Extra space removed in paragraph 6's marking.",
+        "template": "rel_to_list_separator",
+        "citation": {
+          "source": "capco_2016",
+          "section": "H.8",
+          "page": 151,
+          "short": "Each code is separated by a comma and a space."
+        },
+        "help": [
+          "REL TO"
+        ]
+      },
+      "outcome": {
+        "kind": "applied",
+        "result": {
+          "text": "(C//REL TO USA, GBR)",
+          "layers": [
+            {
+              "tokens": [
+                {
+                  "t": "(C"
+                }
+              ]
+            },
+            {
+              "tokens": [
+                {
+                  "t": "//REL TO "
+                },
+                {
+                  "t": "USA, "
+                },
+                {
+                  "t": "GBR)"
+                }
+              ]
+            }
+          ],
+          "masks": []
+        },
+        "because": null,
+        "readings": [],
+        "reason": null
+      },
+      "asks": null,
+      "needs_person": "none",
+      "blocks": "never",
+      "depends_on": []
+    }
+  ]
+}

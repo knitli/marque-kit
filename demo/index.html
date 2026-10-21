@@ -1,0 +1,161 @@
+<!doctype html>
+<!-- SPDX-FileCopyrightText: 2026 Knitli Inc.
+     SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marque kit — demo</title>
+<link rel="stylesheet" href="../src/theme.css">
+<link rel="stylesheet" href="../src/kit.css">
+<style>
+  /* Demo scaffolding only. Nothing below is part of the kit. */
+  html, body { margin: 0; height: 100%; }
+  body { font-family: var(--mq-font-body, system-ui, sans-serif); background: var(--mq-ground); color: var(--mq-text); }
+  .demo { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(280px, 380px); height: 100vh; }
+  /* The document is the host's, not the kit's: it stays as it will print, in every theme. */
+  .doc { padding: 40px 48px; overflow: auto; background: #fff; color: #1a1a1a; }
+  .doc .banner { text-align: center; margin-bottom: 28px; }
+  .doc p { font: 400 15px/1.7 var(--mq-font-body, Georgia, serif); max-width: 64ch; margin: 0 0 14px; }
+  .doc .mq-mark { font-size: 13px; }
+  .side { overflow: auto; border-left: var(--mq-border, 1.5px) solid var(--mq-rule-strong); background: var(--mq-ground); }
+  .bar { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--mq-rule); font-size: 12px; }
+  .bar select, .bar button { font: inherit; }
+  #help { position: fixed; right: 400px; bottom: 24px; width: 360px; max-width: calc(100vw - 48px); padding: 16px; display: none; }
+  #help.on { display: block; }
+  #help .mq-h { margin: 0 0 8px; }
+  @media (max-width: 760px) { .demo { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } .side { border-left: 0; border-top: 1.5px solid var(--mq-rule-strong); max-height: 50vh; } #help { right: 24px; } }
+</style>
+</head>
+<body class="mq">
+<div class="demo">
+  <main class="doc" id="doc" aria-label="The memo"></main>
+  <aside class="side">
+    <div class="bar">
+      <label>Theme <select id="theme"><option value="">light (default)</option><option value="dark">dark</option><option value="auto">auto</option></select></label>
+      <label>Moment <select id="moment"><option value="editing">editing</option><option value="finalize">finalize</option></select></label>
+      <button id="finalize" class="mq-btn attn" type="button">Finalize</button>
+    </div>
+    <div id="pane"></div>
+    <div id="gate" style="padding:14px"></div>
+    <div id="receipt" style="padding:14px"></div>
+  </aside>
+</div>
+<div id="help" class="mq-pop" role="dialog" aria-label="Help"></div>
+
+<script type="module">
+import { render as mark, settle } from '../src/marking.js';
+import { pane, gate, receipt, derivation, rung } from '../src/render.js';
+
+const $ = (s) => document.querySelector(s);
+const doc = await (await fetch('../fixtures/memo.findings.json')).json();
+const memo = await (await fetch('../fixtures/memo.txt')).text();
+const bytes = new TextEncoder().encode(memo);
+const dec = new TextDecoder();
+const state = { moment: 'editing', answers: {}, kept: {} };
+
+/* The host: what the kit never decides. Answers mutate the fixture the
+   way the engine would re-emit it, so the pane and the page both move. */
+const host = {
+  get moment() { return state.moment; },
+  onAnswer(f, chosen) {
+    if (chosen.reading) {
+      f.outcome = { ...f.outcome, kind: 'applied', result: chosen.reading.result, readings: [], fallback: undefined };
+    } else {
+      f.outcome = { ...f.outcome, kind: 'applied', result: chosen.free, readings: [], fallback: undefined };
+    }
+    f.asks = null; f.needs_person = 'none'; f.blocks = 'never';
+    doc.document.blocking = doc.document.blocking.filter((id) => id !== f.id);
+    if (f.id === 'f-p5-noforn-rel-conflict') {
+      const banner = doc.document.artifacts.find((a) => a.id === 'a-banner');
+      banner.derived_value = banner.if_taken[f.id]; banner.if_taken = null;
+    }
+    draw();
+  },
+  onKeep(f) { f.overridden = true; f.outcome = { ...f.outcome, kind: 'kept_as_written', result: f.marking.as_written, readings: [] }; f.needs_person = 'none'; draw(); },
+  onDefer(f, o) { f.deferred = o?.route ? 'routed' : 'later'; draw(); },
+  onHelp(req) { help(req); },
+  onJump(f) { const t = document.querySelector(`[data-anchor="${f.id}"]`); t?.scrollIntoView({ block: 'center', behavior: 'smooth' }); },
+};
+
+function slice(a, b) { return dec.decode(bytes.subarray(a, b)); }
+
+/* C8 · inline marks: replace each anchored span with the kit's marking
+   element carrying the rung's shape. Web host = real DOM; Word = content
+   control + underline style (docs/MODEL.md, Hosts). */
+function page() {
+  const root = $('#doc'); root.replaceChildren();
+  const banner = doc.document.artifacts.find((a) => a.kind === 'front_marking');
+  const b = document.createElement('div'); b.className = 'banner';
+  const bm = mark(banner.derived_value, { size: 'lg' });
+  bm.classList.add(banner.state === 'absent_but_required' ? 'mq-absent' : 'mq-changed');
+  bm.title = banner.says.text; b.append(bm); root.append(b);
+
+  const spans = doc.findings.filter((f) => f.anchor?.kind === 'span').sort((x, y) => x.anchor.span[0] - y.anchor.span[0]);
+  const paras = memo.split('\n\n');
+  let offset = 0;
+  for (const text of paras) {
+    const p = document.createElement('p');
+    const start = offset, end = offset + new TextEncoder().encode(text).length;
+    const absent = doc.findings.find((f) => f.anchor?.kind === 'portion' && f.anchor.span[0] === start);
+    let cursor = start;
+    for (const f of spans.filter((f) => f.anchor.span[0] >= start && f.anchor.span[1] <= end)) {
+      p.append(slice(cursor, f.anchor.span[0]));
+      const shown = f.outcome?.result && f.outcome.kind !== 'choices' ? f.outcome.result : f.marking.as_written;
+      const m = mark(shown, { size: 'sm' });
+      const r = rung(f, state.moment);
+      m.classList.add(r === 'action' || r === 'blocking' ? 'mq-must-act' : r === 'advisory' ? 'mq-can-act' : 'mq-changed');
+      m.dataset.anchor = f.id; m.tabIndex = 0; m.title = f.asks?.text || f.says.text;
+      m.addEventListener('click', () => { $(`[data-finding="${f.id}"].mq-row-item`)?.click(); });
+      p.append(m); cursor = f.anchor.span[1];
+    }
+    if (absent) {
+      const m = document.createElement('span'); m.className = 'mq-mark mq-absent'; m.textContent = '( )'; m.dataset.anchor = absent.id; m.title = absent.says.text;
+      m.addEventListener('click', () => { $(`[data-finding="${absent.id}"].mq-row-item`)?.click(); });
+      const lead = slice(cursor, cursor + 3); p.append(lead, m, ' '); cursor += 3;
+    }
+    p.append(slice(cursor, end));
+    root.append(p);
+    offset = end + 2;
+  }
+  root.querySelectorAll('.mq-mark').forEach(settle);
+}
+
+function help(req) {
+  const h = $('#help'); h.replaceChildren(); h.classList.add('on');
+  const close = document.createElement('button'); close.className = 'mq-btn ghost'; close.textContent = 'Close'; close.style.float = 'right';
+  close.addEventListener('click', () => h.classList.remove('on'));
+  h.append(close);
+  if (req.kind === 'citation') {
+    const c = req.citation;
+    h.append(Object.assign(document.createElement('div'), { className: 'mq-h', textContent: `CAPCO 2016 §${c.section}, page ${c.page}` }));
+    h.append(Object.assign(document.createElement('blockquote'), { className: 'mq-quote', textContent: c.short }));
+    h.append(Object.assign(document.createElement('p'), { className: 'mq-keep', textContent: 'Verified against the vendored manual (crates/capco/docs/CAPCO-2016.md). A citation that cannot be traced to a real passage is removed, never left pending.' }));
+  } else if (req.kind === 'derivation') {
+    h.append(Object.assign(document.createElement('div'), { className: 'mq-h', textContent: 'How Marque got here' }));
+    h.append(derivation(req.artifact, doc, host));
+  } else {
+    const f = req.finding || req.artifact;
+    h.append(Object.assign(document.createElement('div'), { className: 'mq-h', textContent: 'Why' }));
+    h.append(Object.assign(document.createElement('p'), { className: 'mq-p', textContent: f.says.text }));
+    if (f.says.citation) h.append(Object.assign(document.createElement('blockquote'), { className: 'mq-quote', textContent: f.says.citation.short }));
+    if (f.outcome?.because) h.append(Object.assign(document.createElement('p'), { className: 'mq-p', textContent: `Marque chose this because it is the ${f.outcome.because.replace(/_/g, ' ')} reading. You can take the other one; the audit records either way.` }));
+  }
+}
+
+function draw() {
+  $('#pane').replaceChildren(pane(doc, host));
+  $('#gate').replaceChildren(state.moment === 'finalize' ? gate(doc, host) : '');
+  $('#receipt').replaceChildren(receipt(doc, { schema: 'marque-3.44', classifier_id: 'J. Doe, Analyst, DIA/XX' }));
+  page();
+}
+
+// The kit root is <body class="mq">; the theme attribute goes on the root, and
+// no attribute means light (docs/THEME.md).
+$('#theme').addEventListener('change', (e) => { if (e.target.value) document.body.dataset.mqTheme = e.target.value; else delete document.body.dataset.mqTheme; });
+$('#moment').addEventListener('change', (e) => { state.moment = e.target.value; draw(); });
+$('#finalize').addEventListener('click', () => { state.moment = 'finalize'; $('#moment').value = 'finalize'; draw(); $('#gate').scrollIntoView({ behavior: 'smooth' }); });
+draw();
+</script>
+</body>
+</html>

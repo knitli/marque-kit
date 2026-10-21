@@ -1,0 +1,38 @@
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+
+SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+-->
+
+# Decisions
+
+Maintainer decisions that bound the kit, in the order they were taken. Each is a sentence the code has to keep true; the reason follows so the next person can tell when the reason no longer holds. Carried from the observations doc (rev 16, 21 Oct 2026). Add new ones at the bottom, dated.
+
+| # | Date | Decision | Why |
+|---|---|---|---|
+| 1 | 13 Oct | **Knitli's design system guides the kit.** The Marque system is a lineage, not a source; nothing from it is carried over as-is. | Its gold-as-accent, saturated red, lifting cards and typed arrows contradict decisions Knitli has since made. |
+| 2 | 13 Oct | **Gold means a person must act; blue means a person can.** Action required and Blocking are gold; Advisory is a blue dotted underline on the marking; Noticeable a thin neutral underline; Quiet has no mark. | Two colours, two meanings, nothing else. The engine's `most_restrictive` ranking is the Advisory rung's data: "safe reading taken, intent unknown." |
+| 3 | 13 Oct | **Attention is derived, never emitted.** Marque emits `needs_person` and `blocks`; the host supplies the moment; the kit computes the rung. Severity never sets a rung. | Severity is about the rule; attention is about the person and the moment. |
+| 4 | 13 Oct | **Two layers of state.** Identified and generated are Marque's; applied, completed, deferred and seen are the host's; ready is Marque's again, at finalize. Generated is never shown as applied. | The engine resolves; the host actuates (constitution VI). |
+| 5 | 14 Oct | **Build to the design we want.** The default is the finished look, fonts included. No deferential "guest" skin. | Most integrators slide the kit in and ship the default; air-gapped hosts can't fetch fonts. |
+| 6 | 14 Oct | **Theme is free; behaviour is fixed.** Hosts change type, colour, radii, placement, icons, motion and their own strings. They don't change the five rungs, the two-layer state, fact-not-syntax questions, the always-present "not my call", stale-question withdrawal, re-check at finalize, markings quoted exactly, or text-not-person judgement. | The behaviour is what makes a Marque host a Marque host. |
+| 7 | 14 Oct | **Judge the text, never the person.** `basis = system_ideal` is a tone switch — "Marque adds this; nobody was required to." Never an error voice. | TENETS: default rules honour the system as designed, not the concessions made for the humans who apply it. |
+| 8 | 14 Oct | **Tooltip vs popover.** Read-only reveals are tooltips; anything with an action is a popover with focus management. In Office hosts the pane follows the cursor. | Office hosts can't draw over the document. |
+| 9 | 14 Oct | **Help in three tiers.** Tier 1 the authored `plain` text; tier 2 the verbatim `short` quote with a citation chip; tier 3 the section itself, landing on the quoted sentence, in a window, not a modal. Authored and verbatim stay visually distinct everywhere the manual's words appear. | A reader must always know whether Marque or the manual is speaking. |
+| 10 | 14 Oct | **The question stem is nearly fixed.** Ownership covers nearly every case that needs a person; the decision prompt is one component with a variable list of readings, each carrying the marking it produces. | One renderer, many questions. |
+| 11 | 16 Oct | **A free answer is always possible.** Every choice prompt carries "Something else — I'll type it" beside "not my call". | `Withheld(classifier_judgment)` is mostly a placeholder for cases Marque doesn't yet handle, not cases it can't. |
+| 12 | 16 Oct | **Pathological markings block finalize.** | A marking Marque couldn't read doesn't go out unexamined. |
+| 13 | 16 Oct | **Caller edits are the caller's call; Marque offers a conservative fallback.** When the host can't perform an edit the recommendation is to block, but it's an integration decision. When Marque can't fully resolve but understands enough, it computes the most restrictive form that keeps every stated equity — for the JOINT case `(S//FGI AUS GBR//NF)`. The kit shows that fallback on the Blocking card as what happens if nobody answers. | A network-boundary deployment with nobody to ask needn't be babysat. |
+| 14 | 16 Oct | **A narrowing portion is Noticeable, not Advisory.** A UK-only portion changes the banner's REL list; Marque computes it and moves on. | People generally can't decide to make something releasable, and Marque can't know what guidance allows. A fact, not a choice. |
+| 15 | 16 Oct | **Default theme is light.** `auto` is opt-in; dark is for Marque's own surfaces and anyone who asks. | Dark-mode use in Word and Outlook is rare; documents are laid out as they will print. |
+| 16 | 16 Oct | **Attention lives in the kit, computed from the engine's facts.** The derivation table ([DERIVATION.md](DERIVATION.md)) is the published spec. | Marque gives answers and identifies problems; what gets done depends on the caller. |
+| 17 | 17 Oct | **Advisory when the safe reading is one the author wrote; Action required when the safe form is one nobody wrote.** A portion marked both NOFORN and REL TO resolves to NOFORN and offers the REL TO back as an Advisory. The JOINT fallback is a form nobody wrote, so it is a fallback, not a reading; the question stays Action required when a person is there. | The person resolves their own contradiction, not a release decision. |
+| 18 | 17 Oct | **No Undo on a fix the person must own; an override is recorded.** "Keep as written" is offered on Noticeable and Advisory; the audit reports the finding as-is either way. | Suppressing a finding is a decision; the audit always reports it. |
+| 19 | 21 Oct | **The kit is its own repo and package** (`@marque/kit`), plain CSS and ES modules, no framework. It depends on Knitli's token values, not its component bundle. | Hosts are Word, Outlook and the web; the kit has to drop into all three. |
+
+Settled facts about the manual that the examples rely on, verified against `crates/capco/docs/CAPCO-2016.md` in marque-dev:
+
+- USA is always a co-owner in a JOINT list (§H.3 p55). JOINT is not carried to the banner of a U.S. document; the banner carries FGI with the co-owner codes (§H.3 p57). The maintainer notes p57 itself reads "between misleading and wrong": JOINT can be a banner, but not here, because like non-U.S. classification it yields to unilateral U.S. classification.
+- REL TO codes are separated by a comma and a space (§H.8 p151). NOFORN "cannot be used with REL TO, RELIDO, EYES ONLY, or DISPLAY ONLY" (§H.8 p145); a NOFORN portion puts NOFORN in the banner (§H.3 p57).
+- Every portion is marked (§C p25). The authority block is `Classified By / Derived From / Declassify On`, dates `YYYYMMDD` (§E p31, §E.2 p32). The banner carries the highest classification of any portion (§D p28).
+- EO 13526 §1.4 lists eight classification categories, (a)–(h); an original classifier's reason must be one or more of them.

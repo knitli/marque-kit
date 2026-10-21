@@ -1,0 +1,22 @@
+{
+  "name": "@marque/kit",
+  "version": "0.1.0",
+  "description": "Marque UI kit: the finding card, decision prompt, pane, inline marks and the theme layer. Plain CSS and ES modules; no framework.",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/render.js",
+    "./marking": "./src/marking.js",
+    "./theme.css": "./src/theme.css",
+    "./kit.css": "./src/kit.css"
+  },
+  "files": ["src", "docs", "fixtures", "LICENSE.md", "README.md"],
+  "scripts": {
+    "demo": "python3 -m http.server 8765",
+    "check": "node --check src/marking.js && node --check src/render.js && node test/marking.test.js"
+  },
+  "repository": { "type": "git", "url": "https://github.com/knitli/marque-kit.git" },
+  "author": "Knitli Inc.",
+  "engines": { "node": ">=20" }
+}
