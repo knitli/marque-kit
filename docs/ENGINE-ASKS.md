@@ -24,5 +24,10 @@ Until these land, the kit renders from a hand-written oracle in the contract's s
 | [#2642](https://github.com/knitli/marque-dev/issues/2642) | Decision-trace event shape for a derivation panel | "How Marque got here" lists axis → inputs → output → rule → citation. |
 | [#2643](https://github.com/knitli/marque-dev/issues/2643) | Closed vocabulary for what a person did | answered · changed · kept as written · deferred · declined — on the wire in and in the audit out. A kept-as-written override is recorded, never hidden. |
 | [#2644](https://github.com/knitli/marque-dev/issues/2644) | PlacementGuidance, fixability and derived value on every artifact | The banner card says "every page"; the CAB card says "first page"; both say whether Marque can write it. |
+| [#2650](https://github.com/knitli/marque-dev/issues/2650) | Help entries for REL TO, JOINT, FGI; `plain` on TS, S, C, U and six others | Tier 1 shows only authored text. Without an entry the token gets no tooltip; the kit doesn't write one. |
+| [#2651](https://github.com/knitli/marque-dev/issues/2651) | `member_of` on `/v1/vocab/trigraph/{code}` | The lookup shows which groups a country is in; today `answer()` inverts every tetragraph's members itself. |
+| [#2652](https://github.com/knitli/marque-dev/issues/2652) | Serve the cited CAPCO-2016 section with the quote's offsets | Tier 3 lands on the quoted sentence. Until then hosts have only `fixtures/memo.manual.json`. |
+
+Filed 21 Oct 2026 from the kit build (help tiers and lookup).
 
 Decisions that bound these, already taken (dated in [DECISIONS.md](DECISIONS.md)): attention is computed kit-side from `needs_person` and `blocks`; no issue asks the engine to emit a rung. Markings are not content (constitution V, v2.8.0 / v2.11.0); nothing here touches content-ignorance.
