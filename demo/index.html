@@ -33,7 +33,9 @@
   <aside class="side">
     <div class="bar">
       <label>Theme <select id="theme"><option value="">light (default)</option><option value="dark">dark</option><option value="auto">auto</option></select></label>
-      <label>Moment <select id="moment"><option value="editing">editing</option><option value="finalize">finalize</option></select></label>
+      <label>Moment <select id="moment"><option value="editing">editing</option><option value="finalize">finalize</option><option value="send">send</option></select></label>
+      <label>Engine <select id="engine"><option value="ok">ok</option><option value="checking">checking</option><option value="failed">failed closed</option><option value="unreachable">not running</option></select></label>
+      <label><input type="checkbox" id="ro"> read-only</label>
       <button id="finalize" class="mq-btn attn" type="button">Finalize</button>
     </div>
     <div id="pane"></div>
@@ -45,77 +47,68 @@
 
 <script type="module">
 import { render as mark, settle } from '../src/marking.js';
-import { pane, gate, receipt, derivation, rung } from '../src/render.js';
+import { mount, gate, receipt, derivation, markClass } from '../src/render.js';
 
 const $ = (s) => document.querySelector(s);
 const doc = await (await fetch('../fixtures/memo.findings.json')).json();
 const memo = await (await fetch('../fixtures/memo.txt')).text();
 const bytes = new TextEncoder().encode(memo);
 const dec = new TextDecoder();
-const state = { moment: 'editing', answers: {}, kept: {} };
 
-/* The host: what the kit never decides. Answers mutate the fixture the
-   way the engine would re-emit it, so the pane and the page both move. */
-const host = {
-  get moment() { return state.moment; },
-  onAnswer(f, chosen) {
-    if (chosen.reading) {
-      f.outcome = { ...f.outcome, kind: 'applied', result: chosen.reading.result, readings: [], fallback: undefined };
-    } else {
-      f.outcome = { ...f.outcome, kind: 'applied', result: chosen.free, readings: [], fallback: undefined };
-    }
-    f.asks = null; f.needs_person = 'none'; f.blocks = 'never';
-    doc.document.blocking = doc.document.blocking.filter((id) => id !== f.id);
-    if (f.id === 'f-p5-noforn-rel-conflict') {
-      const banner = doc.document.artifacts.find((a) => a.id === 'a-banner');
-      banner.derived_value = banner.if_taken[f.id]; banner.if_taken = null;
-    }
-    draw();
-  },
-  onKeep(f) { f.overridden = true; f.outcome = { ...f.outcome, kind: 'kept_as_written', result: f.marking.as_written, readings: [] }; f.needs_person = 'none'; draw(); },
-  onDefer(f, o) { f.deferred = o?.route ? 'routed' : 'later'; draw(); },
+/* The host: what the kit never decides. The kit keeps the person's acts
+   (src/state.js) and hands each one here; a real host would persist the
+   state and apply the edit, then re-lint and call p.update({ doc }). */
+const p = mount($('#pane'), {
+  doc,
+  onChange() { draw(); },
   onHelp(req) { help(req); },
-  onJump(f) { const t = document.querySelector(`[data-anchor="${f.id}"]`); t?.scrollIntoView({ block: 'center', behavior: 'smooth' }); },
-};
+  onJump(f) { document.querySelector(`[data-anchor="${f.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }); },
+  onGate() { setMoment('finalize'); $('#gate').scrollIntoView({ behavior: 'smooth' }); },
+  onReceipt() { $('#receipt').scrollIntoView({ behavior: 'smooth' }); },
+  onRetry() { $('#engine').value = 'ok'; p.update({ engine: 'ok' }); draw(); },
+});
 
 function slice(a, b) { return dec.decode(bytes.subarray(a, b)); }
+const open = (id) => { const r = $(`.mq-row-item[data-finding="${id}"]`); if (r && !r.classList.contains('open')) r.click(); };
 
 /* C8 · inline marks: replace each anchored span with the kit's marking
    element carrying the rung's shape. Web host = real DOM; Word = content
    control + underline style (docs/MODEL.md, Hosts). */
-function page() {
+function page(v) {
   const root = $('#doc'); root.replaceChildren();
-  const banner = doc.document.artifacts.find((a) => a.kind === 'front_marking');
+  const moment = p.host.moment;
+  const banner = v.document.artifacts.find((a) => a.kind === 'front_marking');
   const b = document.createElement('div'); b.className = 'banner';
   const bm = mark(banner.derived_value, { size: 'lg' });
   bm.classList.add(banner.state === 'absent_but_required' ? 'mq-absent' : 'mq-changed');
   bm.title = banner.says.text; b.append(bm); root.append(b);
 
-  const spans = doc.findings.filter((f) => f.anchor?.kind === 'span').sort((x, y) => x.anchor.span[0] - y.anchor.span[0]);
-  const paras = memo.split('\n\n');
+  const spans = v.findings.filter((f) => f.anchor?.kind === 'span').sort((x, y) => x.anchor.span[0] - y.anchor.span[0]);
   let offset = 0;
-  for (const text of paras) {
-    const p = document.createElement('p');
+  for (const text of memo.split('\n\n')) {
+    const para = document.createElement('p');
     const start = offset, end = offset + new TextEncoder().encode(text).length;
-    const absent = doc.findings.find((f) => f.anchor?.kind === 'portion' && f.anchor.span[0] === start);
+    const absent = v.findings.find((f) => f.anchor?.kind === 'portion' && f.anchor.span[0] === start);
     let cursor = start;
     for (const f of spans.filter((f) => f.anchor.span[0] >= start && f.anchor.span[1] <= end)) {
-      p.append(slice(cursor, f.anchor.span[0]));
+      para.append(slice(cursor, f.anchor.span[0]));
       const shown = f.outcome?.result && f.outcome.kind !== 'choices' ? f.outcome.result : f.marking.as_written;
       const m = mark(shown, { size: 'sm' });
-      const r = rung(f, state.moment);
-      m.classList.add(r === 'action' || r === 'blocking' ? 'mq-must-act' : r === 'advisory' ? 'mq-can-act' : 'mq-changed');
+      const cls = markClass(f, moment); if (cls) m.classList.add(cls);
       m.dataset.anchor = f.id; m.tabIndex = 0; m.title = f.asks?.text || f.says.text;
-      m.addEventListener('click', () => { $(`[data-finding="${f.id}"].mq-row-item`)?.click(); });
-      p.append(m); cursor = f.anchor.span[1];
+      m.addEventListener('click', () => open(f.id));
+      para.append(m); cursor = f.anchor.span[1];
     }
     if (absent) {
-      const m = document.createElement('span'); m.className = 'mq-mark mq-absent'; m.textContent = '( )'; m.dataset.anchor = absent.id; m.title = absent.says.text;
-      m.addEventListener('click', () => { $(`[data-finding="${absent.id}"].mq-row-item`)?.click(); });
-      const lead = slice(cursor, cursor + 3); p.append(lead, m, ' '); cursor += 3;
+      // The missing mark: a dashed placeholder until answered, then the answer.
+      const m = absent.outcome?.result ? mark(absent.outcome.result, { size: 'sm' }) : Object.assign(document.createElement('span'), { className: 'mq-mark', textContent: '( )' });
+      const cls = markClass(absent, moment); if (cls) m.classList.add(cls);
+      m.dataset.anchor = absent.id; m.tabIndex = 0; m.title = absent.asks?.text || absent.says.text;
+      m.addEventListener('click', () => open(absent.id));
+      const lead = slice(cursor, cursor + 3); para.append(lead, m, ' '); cursor += 3;
     }
-    p.append(slice(cursor, end));
-    root.append(p);
+    para.append(slice(cursor, end));
+    root.append(para);
     offset = end + 2;
   }
   root.querySelectorAll('.mq-mark').forEach(settle);
@@ -133,7 +126,7 @@ function help(req) {
     h.append(Object.assign(document.createElement('p'), { className: 'mq-keep', textContent: 'Verified against the vendored manual (crates/capco/docs/CAPCO-2016.md). A citation that cannot be traced to a real passage is removed, never left pending.' }));
   } else if (req.kind === 'derivation') {
     h.append(Object.assign(document.createElement('div'), { className: 'mq-h', textContent: 'How Marque got here' }));
-    h.append(derivation(req.artifact, doc, host));
+    h.append(derivation(req.artifact, p.view(), p.host));
   } else {
     const f = req.finding || req.artifact;
     h.append(Object.assign(document.createElement('div'), { className: 'mq-h', textContent: 'Why' }));
@@ -143,18 +136,24 @@ function help(req) {
   }
 }
 
+/* Everything outside the pane is the host's: the page, the gate it calls at
+   its real moment, and where it shows the receipt. */
 function draw() {
-  $('#pane').replaceChildren(pane(doc, host));
-  $('#gate').replaceChildren(state.moment === 'finalize' ? gate(doc, host) : '');
-  $('#receipt').replaceChildren(receipt(doc, { schema: 'marque-3.44', classifier_id: 'J. Doe, Analyst, DIA/XX' }));
-  page();
+  const v = p.view();
+  const moment = p.host.moment;
+  $('#gate').replaceChildren(moment !== 'editing' ? gate(v, p.host) : '');
+  $('#receipt').replaceChildren(receipt(v, { schema: 'marque-3.44', classifier_id: 'J. Doe, Analyst, DIA/XX' }));
+  page(v);
 }
+function setMoment(m) { $('#moment').value = m; p.update({ moment: m }); draw(); }
 
 // The kit root is <body class="mq">; the theme attribute goes on the root, and
 // no attribute means light (docs/THEME.md).
 $('#theme').addEventListener('change', (e) => { if (e.target.value) document.body.dataset.mqTheme = e.target.value; else delete document.body.dataset.mqTheme; });
-$('#moment').addEventListener('change', (e) => { state.moment = e.target.value; draw(); });
-$('#finalize').addEventListener('click', () => { state.moment = 'finalize'; $('#moment').value = 'finalize'; draw(); $('#gate').scrollIntoView({ behavior: 'smooth' }); });
+$('#moment').addEventListener('change', (e) => setMoment(e.target.value));
+$('#engine').addEventListener('change', (e) => p.update({ engine: e.target.value }));
+$('#ro').addEventListener('change', (e) => p.update({ readOnly: e.target.checked }));
+$('#finalize').addEventListener('click', () => p.host.onGate());
 draw();
 </script>
 </body>

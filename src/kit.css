@@ -94,6 +94,14 @@
 .mq-engine.err { border-color: var(--mq-error-ink); }
 .mq-engine .mq-h { font-size: var(--mq-size-base); }
 
+.mq-quiet > summary { list-style: none; }
+.mq-quiet > summary::-webkit-details-marker { display: none; }
+.mq-quiet[open] > summary { border-bottom: var(--mq-border-hair) solid var(--mq-rule); }
+.mq-pane-foot { display: flex; justify-content: space-between; gap: calc(var(--mq-unit) * 2); flex-wrap: wrap;
+            padding-top: calc(var(--mq-unit) * 2.5); border-top: var(--mq-border-hair) solid var(--mq-rule); }
+/* Read by assistive tech, not drawn: the live region that announces a new question. */
+.mq-sr    { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
 /* ── Document status — one line the host places anywhere ────────────────── */
 .mq-status { display: flex; align-items: center; gap: calc(var(--mq-unit) * 3); flex-wrap: wrap; padding: calc(var(--mq-unit) * 2) calc(var(--mq-unit) * 3);
             background: var(--mq-surface); border: var(--mq-border) solid var(--mq-rule-strong); border-radius: var(--mq-radius); }

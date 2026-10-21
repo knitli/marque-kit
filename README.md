@@ -17,20 +17,32 @@ src/theme.css      the theme layer: --mq-* tokens (light default, dark, auto), h
                    the four shapes that carry meaning, control states, print, forced colours
 src/kit.css        the components, built only on theme.css
 src/marking.js     the marking primitive: layers, tokens, four forms, never breaks inside a token
-src/render.js      finding JSON → DOM: rung(), card(), row(), pane(), status(), artifact(), gate(), derivation(), receipt()
+src/render.js      finding JSON → DOM: rung(), markClass(), card(), row(), pane(), status(), artifact(), gate(),
+                   derivation(), receipt(), and mount(): the pane wired to the kit's state, the one call a host needs
+src/state.js       the kit's half of the ladder: what the person did (answered, changed, kept as written,
+                   deferred, declined), keyed by finding id, append-only, plain JSON the host persists
 fixtures/memo.txt            a six-paragraph memo with five things wrong
 fixtures/memo.findings.json  what Marque should say about it, in the contract's shape
 demo/index.html    the memo on the left, the pane on the right; answer ¶3 and watch the banner move
 docs/              the design, extracted from the canvas: CONTRACT, DERIVATION, MODEL, THEME,
                    COMPONENTS, DECISIONS, ENGINE-ASKS
-test/              the parser under plain node
+test/              the parser, the rung table and the state layer under plain node
 ```
 
 ## Run it
 
 ```sh
-npm run check      # syntax + the parser test (node ≥ 20)
+npm run check      # syntax + the parser, rung and state tests (node ≥ 20)
 npm run demo       # then open http://localhost:8765/demo/
+```
+
+A host mounts the pane and listens:
+
+```js
+import { mount } from '@marque/kit';
+const p = mount(el, { doc, state, moment: 'editing', onChange: (state, act) => save(state), onHelp, onJump });
+p.update({ doc });              // after a re-lint
+p.update({ moment: 'finalize' }); // the host's moment; the kit never guesses it
 ```
 
 The demo is static files over any HTTP server; it needs one only because ES modules won't load from `file://`.
