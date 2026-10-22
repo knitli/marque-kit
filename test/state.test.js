@@ -453,4 +453,15 @@ for (const act of ['deferred', 'declined']) {
   assert.equal(view({ ...p2, anchor: { ...p2.anchor, portion: 5 } }, s).stale, true);
 }
 
+// Taking back a written answer reopens the question as it was asked, fallback included.
+{
+  let s = record(empty(), P3, 'answered', { reading: f(P3).outcome.readings[0], index: 0 }, undefined, snapshot(f(P3)));
+  s = linted(s);
+  const { fallback, ...rest } = f(P3).outcome;
+  const written = { ...f(P3), asks: null, needs_person: 'none', blocks: 'never', outcome: { ...rest, result: f(P3).outcome.readings[0].result } };
+  s = record(s, P3, 'changed', null, undefined, snapshot(view(written, s)));
+  assert.ok(fallback, 'the fixture has a fallback');
+  assert.deepEqual(view(written, s).outcome.fallback, fallback);
+}
+
 console.log('state: ok');

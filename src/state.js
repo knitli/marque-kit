@@ -57,8 +57,8 @@ export const snapshot = (f) => structuredClone({ // a record, not a view of a do
   ...(typed(f.derived_value) && { content: typed(f.derived_value) }),
   // Where an artifact goes: an apply was approved for this place.
   ...(f.kind && { placement: f.placement ?? null, scope: f.scope ?? null }),
-  // What taking the act back restores: Marque's own words, never body text.
-  ...(f.outcome && { outcome: { kind: f.outcome.kind, result: f.outcome.result, readings: f.outcome.readings } }),
+  // What taking the act back restores, whole (fallback, because and all): Marque's own words, never body text.
+  ...(f.outcome && { outcome: f.outcome }),
   ...(f.asks && { asks: f.asks }), needs_person: f.needs_person, blocks: f.blocks,
   ...(f.state && { state: f.state }), ...(f.fields && { fields: f.fields }),
 });

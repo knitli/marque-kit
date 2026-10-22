@@ -895,7 +895,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
 
   // `fresh`: the person just acted, so what they had in the form went with it.
   let dead = false; // destroyed: a draw queued before it (onOpen, a resize) draws nothing
-  function draw(focusId = focusedId(), { fresh = false } = {}) {
+  function draw(focusId, { fresh = false } = {}) {
     if (dead) return;
     const kept = fresh ? [] : drafts();
     const v = cur.doc && docView(cur.doc, cur.state);
@@ -913,6 +913,8 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     live.textContent = say;
     // A popover opened on the last draw acts on the findings it was drawn from: it goes with them.
     closeWithin(root, { windows: false });
+    // Read after the popover has handed focus back to its row or card, so focus follows into the new draw.
+    if (focusId === undefined) focusId = focusedId();
     body.replaceChildren(pane(v, h));
     if (host.vocab) relabel(body, host.vocab); // this pane's own vocabulary
     refocus(focusId);

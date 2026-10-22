@@ -78,21 +78,31 @@ export function normalise(marking) {
 }
 
 /** A mask given as a span ([start, end) in UTF-8 bytes of `text`, as every span is) covers bytes the tokens
- *  may still carry: those tokens go, in what is drawn, said and copied, and the mask is drawn in their layer instead. */
-const utf8 = new TextEncoder();
+ *  may still carry: those bytes go, in what is drawn, said and copied, and the mask stands where they were
+ *  (a `{ t: '', mask }` token); the rest of a token it cuts through stays. */
+const utf8 = new TextEncoder(), utf8d = new TextDecoder();
 function conceal(m) {
-  const spans = (m.masks || []).filter((k) => Array.isArray(k.span));
+  const spans = (m.masks || []).filter((k) => Array.isArray(k.span)).sort((x, y) => x.span[0] - y.span[0]);
   if (!spans.length) return m;
-  const hit = (s, e) => spans.filter((k) => k.span[0] < e && s < k.span[1]);
-  const masks = m.masks.map((k) => ({ ...k, ...(Array.isArray(k.span) && { len: k.len ?? k.span[1] - k.span[0] }) }));
+  const placed = new Set();
   let at = 0;
-  const layers = m.layers.map((l, li) => ({ ...l, tokens: l.tokens.filter(({ t }) => {
-    const over = hit(at, (at += utf8.encode(t).length));
-    for (const k of over) { const i = m.masks.indexOf(k); masks[i].layer ??= li; }
-    return !over.length;
+  const layers = m.layers.map((l) => ({ ...l, tokens: l.tokens.flatMap((tok) => {
+    const b = utf8.encode(tok.t), s = at, e = (at += b.length);
+    const over = spans.filter((k) => k.span[0] < e && s < k.span[1]);
+    if (!over.length) return [tok];
+    const out = [];
+    let c = s;
+    for (const k of over) {
+      if (k.span[0] > c) out.push({ ...tok, t: utf8d.decode(b.slice(c - s, k.span[0] - s)) });
+      if (!placed.has(k)) { placed.add(k); out.push({ t: '', mask: { ...k, len: k.len ?? k.span[1] - k.span[0] } }); }
+      c = Math.max(c, k.span[1]);
+    }
+    if (c < e) out.push({ ...tok, t: utf8d.decode(b.slice(c - s)) });
+    return out;
   }) }));
+  const masks = m.masks.filter((k) => !Array.isArray(k.span)); // the rest are drawn at their layer's end
   const b = [...spans].sort((x, y) => y.span[0] - x.span[0]).reduce((t, k) => [...t.slice(0, k.span[0]), ...t.slice(k.span[1])], [...utf8.encode(m.text)]);
-  const text = new TextDecoder().decode(new Uint8Array(b));
+  const text = utf8d.decode(new Uint8Array(b));
   return { ...m, text, layers, masks };
 }
 
@@ -142,6 +152,7 @@ export function render(marking, o = {}) {
     }
     shown.forEach((t, i) => {
       if (i > 0) L.appendChild(document.createElement('wbr'));
+      if (t.mask) { L.appendChild(maskEl(t.mask)); return; }
       const text = (hidden.length && i === shown.length - 1) ? t.t.replace(/[, ]+$/, '') : t.t;
       const span = el('span', 'mq-i', text);
       const help = t.help || (o.help?.includes(bare(t.t)) ? bare(t.t) : null);
@@ -163,23 +174,24 @@ export function render(marking, o = {}) {
     root.appendChild(L);
   });
   // masks: typed regions from the engine (knitli/marque-dev#2634)
-  for (const mask of m.masks || []) {
-    const L = root.querySelectorAll('.mq-l')[mask.layer];
-    if (!L) continue;
-    const s = el('span', mask.kind === 'concealed' ? 'mq-conceal' : 'mq-mask',
-      (mask.kind === 'concealed' ? '█' : '_').repeat(mask.len));
-    s.tabIndex = 0;
-    s.title = mask.kind === 'concealed' ? 'Source concealed.' : `${mask.len} characters Marque couldn't identify.`;
-    L.appendChild(s);
-  }
+  for (const mask of m.masks || []) root.querySelectorAll('.mq-l')[mask.layer]?.appendChild(maskEl(mask));
   return root;
+}
+
+const chars = (n) => `${n} character${n === 1 ? '' : 's'}`;
+const glyphs = (mask) => (mask.kind === 'concealed' ? '█' : '_').repeat(mask.len);
+function maskEl(mask) {
+  const s = el('span', mask.kind === 'concealed' ? 'mq-conceal' : 'mq-mask', glyphs(mask));
+  s.tabIndex = 0;
+  s.title = mask.kind === 'concealed' ? 'Source concealed.' : `${chars(mask.len)} Marque couldn't identify.`;
+  return s;
 }
 
 function summary(m, root) {
   root.classList.add('summary');
   m.layers.forEach((layer, li) => {
     if (li > 0) root.appendChild(document.createElement('wbr'));
-    const toks = layer.tokens.map((t) => t.t);
+    const toks = layer.tokens.map((t) => (t.mask ? glyphs(t.mask) : t.t));
     const codes = toks.filter(isCode);
     const L = el('span', 'mq-l');
     if (codes.length > 5) {
@@ -234,12 +246,14 @@ export function relabel(node, vocab) {
 export function spoken(marking, vocab = {}) {
   const m = normalise(marking);
   const words = [];
-  for (const layer of m.layers) for (const { t } of layer.tokens) {
+  // Masks are said as what they are, never as what they cover: in place, or at the end for one given by layer.
+  const said = (mask) => (mask.kind === 'concealed' ? 'source concealed' : `${chars(mask.len)} not identified`);
+  for (const layer of m.layers) for (const { t, mask } of layer.tokens) {
+    if (mask) { words.push(said(mask)); continue; }
     const tok = bare(t);
     if (!tok) continue;
     words.push(word(vocab, tok) || (/^[A-Z]{3,4}$/.test(tok) ? tok.split('').join('-') : tok));
   }
-  // Masks are said as what they are, never as what they cover.
-  for (const mask of m.masks || []) words.push(mask.kind === 'concealed' ? 'source concealed' : `${mask.len} characters not identified`);
+  for (const mask of m.masks || []) words.push(said(mask));
   return words.join(', ');
 }

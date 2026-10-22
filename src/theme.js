@@ -28,6 +28,7 @@ export const PAIRS = [
   ['act-ink', 'attn-tint', 4.5], // a link-coloured marking with a highlighted layer
 ];
 export const SIZES = [['size-xs', 12], ['size-sm', 13], ['size-md', 13]]; // md carries banner markings
+const TOKENS = [...new Set([...PAIRS.flatMap(([f, b]) => [f, b]), ...SIZES.map(([t]) => t), 'font-mark'])];
 /** The narrowest pane a card fits (docs/THEME.md); under it the kit shows rows only. */
 export const FLOOR = 240;
 
@@ -204,7 +205,10 @@ export function watch(root, onTheme) {
   const chain = () => { const ns = []; for (let n = root; n; n = n.parentElement) ns.push(n); return ns; };
   const sig = () => chain().map((n) => `${n.className}|${n.style.cssText}`).join('\n');
   let last = sig();
-  const run = () => { onTheme(check(root)); last = sig(); };
+  // The tokens as computed now, the gate's pins included: what a media query can move without the DOM changing.
+  const values = () => { const cs = getComputedStyle(root); return TOKENS.map((t) => cs.getPropertyValue(`--mq-${t}`).trim()).join('|'); };
+  let seen = root.isConnected ? values() : '';
+  const run = () => { onTheme(check(root)); last = sig(); seen = values(); };
   // A root moved under another ancestor (removed and put back) may be under another theme.
   let parent = root.parentElement;
   // shortcut: rules changed through the CSSOM (insertRule, adoptedStyleSheets) aren't seen; a host that does so re-mounts.
@@ -245,17 +249,21 @@ export function watch(root, onTheme) {
   const fonts = document.fonts, loaded = () => { if (root.isConnected) run(); };
   let live = true;
   if (fonts) { fonts.addEventListener('loadingdone', loaded); fonts.ready.then(() => { if (live) loaded(); }); }
-  // Re-checked when the pane crosses the width floor, not on every resize.
+  // On a resize, re-checked when the pane crosses the width floor, or when a host media query
+  // has moved a token's computed value; not on every frame.
   const under = () => room(root) < FLOOR;
   let narrow = under();
-  const ro = typeof ResizeObserver !== 'undefined' && new ResizeObserver(() => {
-    if (!root.isConnected || under() === narrow) return;
+  const resized = () => {
+    if (!root.isConnected) return;
+    if (under() === narrow && values() === seen) return;
     narrow = under(); run();
-  });
+  };
+  const ro = typeof ResizeObserver !== 'undefined' && new ResizeObserver(resized);
   if (ro) { ro.observe(root); if (root.parentElement) ro.observe(root.parentElement); }
+  addEventListener('resize', resized);
   return () => {
     mo.disconnect(); mqs.forEach((q) => q.removeEventListener('change', run)); if (ro) ro.disconnect();
-    removeEventListener('beforeprint', printing); removeEventListener('afterprint', printed);
+    removeEventListener('beforeprint', printing); removeEventListener('afterprint', printed); removeEventListener('resize', resized);
     live = false; if (fonts) fonts.removeEventListener('loadingdone', loaded);
     for (const n of links) n.removeEventListener('load', loaded); links.clear();
   };
