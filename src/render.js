@@ -143,7 +143,7 @@ function asks(f, host, r, help) {
   fs.append(el('legend', null, a.text));
   options.forEach((o, i) => {
     const lab = el('label', 'mq-opt');
-    const inp = el('input'); inp.type = 'radio'; inp.name = name; inp.value = String(i);
+    const inp = el('input'); inp.type = 'radio'; inp.name = name; inp.value = String(i); inp.dataset.draft = `${f.id}:reading`;
     inp.addEventListener('change', () => { chosen = { reading: o, index: i }; free.value = ''; clear(); });
     const txt = el('div', 'mq-txt');
     txt.append(el('div', 'mq-pr', o.reading));
@@ -156,7 +156,7 @@ function asks(f, host, r, help) {
   const fld = el('div', 'mq-field');
   const lab = el('label', null, a.field?.type === 'marking' ? 'Or type the marking' : 'Or type your answer');
   lab.htmlFor = `${name}-free`;
-  const free = el('input', 'mono'); free.id = `${name}-free`; free.type = 'text';
+  const free = el('input', 'mono'); free.id = `${name}-free`; free.type = 'text'; free.dataset.draft = `${f.id}:free`;
   free.placeholder = a.field?.hint || 'Type an answer';
   free.addEventListener('input', () => {
     const t = free.value.trim();
@@ -360,7 +360,9 @@ const unwritable = (doc, host) => (host.readOnly ? doc.document.artifacts.filter
 const ready = (doc, host) => doc.document.ready && !unwritable(doc, host);
 /** What the gate lists: blockers and the writes still waiting, once each. A required
  *  finding that never blocks needs the person but holds nothing up. */
-const held = (doc) => new Set([...doc.document.blocking, ...(doc.document.pending || [])]).size;
+const holding = (doc, host = {}) => [...new Set([...doc.document.blocking, ...(doc.document.pending || []),
+  ...(host.readOnly ? doc.document.artifacts.filter(due).map((a) => a.id) : [])])];
+const held = (doc, host) => holding(doc, host).length;
 
 export function status(doc, host = {}) {
   const s = el('div', 'mq-status');
@@ -389,9 +391,9 @@ export function status(doc, host = {}) {
     s.append(el('span', 'mq-stamp', 'Not ready'), words(`${plural(doc.document.pending.length, 'answer', 'answers')} waiting to be written into the document`));
   } else if (!g.must.length && stuck) {
     s.append(el('span', 'mq-stamp', 'Not ready'), words(`${plural(stuck, 'thing', 'things')} can't be written while the document is read-only`));
-  } else if (GATE.has(host.moment) && held(doc)) {
+  } else if (GATE.has(host.moment) && held(doc, host)) {
     s.classList.add('must');
-    const n = held(doc);
+    const n = held(doc, host);
     s.append(el('span', 'mq-stamp attn', 'Blocked'), words(`${plural(n, 'thing has', 'things have')} to be settled before it can go out`));
   } else {
     if (g.must.length) { s.classList.add('must'); s.append(el('span', 'mq-stamp attn', `${g.must.length} needs you`)); }
@@ -445,7 +447,7 @@ export function pane(doc, host = {}) {
   const g = sections(doc, host.moment);
   const atGate = GATE.has(host.moment);
   head.append(partial ? el('span', 'mq-stamp quiet', 'Checking')
-    : g.must.length ? el('span', 'mq-stamp attn', atGate && held(doc) ? 'Blocked' : `${g.must.length} needs you`)
+    : g.must.length ? el('span', 'mq-stamp attn', atGate && held(doc, host) ? 'Blocked' : `${g.must.length} needs you`)
     : el('span', 'mq-stamp', ready(doc, host) ? 'Ready' : 'Not ready'));
   p.append(status(doc, host));
   if (partial) p.append(engineState(host));
@@ -534,9 +536,9 @@ export function artifact(a, host = {}) {
     // A field a person fills: labelled by its key, committed on Enter or Fill in.
     const entry = (k, fld, key) => {
       const v = el('span', 'v blank mq-field');
-      const inp = el('input', 'mono'); inp.type = 'text'; inp.id = `${a.id}-${k}-${++uid}`;
+      const inp = el('input', 'mono'); inp.type = 'text'; inp.id = `${a.id}-${k}-${++uid}`; inp.dataset.draft = `${a.id}:${k}`;
       key.id = `${inp.id}-k`; inp.setAttribute('aria-labelledby', key.id);
-      inp.placeholder = fld.format || ''; inp.value = fld.value || '';
+      inp.placeholder = fld.format || ''; inp.defaultValue = fld.value || '';
       const fill = () => { const t = inp.value.trim(); if (t && t !== fld.value) host.onAct?.(a, 'answered', { fields: { [k]: t } }); };
       inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); fill(); } });
       v.append(inp);
@@ -555,7 +557,9 @@ export function artifact(a, host = {}) {
       // A filled field stays correctable: a typo, or Classified By when someone else made the call.
       // Read-only too: the correction waits with the other answers.
       if (has) {
-        v.append(' ', button('ghost', 'Change', () => { const n = entry(k, fld, key); v.replaceWith(n); n.querySelector('input').focus(); }));
+        const change = button('ghost', 'Change', () => { const n = entry(k, fld, key); v.replaceWith(n); n.querySelector('input').focus(); });
+        change.dataset.change = `${a.id}:${k}`;
+        v.append(' ', change);
       }
       dl.append(v);
     }
@@ -603,8 +607,8 @@ export function gate(doc, host = {}) {
     answered.forEach((f) => g.append(card(f, h)));
     return g;
   }
-  // An answer still waiting to be written holds it up too.
-  const all = [...ids, ...(doc.document.pending || []).filter((id) => !ids.includes(id))];
+  // An answer still waiting to be written holds it up too, and so, read-only, does a required artifact nobody can write.
+  const all = holding(doc, host);
   g.append(el('h3', 'mq-q', all.length === 1 ? 'One thing before this can go out.' : `${all.length} things before this can go out.`));
   for (const id of all) {
     const f = doc.findings.find((x) => x.id === id);
@@ -724,6 +728,9 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   if (added) root.classList.add('mq');
   root.replaceChildren(body, live);
   let theme = check(root); // before the first draw, so a failing host token never shows
+  // Under the floor, rows only, in the room there is: the root's own minimum steps aside.
+  const narrowed = () => root.classList.toggle('mq-narrow', !!theme?.narrow);
+  narrowed();
   host.onTheme?.(theme);
   // A marking stacked or not at one width is measured again at another.
   let width = 0;
@@ -735,7 +742,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   if (sized) sized.observe(root);
   const unwatch = typeof MutationObserver !== 'undefined' ? watch(root, (r) => {
     const was = !!theme?.narrow;
-    theme = r; host.onTheme?.(r);
+    theme = r; narrowed(); host.onTheme?.(r);
     if (!!r?.narrow !== was) draw();
   }) : () => {};
   const untips = host.vocab ? tips(body, host.vocab, host) : () => {};
@@ -763,7 +770,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
       const inPane = body.contains(document.activeElement);
       cur.open = f.id;
       host.onChange?.(cur.state, { id: f.id, act, value });
-      draw(inPane ? f.id : null);
+      draw(inPane ? f.id : null, { fresh: true });
     },
   };
 
@@ -785,7 +792,25 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     return n ? n.dataset.finding ?? n.dataset.artifact : null;
   };
 
-  function draw(focusId = focusedId()) {
+  /** What the person has picked or typed and not yet sent, by a key that survives a redraw. */
+  const drafts = () => [...body.querySelectorAll('[data-draft]')]
+    .filter((x) => (x.type === 'radio' ? x.checked : x.value.trim() && x.value !== x.defaultValue))
+    .map((x) => ({ key: x.dataset.draft, value: x.value, radio: x.type === 'radio', focused: x === document.activeElement }));
+  function restore(list) {
+    const find = (d) => [...body.querySelectorAll('[data-draft]')].find((x) => x.dataset.draft === d.key && (d.radio ? x.type === 'radio' && x.value === d.value : x.type !== 'radio'));
+    for (const d of list) {
+      let n = find(d);
+      // A correction under way to a filled field: open it again for the person.
+      if (!n && !d.radio) { [...body.querySelectorAll('[data-change]')].find((x) => x.dataset.change === d.key)?.click(); n = find(d); }
+      if (!n) continue;
+      if (d.radio) { n.checked = true; n.dispatchEvent(new Event('change')); } else { n.value = d.value; n.dispatchEvent(new Event('input')); }
+      if (d.focused) n.focus();
+    }
+  }
+
+  // `fresh`: the person just acted, so what they had in the form went with it.
+  function draw(focusId = focusedId(), { fresh = false } = {}) {
+    const kept = fresh ? [] : drafts();
     const v = cur.doc && docView(cur.doc, cur.state);
     let say = '';
     const ok = cur.engine === 'ok';
@@ -801,13 +826,15 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     live.textContent = say;
     body.replaceChildren(pane(v, h));
     refocus(focusId);
+    // After the open card is back (a microtask) and focus with it.
+    if (kept.length) queueMicrotask(() => queueMicrotask(() => restore(kept)));
   }
   draw();
 
   return {
     get theme() { return theme; }, // the gate's report: { checked, rejected: [{ token, measured, floor, fallback }] }
     /** Take the pane down: its theme watchers go, and so does what it drew. */
-    destroy() { unwatch(); if (sized) sized.disconnect(); untips(); release(root); root.replaceChildren(); if (added) root.classList.remove('mq'); },
+    destroy() { unwatch(); if (sized) sized.disconnect(); untips(); release(root); root.replaceChildren(); root.classList.remove('mq-narrow'); if (added) root.classList.remove('mq'); },
     update({ linted: upTo, seq, ...next }) {
       // A lint that began before the one already shown is stale: keep the newer document.
       // `seq` orders lints that began at the same point in the log. A stale lint's

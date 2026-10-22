@@ -273,6 +273,7 @@
 /* The floor. Below this the kit tells the host it cannot lay out a card
    and renders the collapsed row only.                                      */
 .mq { min-width: 240px; }
+.mq.mq-narrow { min-width: 0; }   /* under the floor: rows only, in the room the host gave */
 
 /* ═══ 4 · SHAPES ══════════════════════════════════════════════════════ */
 /* Colour rides along; the shape carries the meaning, so a colour-blind
