@@ -355,6 +355,14 @@ function onEsc(e) {
  * closes on a click outside; kind 'window' sits beside the pane and stays
  * open while the person works. Neither is modal. Returns close().
  */
+/** Put a fixed overlay at viewport `x`, `y`. A `.mq` root is a container, and a
+ *  container holds its fixed children, so their origin is measured, not assumed. */
+function place(n, x, y) {
+  n.style.left = n.style.top = '0px';
+  const o = n.getBoundingClientRect();
+  n.style.left = `${x - o.left}px`; n.style.top = `${y - o.top}px`;
+}
+
 export function float(content, anchor, { kind = 'pop', onClose } = {}) {
   const root = anchor?.closest?.('.mq') || document.querySelector('.mq') || document.body;
   content.classList.add('mq-float', kind);
@@ -363,15 +371,13 @@ export function float(content, anchor, { kind = 'pop', onClose } = {}) {
   const r = anchor?.getBoundingClientRect?.();
   const vw = document.documentElement.clientWidth;
   if (kind === 'pop' && r) {
-    content.style.top = `${Math.min(r.bottom + 6, innerHeight - content.offsetHeight - 8)}px`;
-    content.style.left = `${Math.max(8, Math.min(r.left, vw - content.offsetWidth - 8))}px`;
+    place(content, Math.max(8, Math.min(r.left, vw - content.offsetWidth - 8)), Math.min(r.bottom + 6, innerHeight - content.offsetHeight - 8));
   } else {
     // Beside the pane where there's room; over the page where there isn't. Never over the pane.
     const pane = (anchor?.closest?.('.mq-pane') || root.querySelector('.mq-pane'))?.getBoundingClientRect();
-    content.style.top = '24px';
-    if (pane && pane.left - 32 >= 520) content.style.right = `${vw - pane.left + 16}px`;
-    else if (pane && vw - pane.right - 32 >= 520) content.style.left = `${pane.right + 16}px`;
-    else content.style.left = '16px';
+    const x = pane && pane.left - 32 >= 520 ? pane.left - 16 - content.offsetWidth
+      : pane && vw - pane.right - 32 >= 520 ? pane.right + 16 : 16;
+    place(content, x, 24);
   }
   const back = document.activeElement;
   const outside = (e) => { if (!content.contains(e.target) && e.target !== anchor) close(); };
@@ -416,8 +422,7 @@ export function tips(root, vocab, host = {}) {
     const vw = document.documentElement.clientWidth;
     // Below the marking, or above it when there's no room below.
     const vh = document.documentElement.clientHeight;
-    t.style.top = `${r.bottom + 6 + t.offsetHeight > vh - 8 ? Math.max(8, r.top - 6 - t.offsetHeight) : r.bottom + 6}px`;
-    t.style.left = `${Math.max(8, Math.min(tok.getBoundingClientRect().left, vw - t.offsetWidth - 8))}px`;
+    place(t, Math.max(8, Math.min(tok.getBoundingClientRect().left, vw - t.offsetWidth - 8)), r.bottom + 6 + t.offsetHeight > vh - 8 ? Math.max(8, r.top - 6 - t.offsetHeight) : r.bottom + 6);
     tok.setAttribute('aria-describedby', id);
     shown = { tok, t };
   };

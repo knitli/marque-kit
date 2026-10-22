@@ -18,6 +18,7 @@ export const PAIRS = [
   ['act-ink', 'surface', 4.5], ['act-on', 'act', 4.5], ['act-ink', 'act-tint', 4.5],
   ['attn-on', 'attn', 4.5], ['attn-ink', 'surface', 4.5], ['attn-ink', 'attn-tint', 4.5],
   ['error-ink', 'surface', 4.5], ['focus', 'surface', 3.0],
+  ['text', 'ground', 4.5], ['text-muted', 'ground', 4.5], // the pane's own headings sit on the ground
 ];
 export const SIZES = [['size-xs', 12], ['size-sm', 13]];
 /** The narrowest pane a card fits (docs/THEME.md); under it the kit shows rows only. */
@@ -79,14 +80,20 @@ function backdrop(root) {
 // root → the fallbacks check() set inline, with what the host had there, so a re-check can put it back
 const pinned = new WeakMap();
 
-/** Measure `root`'s tokens; fall back the host's where a pair fails.
- *  Run again when the theme changes: it lifts its own earlier fallbacks first. */
-export function check(root) {
-  if (!root?.isConnected) return null;
+/** Put back what the host had on `root` before check() pinned fallbacks there. */
+export function release(root) {
   for (const { t, ship, value, priority } of pinned.get(root) || []) {
     if (!same(root.style.getPropertyValue(t), ship)) continue; // the host has set it again since
     if (value) root.style.setProperty(t, value, priority); else root.style.removeProperty(t);
   }
+  pinned.delete(root);
+}
+
+/** Measure `root`'s tokens; fall back the host's where a pair fails.
+ *  Run again when the theme changes: it lifts its own earlier fallbacks first. */
+export function check(root) {
+  if (!root?.isConnected) return null;
+  release(root);
   pinned.set(root, []);
   const probe = document.createElement('span');
   probe.hidden = true;
@@ -112,10 +119,10 @@ export function check(root) {
   // A fallback can break a pair that passed before it, so the pairs run again until nothing moves.
   for (let pass = 0, moved = !forced; moved && pass < PAIRS.length; pass++) {
     moved = false;
-    const page = backdrop(root); // the ground is root's own background
     for (const [fg, bg, floor] of PAIRS) {
+      const page = backdrop(root); // the ground is root's own background
       const surface = over(read('surface'), page);
-      const back = bg === 'surface' ? surface : over(read(bg), surface); // the surface is composited once
+      const back = bg === 'ground' ? page : bg === 'surface' ? surface : over(read(bg), surface); // each layer composited once
       const m = ratio(over(read(fg), back), back);
       if (m >= floor) continue;
       // The host's token gives way; if both are the host's, both do.
@@ -147,9 +154,14 @@ export function watch(root, onTheme) {
   // A root mounted detached is checked once it's in the document.
   let done = root.isConnected;
   const run = () => onTheme(check(root));
+  // A root moved under another ancestor (removed and put back) may be under another theme.
+  let parent = root.parentElement;
   const mo = new MutationObserver((ms) => {
-    if (ms.some((m) => m.type === 'attributes')) run();
-    else if (!done && root.isConnected) { done = true; run(); }
+    if (!root.isConnected) return;
+    const moved = root.parentElement !== parent || ms.some((m) => [...m.addedNodes].some((n) => n === root || n.contains?.(root)));
+    if (moved && ro) { ro.disconnect(); ro.observe(root.parentElement || root); }
+    parent = root.parentElement;
+    if (ms.some((m) => m.type === 'attributes') || moved || !done) { done = true; run(); }
   });
   const mqs = ['(prefers-color-scheme: dark)', '(forced-colors: active)'].map((q) => matchMedia(q));
   mo.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-mq-theme'], childList: true });

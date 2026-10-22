@@ -35,7 +35,7 @@
 import { render as mark, settle } from './marking.js';
 import { empty, record, see, linted, snapshot, docView } from './state.js';
 import { cite, hasTip, tips } from './help.js';
-import { check, watch } from './theme.js';
+import { check, watch, release } from './theme.js';
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 const el = (tag, cls, text) => {
@@ -92,8 +92,14 @@ function visiblyChanged(f) {
 const edit = (e) => (e?.act === 'answered' || e?.act === 'changed') ? e : null;
 /** The person's decision on this finding: the act in force, or, once a lint has
  *  written it and nothing is asked again, the last one in the history. A stale
- *  view has no decision: the lint dropped the person's last one. */
-const decided = (f) => edit(f.person) || (!f.stale && f.needs_person === 'none' && !f.asks ? edit(f.history?.findLast((e) => edit(e))) : null);
+ *  view has no decision: the lint dropped the person's last one. Nor is a
+ *  written answer whose marking the engine has since moved off. */
+const holds = (e, f) => {
+  const r = e?.value?.reading?.result?.text ?? e?.value?.free;
+  const norm = (t) => t.replace(/\s+/g, ' ').trim();
+  return r == null || norm(r) === norm(f.outcome?.result?.text ?? '') ? e : null;
+};
+const decided = (f) => edit(f.person) || (!f.stale && f.needs_person === 'none' && !f.asks ? holds(edit(f.history?.findLast((e) => edit(e))), f) : null);
 const settled = (f) => decided(f)?.value != null;
 const wasAsked = (f) => !!f.asked || !!f.history?.some((e) => e.act === 'answered');
 const SHAPE = { quiet: '', noticeable: '', advisory: 'can-act', action: 'must-act', blocking: 'must-act' };
@@ -368,7 +374,8 @@ export function status(doc, host = {}) {
     s.append(el('span', 'mq-stamp', 'Not ready'), words(`${plural(doc.document.pending.length, 'answer', 'answers')} waiting to be written into the document`));
   } else if (GATE.has(host.moment)) {
     s.classList.add('must');
-    const n = doc.document.blocking.length;
+    // What the gate lists: blockers and the writes still waiting, once each.
+    const n = new Set([...doc.document.blocking, ...(doc.document.pending || [])]).size;
     s.append(el('span', 'mq-stamp attn', 'Blocked'), words(`${plural(n, 'thing has', 'things have')} to be settled before it can go out`));
   } else {
     if (g.must.length) { s.classList.add('must'); s.append(el('span', 'mq-stamp attn', `${g.must.length} needs you`)); }
@@ -533,6 +540,7 @@ export function artifact(a, host = {}) {
       dl.append(v);
     }
     c.append(dl);
+    if (a.applying && !a.derived_value && a.state !== 'present_not_required') c.append(el('p', 'mq-p', 'Waiting to be written into the document.'));
   }
   if (a.if_taken) {
     const dep = el('div', 'mq-dep');
@@ -756,7 +764,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   return {
     get theme() { return theme; }, // the gate's report: { checked, rejected: [{ token, measured, floor, fallback }] }
     /** Take the pane down: its theme watchers go, and so does what it drew. */
-    destroy() { unwatch(); root.replaceChildren(); if (added) root.classList.remove('mq'); },
+    destroy() { unwatch(); release(root); root.replaceChildren(); if (added) root.classList.remove('mq'); },
     update({ linted: upTo, seq, ...next }) {
       // A lint that began before the one already shown is stale: keep the newer document.
       // `seq` orders lints that began at the same point in the log.

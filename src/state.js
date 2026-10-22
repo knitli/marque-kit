@@ -198,7 +198,8 @@ function artifactView(a, state, took) {
     out = { ...out, fields, needs_person: open ? a.needs_person : 'none' };
   }
   const asked = (ops.length ? valid[valid.length - 1] : live(state, a.id))?.value;
-  if (asked?.apply || asked?.remove) out = { ...out, applying: true };
+  // A block the person has now filled in waits to be written, like an apply.
+  if (asked?.apply || asked?.remove || (ops.length && asked?.fields && out.needs_person === 'none')) out = { ...out, applying: true };
   return out;
 }
 

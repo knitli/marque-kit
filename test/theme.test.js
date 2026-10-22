@@ -24,7 +24,7 @@ const light = block('.mq, [data-mq-theme="light"] {');
 for (const [name, t] of [['light', light], ['dark', { ...light, ...block('[data-mq-theme="dark"] {') }]]) {
   for (const [fg, bg, floor] of PAIRS) {
     const surface = over(parse(t.surface), [255, 255, 255]);
-    const back = over(parse(t[bg]), surface);
+    const back = bg === 'ground' ? over(parse(t.ground), [255, 255, 255]) : over(parse(t[bg]), surface);
     const m = ratio(over(parse(t[fg]), back), back);
     assert.ok(m >= floor, `${name} ${fg} / ${bg} measured ${m.toFixed(2)}, floor ${floor}`);
   }

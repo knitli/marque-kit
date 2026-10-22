@@ -276,6 +276,14 @@ assert.equal(view(derivedCab, record(empty(), 'a-cab', 'answered', { fields: { d
   assert.equal(view({ ...cab, fields: rest }, s).stale, true);
   assert.equal(view({ ...cab, fields: { ...cab.fields, derived_from: { ...derived_from, hint: 'a source list' } } }, s).stale, true);
 }
+// A block filled in to the last field waits to be written; one still open doesn't yet.
+{
+  let s = record(empty(), 'a-cab', 'answered', { fields: { derived_from: 'Multiple Sources' } }, undefined, snapshot(cab));
+  assert.equal(view(cab, s).applying, undefined);
+  s = record(s, 'a-cab', 'answered', { fields: { declassify_on: '20490115' } }, undefined, snapshot(cab));
+  assert.equal(view(cab, s).applying, true);
+  assert.equal(view(cab, linted(s)).applying, undefined);
+}
 // A stale later field leaves an earlier one that still holds: shown, and still waiting to be written.
 {
   let s = record(empty(), 'a-cab', 'answered', { fields: { derived_from: 'Multiple Sources' } }, undefined, snapshot(cab));
