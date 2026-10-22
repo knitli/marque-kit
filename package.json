@@ -1,9 +1,21 @@
 {
   "name": "@marque/kit",
   "version": "0.1.0",
+  "private": true,
   "description": "Marque UI kit: the finding card, decision prompt, pane, inline marks and the theme layer. Plain CSS and ES modules; no framework.",
   "license": "SEE LICENSE IN LICENSE.md",
-  "private": true,
+  "author": "Knitli Inc.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/knitli/marque-kit.git"
+  },
+  "files": [
+    "src",
+    "docs",
+    "fixtures",
+    "LICENSE.md",
+    "README.md"
+  ],
   "type": "module",
   "exports": {
     ".": "./src/render.js",
@@ -13,12 +25,20 @@
     "./theme.css": "./src/theme.css",
     "./kit.css": "./src/kit.css"
   },
-  "files": ["src", "docs", "fixtures", "LICENSE.md", "README.md"],
   "scripts": {
-    "demo": "python3 -m http.server 8765",
-    "check": "node --check src/marking.js && node --check src/render.js && node --check src/state.js && node --check src/help.js && node test/marking.test.js && node test/state.test.js && node test/help.test.js"
+    "demo": "vp dev",
+    "dev": "vp dev",
+    "check": "vp check",
+    "fix": "vp check --fix",
+    "fmt": "vp fmt --write"
   },
-  "repository": { "type": "git", "url": "https://github.com/knitli/marque-kit.git" },
-  "author": "Knitli Inc.",
-  "engines": { "node": ">=20" }
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": "^26"
+  },
+  "packageManager": "pnpm@12.14.0"
 }
