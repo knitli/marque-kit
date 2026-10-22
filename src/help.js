@@ -141,7 +141,8 @@ export function why(f, host = {}, rung = null) {
   } else if ((rung === 'noticeable' || rung === 'quiet') && f.marking?.as_written && f.person?.value == null && !f.overridden) {
     // Only Marque's own fix can be overridden: never a person's answer, and never a mark nobody wrote.
     const k = el('div', 'mq-keep');
-    k.append(button('ghost', 'Keep it as written', () => host.onAct?.(f, 'kept_as_written')), ' Marque still reports it in the audit.');
+    // Recorded once: the popover closes, so the button can't record it again.
+    k.append(button('ghost', 'Keep it as written', () => { host.onAct?.(f, 'kept_as_written'); p.dispatchEvent(new Event('mq-close', { bubbles: true })); }), ' Marque still reports it in the audit.');
     p.append(k);
   }
   return p;
@@ -369,6 +370,7 @@ export function float(content, anchor, { kind = 'pop', onClose } = {}) {
   const back = document.activeElement;
   const outside = (e) => { if (!content.contains(e.target) && e.target !== anchor) close(); };
   const entry = { close };
+  content.addEventListener('mq-close', close); // content asks to close itself after an act
   function close() {
     const i = stack.indexOf(entry); if (i < 0) return;
     stack.splice(i, 1);

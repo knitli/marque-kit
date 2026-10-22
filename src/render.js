@@ -416,11 +416,11 @@ export function pane(doc, host = {}) {
 
   if (host.readOnly) {
     // The host's state, not Marque's. Findings still show; a reader needs them too.
-    const waiting = doc.findings.filter((f) => f.outcome?.kind === 'applied').length;
+    const waiting = doc.document.pending?.length || 0; // acts the host hasn't written, not Marque's own fixes
     const ro = el('div', 'mq-engine');
     const body = el('div', 'mq-txt');
     body.append(el('div', 'mq-h', 'This document is read-only.'),
-      el('p', 'mq-p', `Marque can show what it found but can't change the document. ${waiting ? `${plural(waiting, 'fix is', 'fixes are')} waiting; ` : ''}answers you give are kept for when it can be edited.`));
+      el('p', 'mq-p', `Marque can show what it found but can't change the document. ${waiting ? `${plural(waiting, 'answer is', 'answers are')} waiting; answers` : 'Answers'} you give are kept for when it can be edited.`));
     ro.append(body); p.append(ro);
   }
 
@@ -610,9 +610,11 @@ export function receipt(doc, session = {}) {
     if (f.outcome?.result) b.append(mark(f.outcome.result, { size: 'xs', state: 'changed' }));
     ln.append(b); r.append(ln);
   }
-  for (const a of doc.document.artifacts.filter((x) => x.history?.length)) {
+  // Every artifact, card or not: present and absent-not-required ones live only here.
+  for (const a of doc.document.artifacts) {
     const ln = el('div', 'ln');
-    ln.append(el('span', 't', where(a)), el('div', 'b', `${a.kind} · ${acts(a)}`));
+    const did = acts(a);
+    ln.append(el('span', 't', where(a)), el('div', 'b', `${a.kind} · ${a.state.replace(/_/g, ' ')}${did ? ` · ${did}` : ''}`));
     r.append(ln);
   }
   // Acts on findings a later lint withdrew stay in the audit.
@@ -654,7 +656,7 @@ export function receipt(doc, session = {}) {
  */
 export function mount(root, { doc = null, state = empty(), moment = 'editing', engine = 'ok', readOnly = false, ...host } = {}) {
   const cur = { doc, state, moment, engine, readOnly, open: null, seq: null };
-  let said = null;
+  let said = null, unseen = false;
   const live = el('div', 'mq-sr'); live.setAttribute('aria-live', 'polite');
   const body = el('div');
   root.replaceChildren(body, live);
@@ -668,11 +670,11 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     get open() { return cur.open; },
     onOpen(f) {
       cur.open = f?.id ?? null;
-      // Opening it is seeing it. Recorded now, drawn next time, so rows never move under the pointer.
+      // Opening it is seeing it. Recorded now and drawn when the row closes, so rows never move under the pointer.
       if (f) {
         const s = see(cur.state, f);
-        if (s !== cur.state) { cur.state = s; host.onChange?.(s, null); }
-      }
+        if (s !== cur.state) { cur.state = s; unseen = true; host.onChange?.(s, null); }
+      } else if (unseen) { unseen = false; queueMicrotask(() => draw()); }
       host.onOpen?.(f);
     },
     onAct(f, act, value = null) {
