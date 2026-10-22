@@ -142,7 +142,7 @@ export function why(f, host = {}, rung = null) {
   if (f.says.caveat) p.append(el('p', 'mq-p', f.says.caveat));
   if (rung === 'advisory' && f.outcome?.kind === 'chosen_over' && f.outcome.readings?.length) {
     p.append(el('p', 'mq-keep', 'Both readings are ones you wrote. Choosing between them is yours, and neither is recorded as an override. Keeping the marking as written, with neither, is an override and is reported.'));
-  } else if ((rung === 'noticeable' || rung === 'quiet') && f.marking?.as_written && !answered(f) && !f.overridden) {
+  } else if ((rung === 'noticeable' || rung === 'quiet') && f.outcome?.kind === 'applied' && f.marking?.as_written && !answered(f) && !f.overridden) {
     // Only Marque's own fix can be overridden: never a person's answer, and never a mark nobody wrote.
     const k = el('div', 'mq-keep');
     // Recorded once: the popover closes first, so the button can't record it again

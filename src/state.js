@@ -204,7 +204,8 @@ function overlay(f, state, took) {
     }
     case 'kept_as_written':
       // The person kept one marking against one fix; a different one under the same id is open again.
-      if (e.about && ((e.about.rule ?? null) !== ruleOf(f) || e.about.as_written !== (f.marking?.as_written?.text ?? null) || e.about.result !== (f.outcome?.result?.text ?? null))) return { ...v, person: null, stale: true };
+      if (e.about && ((e.about.rule ?? null) !== ruleOf(f) || e.about.as_written !== (f.marking?.as_written?.text ?? null) || e.about.result !== (f.outcome?.result?.text ?? null)
+        || ('anchor' in e.about && place(e.about.anchor) !== place(f.anchor)))) return { ...v, person: null, stale: true };
       return { ...v, overridden: true, outcome: { ...f.outcome, kind: 'kept_as_written', result: f.marking?.as_written, readings: [] }, needs_person: 'none', blocks: 'never' };
     default: { // deferred, declined: still open, as the question a pending take-back reopened if there is one
       const on = answeredOn(state, f, e);

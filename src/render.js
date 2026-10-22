@@ -295,8 +295,8 @@ export function card(f, host = {}) {
   if (settled(f)) foot.append(button('ghost', wasAsked(f) ? 'Change my answer' : 'Undo', () => host.onAct?.(f, 'changed', null)));
   else if (f.overridden) foot.append(button('ghost', 'Fix it after all', () => host.onAct?.(f, 'changed', null)));
   // No Undo on a fix the person must own; an override is recorded, not hidden.
-  // An available fix isn't applied yet: leaving it is the default, so there's nothing to keep.
-  else if ((r === 'noticeable' || r === 'advisory') && f.outcome?.kind !== 'available') foot.append(button('ghost', 'Keep as written', () => host.onAct?.(f, 'kept_as_written')));
+  // Only a fix Marque made or chose can be kept against: an available one isn't applied, a withheld one is none.
+  else if ((r === 'noticeable' || r === 'advisory') && ['applied', 'chosen_over'].includes(f.outcome?.kind)) foot.append(button('ghost', 'Keep as written', () => host.onAct?.(f, 'kept_as_written')));
   // Available: Marque has the fix and the person applies it (CONTRACT: available → apply); the host writes it.
   if (f.outcome?.kind === 'available' && f.outcome.result && !settled(f) && !f.overridden && !host.readOnly) {
     const acts = el('div', 'mq-acts');
@@ -908,6 +908,8 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     }
     // Never leave an old announcement behind for someone to find later.
     live.textContent = say;
+    // A popover opened on the last draw acts on the findings it was drawn from: it goes with them.
+    closeWithin(root);
     body.replaceChildren(pane(v, h));
     if (host.vocab) relabel(body, host.vocab); // this pane's own vocabulary
     refocus(focusId);

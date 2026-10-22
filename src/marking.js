@@ -72,9 +72,26 @@ export function parse(text) {
  *  into { text, layers:[{tokens:[{t, help?}]}], masks:[] }. */
 export function normalise(marking) {
   if (typeof marking === 'string') return parse(marking);
-  if (marking && marking.layers) return marking;
-  if (marking && marking.text) return parse(marking.text);
+  if (marking && marking.layers) return conceal(marking);
+  if (marking && marking.text) return conceal({ ...parse(marking.text), masks: marking.masks || [] });
   throw new TypeError('marking must be a string or {text, layers}');
+}
+
+/** A mask given as a span ([start, end) in `text`) covers bytes the tokens may still carry: those
+ *  tokens go, in what is drawn, said and copied, and the mask is drawn in their layer instead. */
+function conceal(m) {
+  const spans = (m.masks || []).filter((k) => Array.isArray(k.span));
+  if (!spans.length) return m;
+  const hit = (s, e) => spans.filter((k) => k.span[0] < e && s < k.span[1]);
+  const masks = m.masks.map((k) => ({ ...k, ...(Array.isArray(k.span) && { len: k.len ?? k.span[1] - k.span[0] }) }));
+  let at = 0;
+  const layers = m.layers.map((l, li) => ({ ...l, tokens: l.tokens.filter(({ t }) => {
+    const over = hit(at, (at += t.length));
+    for (const k of over) { const i = m.masks.indexOf(k); masks[i].layer ??= li; }
+    return !over.length;
+  }) }));
+  const text = [...spans].sort((a, b) => b.span[0] - a.span[0]).reduce((t, k) => t.slice(0, k.span[0]) + t.slice(k.span[1]), m.text);
+  return { ...m, text, layers, masks };
 }
 
 function el(tag, cls, text) {

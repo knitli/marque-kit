@@ -30,4 +30,8 @@ const toks = tokens(layers(long)[1]);
 assert.equal(toks.filter((t) => /^[A-Z]{3},? ?\)?$/.test(t)).length, 25, '25 codes');
 assert.equal(layers(long).join(''), long, 'round-trips');
 assert.equal(spoken('(S//REL TO USA, GBR)'), 'S, REL TO, U-S-A, G-B-R');
+// A concealed span the tokens still carry is never said: only that a source is concealed.
+const hidden = { text: '(S//FGI AUS//NF)', layers: [{ tokens: [{ t: '(S' }] }, { tokens: [{ t: '//FGI ' }, { t: 'AUS' }] }, { tokens: [{ t: '//NF)' }] }], masks: [{ kind: 'concealed', span: [8, 11] }] };
+assert.equal(spoken(hidden).includes('A-U-S'), false, 'concealed code not spoken');
+assert.equal(spoken(hidden), 'S, F-G-I, NF, source concealed');
 console.log(`ok · ${cases.length + 1} markings`);

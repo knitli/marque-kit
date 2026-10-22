@@ -445,4 +445,12 @@ for (const act of ['deferred', 'declined']) {
   assert.equal(view(masked, s).seen, false);
 }
 
+// An override on one paragraph doesn't carry to another under the same id.
+{
+  const p2 = f(P2);
+  const s = record(empty(), p2.id, 'kept_as_written', null, undefined, snapshot(p2));
+  assert.equal(view(p2, s).overridden, true);
+  assert.equal(view({ ...p2, anchor: { ...p2.anchor, portion: 5 } }, s).stale, true);
+}
+
 console.log('state: ok');

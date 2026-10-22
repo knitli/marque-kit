@@ -208,6 +208,7 @@ export function watch(root, onTheme) {
   // A root moved under another ancestor (removed and put back) may be under another theme.
   let parent = root.parentElement;
   // shortcut: rules changed through the CSSOM (insertRule, adoptedStyleSheets) aren't seen; a host that does so re-mounts.
+  const links = new Set(); // linked sheets still loading, so unwatch can let them go
   const sheet = (n) => n.nodeName === 'STYLE' || (n.nodeName === 'LINK' && /\bstylesheet\b/i.test(n.rel));
   const mo = new MutationObserver((ms) => {
     if (!root.isConnected) return;
@@ -216,7 +217,7 @@ export function watch(root, onTheme) {
     parent = root.parentElement;
     const themed = ms.some((m) => m.type === 'attributes' && m.attributeName === 'data-mq-theme');
     // A stylesheet put in, taken out or rewritten can set tokens; a linked one is checked once it loads.
-    for (const m of ms) for (const n of m.addedNodes) if (n.nodeName === 'LINK') n.addEventListener('load', loaded, { once: true });
+    for (const m of ms) for (const n of m.addedNodes) if (n.nodeName === 'LINK') { links.add(n); n.addEventListener('load', loaded, { once: true }); }
     const styled = ms.some((m) => (m.type === 'childList' && ([...m.addedNodes, ...m.removedNodes].some(sheet) || m.target.nodeName === 'STYLE'))
       || (m.type === 'characterData' && m.target.parentNode?.nodeName === 'STYLE'));
     if (themed || styled || moved || !done || sig() !== last) { done = true; run(); }
@@ -252,5 +253,6 @@ export function watch(root, onTheme) {
     mo.disconnect(); mqs.forEach((q) => q.removeEventListener('change', run)); if (ro) ro.disconnect();
     removeEventListener('beforeprint', printing); removeEventListener('afterprint', printed);
     live = false; if (fonts) fonts.removeEventListener('loadingdone', loaded);
+    for (const n of links) n.removeEventListener('load', loaded); links.clear();
   };
 }
