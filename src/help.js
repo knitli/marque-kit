@@ -429,6 +429,7 @@ export function tips(root, vocab, host = {}) {
   const hide = () => { clearTimeout(timer); if (shown) { shown.tok.removeAttribute('aria-describedby'); shown.t.remove(); shown = null; } };
   const show = (tok) => {
     hide();
+    if (!root.contains(tok)) return; // redrawn while the tip waited: nothing to point at
     const t = tip(tok.dataset.help, vocab); if (!t) return;
     t.id = id; t.classList.add('mq-float');
     // Inside the token's landmark, so a screen reader finds it where the token is.
