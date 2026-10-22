@@ -79,7 +79,8 @@ export function check(root) {
     if (fallback) { root.style.setProperty(`--mq-${t}`, ship[`--mq-${t}`]); pinned.get(root).push(`--mq-${t}`); }
   };
   for (const [fg, bg, floor] of PAIRS) {
-    const surface = over(read('surface'), [255, 255, 255]);
+    // A translucent surface sits on the ground, and the ground on the page.
+    const surface = over(read('surface'), over(read('ground'), [255, 255, 255]));
     const back = over(read(bg), surface);
     const m = ratio(over(read(fg), back), back);
     if (m >= floor) continue;
@@ -88,14 +89,24 @@ export function check(root) {
     for (const t of own.length ? own : [fg]) fall(t, m, floor);
   }
   for (const [t, floor] of SIZES) { const m = px(t); if (m < floor) fall(t, m, floor); }
+  // The mark font must be monospace: narrow and wide letters measure the same (1.0).
+  probe.className = 'mq-mark';
+  const ctx = document.createElement('canvas').getContext('2d');
+  if (ctx) {
+    ctx.font = `16px ${getComputedStyle(probe).fontFamily}`;
+    const m = ctx.measureText('iiiiii').width / ctx.measureText('MMMMMM').width;
+    if (Math.abs(1 - m) > 0.02) fall('font-mark', m, 1);
+  }
   probe.remove();
   for (const r of rejected) console.warn(`Marque theme: ${r.token} measured ${r.measured}, floor ${r.floor}; ${r.fallback ? 'shipped value used' : 'no shipped value could be read to fall back to'}`);
-  return { checked: PAIRS.length + SIZES.length, rejected };
+  return { checked: PAIRS.length + SIZES.length + 1, rejected };
 }
 
 /** Re-check whenever the theme can change: data-mq-theme anywhere above, or the scheme `auto` follows. */
 export function watch(root, onTheme) {
   const run = () => onTheme(check(root));
-  new MutationObserver(run).observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-mq-theme'] });
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', run);
+  const mo = new MutationObserver(run), mq = matchMedia('(prefers-color-scheme: dark)');
+  mo.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-mq-theme'] });
+  mq.addEventListener('change', run);
+  return () => { mo.disconnect(); mq.removeEventListener('change', run); };
 }

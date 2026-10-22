@@ -39,7 +39,8 @@ export const empty = () => ({ log: [], seen: [] });
 /** Append one act. Returns a new state; the old one is untouched. */
 export function record(state, id, act, value = null, at = new Date().toISOString(), about = undefined) {
   if (!ACTS.includes(act)) throw new Error(`Unknown act "${act}"; expected one of ${ACTS.join(', ')}`);
-  return { ...state, log: [...state.log, { id, act, value, at, ...(about && { about }) }] };
+  // The log owns its values: a host editing its document in place can't rewrite an act.
+  return { ...state, log: [...state.log, { id, act, value: value == null ? value : structuredClone(value), at, ...(about && { about }) }] };
 }
 
 /** What an act is about, kept with it: markings, rule and place, never body text. */
@@ -96,10 +97,12 @@ export const linted = (state, n = state.log.length) => ({ ...state, linted: Math
 /** The finding isn't the one the act was taken on: another marking or question under the same id. */
 const moved = (e, f) => !!e.about
   // The whole question, not only its words: a new field type or format changes what an answer means.
-  && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || JSON.stringify(e.about.asks ?? null) !== JSON.stringify(f.asks ?? null));
+  && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || JSON.stringify(e.about.asks ?? null) !== JSON.stringify(f.asks ?? null)
+    || e.about.result !== (f.outcome?.result?.text ?? null));
 const stale = (e, f) => moved(e, f)
   // A reading picked is stale once the finding no longer offers it.
-  || (!!e.value?.reading && !(f.outcome?.readings || []).some((r) => r.result?.text === e.value.reading.result?.text));
+  // The whole reading, not only its marking: what it asserts is what gets applied and audited.
+  || (!!e.value?.reading && !(f.outcome?.readings || []).some((r) => JSON.stringify(r) === JSON.stringify(e.value.reading)));
 /** An artifact op is stale once the artifact isn't the one it was taken on. */
 const staleOp = (e, a) => !!e.about && (e.about.state !== a.state || e.about.result !== (a.derived_value?.text ?? null)
   // A typed field is stale once the field is gone or asks for something else; its state and value are the overlay's.

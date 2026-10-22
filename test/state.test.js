@@ -277,4 +277,28 @@ assert.equal(view(derivedCab, record(empty(), 'a-cab', 'answered', { fields: { d
   assert.equal(view({ ...cab, fields: { ...cab.fields, derived_from: { ...derived_from, hint: 'a source list' } } }, s).stale, true);
 }
 
+// A reading whose label or assertions changed under the same marking is a different reading.
+{
+  const r0 = f(P3).outcome.readings[0];
+  const s = record(empty(), P3, 'answered', { reading: r0, index: 0 }, undefined, snapshot(f(P3)));
+  const now = { ...f(P3), outcome: { ...f(P3).outcome, readings: [{ ...r0, asserts: { ...r0.asserts, owners: ['AUS'] } }, ...f(P3).outcome.readings.slice(1)] } };
+  assert.equal(view(now, s).stale, true);
+}
+// A take-back of a written answer is stale once the engine's result moved, too.
+{
+  let s = record(empty(), P3, 'answered', { reading: f(P3).outcome.readings[0], index: 0 }, undefined, snapshot(f(P3)));
+  s = linted(s);
+  const written = { ...f(P3), asks: null, needs_person: 'none', blocks: 'never', outcome: { ...f(P3).outcome, result: f(P3).outcome.readings[0].result } };
+  s = record(s, P3, 'changed', null, undefined, snapshot(written));
+  assert.equal(view(written, s).stale, undefined);
+  assert.equal(view({ ...written, outcome: { ...written.outcome, result: { text: '(S//NF)' } } }, s).stale, true);
+}
+// The log owns its values.
+{
+  const reading = structuredClone(f(P3).outcome.readings[0]);
+  const s = record(empty(), P3, 'answered', { reading, index: 0 });
+  reading.reading = 'edited in place';
+  assert.notEqual(s.log[0].value.reading.reading, 'edited in place');
+}
+
 console.log('state: ok');

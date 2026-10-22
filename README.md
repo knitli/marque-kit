@@ -49,6 +49,7 @@ import { mount } from '@marque/kit';
 const p = mount(el, { doc, state, vocab, moment: 'editing', onChange: (state, act) => save(state), onHelp, onJump });
 p.update({ doc });              // after a re-lint; async hosts add { linted: n, seq }
 p.update({ moment: 'finalize' }); // the host's moment; the kit never guesses it
+p.destroy();                    // when the pane goes away
 ```
 
 `act` is null when only the seen list changed. An answer shows on its card at once but stays in `document.pending`, and the document is not ready, until the host applies it, re-lints and calls `p.update({ doc })`. `@marque/kit/help` has what a host needs to answer `onHelp` and `onLookup`. At mount the kit measures the host's `--mq-*` tokens against the contrast and size floors (`@marque/kit/theme`); a failing token falls back to the shipped value, and the report is `p.theme` and `onTheme(report)`.

@@ -675,7 +675,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   root.replaceChildren(body, live);
   let theme = check(root); // before the first draw, so a failing host token never shows
   host.onTheme?.(theme);
-  if (typeof MutationObserver !== 'undefined') watch(root, (r) => { theme = r; host.onTheme?.(r); });
+  const unwatch = typeof MutationObserver !== 'undefined' ? watch(root, (r) => { theme = r; host.onTheme?.(r); }) : () => {};
   if (host.vocab) tips(body, host.vocab, host);
 
   const h = {
@@ -737,7 +737,9 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   draw();
 
   return {
-    get theme() { return theme; }, // the gate's report: { checked, rejected: [{ token, measured, floor }] }
+    get theme() { return theme; }, // the gate's report: { checked, rejected: [{ token, measured, floor, fallback }] }
+    /** Take the pane down: its theme watchers go, and so does what it drew. */
+    destroy() { unwatch(); root.replaceChildren(); },
     update({ linted: upTo, seq, ...next }) {
       // A lint that began before the one already shown is stale: keep the newer document.
       // `seq` orders lints that began at the same point in the log.
