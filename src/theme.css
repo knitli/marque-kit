@@ -391,10 +391,8 @@
    theme.rejected[{token, measured, floor}], and that token falls back to
    the shipped value for the active theme. The finding renders either way;
    it never renders unreadable.
-     text / surface ................ 4.5     attn-on / attn .............. 4.5
-     text-muted / surface .......... 4.5     attn-ink / surface .......... 4.5
-     act-ink / surface ............. 4.5     attn-ink / attn-tint ........ 4.5
-     act-on / act .................. 4.5     error-ink / surface ......... 4.5
-     act-ink / act-tint ............ 4.5     focus / surface ............. 3.0
-   Font floors: size-xs ≥ 12px, size-sm ≥ 13px; the mark font resolves to
-   a monospace or falls back to one. Width floor: the kit root ≥ 240px.    */
+   The pairs are PAIRS in src/theme.js: text 4.5, lines and focus 3.0.
+   test/theme.test.js reads this file and kit.css and fails on any pairing
+   they paint that is neither measured there nor excused with a reason.
+   Font floors: size-xs ≥ 12px, size-sm and size-md ≥ 13px; the mark font
+   resolves to a monospace or falls back to one. Width floor: 240px.       */

@@ -76,7 +76,7 @@ Banner derived: `SECRET//FGI AUS GBR//NOFORN`, or `…//REL TO USA, GBR` if ¶5'
 ## Working here
 
 - `npm run check` before a commit (syntax + the parser test). `npm run demo` to look.
-- Check contrast when a token changes: the pairs and floors are listed at the bottom of `src/theme.css` (`mq.theme.check`). AA 4.5 on text pairs, 3.0 on focus.
+- Check contrast when a token changes: the pairs and floors are `PAIRS` and `SIZES` in `src/theme.js`. AA 4.5 on text pairs, 3.0 on lines and focus. `test/theme.test.js` fails when `kit.css` or `theme.css` paints a pairing that isn't measured there or excused in the test with a reason; a new colour use means deciding which.
 - The docs under `docs/` were extracted from the canvas on 21 Oct 2026 and are now the source. Edit them here; the canvas is history.
 - Engine gaps go to marque-dev as issues, labelled `ui-kit` (+ `engine`, `audit`, `office`, `capco/ism` as they apply), and get a row in `docs/ENGINE-ASKS.md`. The Linear triage agent assigns cluster and lineage.
 - Commits and PRs end with the attribution lines the session provides.

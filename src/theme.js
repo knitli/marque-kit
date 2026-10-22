@@ -12,7 +12,8 @@
  * Shipped values are read from theme.css itself, so no colour lives here.
  */
 
-// [foreground, background, floor]; a tint is laid over the surface first.
+// [foreground, background, floor]; a tint is laid over the surface first. test/theme.test.js
+// checks this against what kit.css and theme.css paint: a pairing is measured here or excused there.
 export const PAIRS = [
   ['text', 'surface', 4.5], ['text-muted', 'surface', 4.5], ['surface', 'text', 4.5], // the tooltip turns them round
   ['act-ink', 'surface', 4.5], ['act-on', 'act', 4.5], ['act-on', 'act-hover', 4.5], ['act-ink', 'act-tint', 4.5], ['text', 'act-tint', 4.5], ['text-muted', 'act-tint', 4.5], // options and rows, hovered or chosen
@@ -22,6 +23,9 @@ export const PAIRS = [
   ['text', 'ground', 4.5], ['text-muted', 'ground', 4.5], ['act-ink', 'ground', 4.5], // the pane's headings, footer links and section marks sit on the ground
   ['text', 'surface-sunken', 4.5], ['text-muted', 'surface-sunken', 4.5], ['act-ink', 'surface-sunken', 4.5], // open rows, wells, notices
   ['rule-strong', 'surface', 3.0], ['rule-strong', 'ground', 3.0], // borders on cards and on the pane itself: non-text parts
+  ['rule-strong', 'surface-sunken', 3.0], // buttons in a well
+  ['focus', 'surface-sunken', 3.0], ['focus', 'act-tint', 3.0], ['focus', 'attn-tint', 3.0], // a focus ring wherever a control can be
+  ['act-ink', 'attn-tint', 4.5], // a link-coloured marking with a highlighted layer
 ];
 export const SIZES = [['size-xs', 12], ['size-sm', 13], ['size-md', 13]]; // md carries banner markings
 /** The narrowest pane a card fits (docs/THEME.md); under it the kit shows rows only. */
