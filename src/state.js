@@ -52,6 +52,8 @@ export const snapshot = (f) => structuredClone({ // a record, not a view of a do
   ...(f.marking?.as_written && { marking: f.marking.as_written }),
   // A typed derived value (a notice's content) isn't text: kept whole, so an apply is of this one.
   ...(f.derived_value && typeof f.derived_value.text !== 'string' && { content: canon(f.derived_value) }),
+  // Where an artifact goes: an apply was approved for this place.
+  ...(f.kind && { placement: f.placement ?? null, scope: f.scope ?? null }),
   // What taking the act back restores: Marque's own words, never body text.
   ...(f.outcome && { outcome: { kind: f.outcome.kind, result: f.outcome.result, readings: f.outcome.readings } }),
   ...(f.asks && { asks: f.asks }), needs_person: f.needs_person, blocks: f.blocks,
@@ -128,6 +130,7 @@ function answeredOn(state, f, e) {
 /** An artifact op is stale once the artifact isn't the one it was taken on. */
 const staleOp = (e, a) => !!e.about && (e.about.state !== a.state || e.about.result !== (a.derived_value?.text ?? null)
   || (e.about.content ?? null) !== (a.derived_value && typeof a.derived_value.text !== 'string' ? canon(a.derived_value) : null)
+  || ('placement' in e.about && (e.about.placement !== (a.placement ?? null) || e.about.scope !== (a.scope ?? null)))
   // A typed field is stale once the field is gone or asks for something else; its state and value are the overlay's.
   || Object.keys(e.value?.fields || {}).some((k) => !a.fields?.[k] || (e.about.fields?.[k] && schema(e.about.fields[k]) !== schema(a.fields[k]))));
 const schema = ({ state, value, source, ...fl }) => canon(fl);

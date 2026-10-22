@@ -75,8 +75,8 @@ const p = mount($('#pane'), {
   vocab,
   onLookup(anchor) { openLookup(anchor); },
   onChange(s, act) {
-    if (!act) return; // only the seen list moved
-    if (!$('#ro').checked) p.update({ doc: relint(s) }); // read-only: answers wait
+    // Only the seen list moved: nothing to relint, but the page's marks follow the pane.
+    if (act && !$('#ro').checked) p.update({ doc: relint(s) }); // read-only: answers wait
     draw();
   },
   onHelp(req) { help(req); },

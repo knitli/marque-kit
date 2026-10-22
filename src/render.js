@@ -34,7 +34,7 @@
 
 import { render as mark, settle, resettle, relabel } from './marking.js';
 import { empty, record, see, linted, snapshot, docView, decision, canon } from './state.js';
-import { cite, hasTip, tips } from './help.js';
+import { cite, hasTip, tips, closeWithin } from './help.js';
 import { check, watch, release } from './theme.js';
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
@@ -56,6 +56,18 @@ const NAME = { front_marking: 'Banner', authority_block: 'Authority block' };
 const page = (f) => (f.anchor?.kind === 'page' ? f.anchor.page : null);
 const where = (f) => f.anchor?.portion ? `¶${f.anchor.portion}` : page(f) != null ? `p${page(f)}` : SHORT[f.kind] || (f.scope === 'document' || f.anchor?.kind === 'document' ? 'DOC' : '—');
 const spokenWhere = (f) => f.anchor?.portion ? `Paragraph ${f.anchor.portion}` : page(f) != null ? `Page ${page(f)}` : NAME[f.kind] || 'The document';
+/** Field formats the kit can check, by the name a format string uses; one it doesn't know is the engine's to judge. */
+const FORMATS = {
+  YYYYMMDD: (t) => /^\d{8}$/.test(t) && +t.slice(4, 6) >= 1 && +t.slice(4, 6) <= 12 && +t.slice(6) >= 1 && +t.slice(6) <= 31,
+  event: (t) => /[A-Za-z]/.test(t) && /\S\s+\S/.test(t), // an event is described in words, not one token
+  '25X#/50X#/75X#': (t) => /^(25|50|75)X\d+(-[A-Z]+)?$/.test(t),
+};
+/** Does `t` fit a format such as "YYYYMMDD | event | 25X#/50X#/75X#"? Any one alternative will do. */
+const fits = (format, t) => {
+  if (!format) return true;
+  const alts = format.split('|').map((s) => s.trim());
+  return alts.some((f) => (FORMATS[f] ? FORMATS[f](t) : true));
+};
 /** A marking-valued artifact; a notice may carry typed content instead, which isn't one. */
 const isMarking = (v) => typeof v === 'string' || typeof v?.text === 'string';
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
@@ -573,11 +585,18 @@ export function artifact(a, host = {}) {
       const inp = el('input', 'mono'); inp.type = 'text'; inp.id = `${a.id}-${k}-${++uid}`; inp.dataset.draft = `${a.id}:${k}`;
       key.id = `${inp.id}-k`; inp.setAttribute('aria-labelledby', key.id);
       inp.placeholder = fld.format || ''; inp.defaultValue = fld.value || '';
-      const fill = () => { const t = inp.value.trim(); if (t && t !== fld.value) host.onAct?.(a, 'answered', { fields: { [k]: t } }); };
+      const err = el('span', 'err'); err.id = `${inp.id}-err`; err.setAttribute('role', 'alert'); inp.setAttribute('aria-describedby', err.id);
+      const fill = () => {
+        const t = inp.value.trim();
+        if (!t || t === fld.value) return;
+        // A declared format is checked before the value is recorded; the field stays open until it fits.
+        if (!fits(fld.format, t)) { v.classList.add('bad'); err.textContent = `That doesn’t fit this field. Use: ${fld.format.split('|').map((s) => s.trim()).join(', or ')}.`; inp.focus(); return; }
+        host.onAct?.(a, 'answered', { fields: { [k]: t } });
+      };
       inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); fill(); } });
       v.append(inp);
       if (fld.hint) v.append(el('span', 'hint', fld.hint));
-      v.append(button('ghost', 'Fill in', fill));
+      v.append(button('ghost', 'Fill in', fill), err);
       return v;
     };
     for (const [k, fld] of Object.entries(a.fields)) {
@@ -633,7 +652,8 @@ export function gate(doc, host = {}) {
     const pend = new Set(doc.document.pending || []);
     const will = doc.document.artifacts.filter((a) => pend.has(a.id) || due(a));
     // What the person decided and still stands; one they took back is the receipt's to show.
-    const answered = doc.findings.filter((f) => pend.has(f.id) || decision(f)?.value != null);
+    // Overrides too: the last look says which markings will be reported as kept.
+    const answered = doc.findings.filter((f) => pend.has(f.id) || decision(f)?.value != null || f.overridden);
     const stuck = unwritable(doc, host);
     g.append(el('h3', 'mq-q', n ? `Waiting for ${plural(n, 'answer', 'answers')} to be written into the document.`
       : stuck ? `Not ready. The document is read-only, so ${plural(stuck, 'thing', 'things')} can't be written into it.`
@@ -683,9 +703,11 @@ export function receipt(doc, session = {}) {
   // A reading by its words and its marking: two readings can write the same marking.
   const said = (v) => (v?.reading ? `${v.reading.result?.text ?? ''} (${v.reading.reading})`.trim() : null) ?? v?.free
     ?? (v?.fields ? Object.entries(v.fields).map(([k, t]) => `${k.replace(/_/g, ' ')} ${t}`).join(', ') : '');
+  // Typed notice content by its identity, so the receipt says which version was approved.
+  const content = (c) => { try { return Object.entries(JSON.parse(c)).map(([k, v]) => `${k.replace(/_/g, ' ')} ${v}`).join(', '); } catch { return c; } };
   const op = (e) => (e.act === 'changed' && e.value == null ? 'back to Marque\u2019s result'
     : e.act === 'kept_as_written' ? (e.about?.result ? `instead of ${e.about.result}` : '')
-    : e.value?.apply ? `apply${e.about?.result ? ` ${e.about.result}` : ''}` : e.value?.remove ? 'remove' : said(e.value));
+    : e.value?.apply ? `apply${e.about?.result ? ` ${e.about.result}` : e.about?.content ? ` ${content(e.about.content)}` : ''}` : e.value?.remove ? 'remove' : said(e.value));
   // An act taken on another rule or marking under this id says which, from its own snapshot.
   const about = (e, x) => {
     const rule = x.rule ? `${x.rule.scheme}:${x.rule.predicate}` : x.kind;
@@ -892,7 +914,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   return {
     get theme() { return theme; }, // the gate's report: { checked, rejected: [{ token, measured, floor, fallback }] }
     /** Take the pane down: its theme watchers go, and so does what it drew. */
-    destroy() { dead = true; unwatch(); if (sized) sized.disconnect(); untips(); release(root); root.replaceChildren(); root.classList.remove('mq-narrow', 'mq-mount'); if (added) root.classList.remove('mq'); if (mirrors) root.removeAttribute('data-mq-theme'); },
+    destroy() { dead = true; closeWithin(root); unwatch(); if (sized) sized.disconnect(); untips(); release(root); root.replaceChildren(); root.classList.remove('mq-narrow', 'mq-mount'); if (added) root.classList.remove('mq'); if (mirrors) root.removeAttribute('data-mq-theme'); },
     update({ linted: upTo, seq, ...next }) {
       // A lint that began before the one already shown is stale: keep the newer document.
       // `seq` orders lints that began at the same point in the log. A stale lint's

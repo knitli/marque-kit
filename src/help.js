@@ -379,6 +379,11 @@ function place(n, x, y) {
   n.style.left = `${x - o.left}px`; n.style.top = `${y - o.top}px`;
 }
 
+/** Close every overlay inside `node`, through its own close path: a mount being destroyed takes its overlays with it. */
+export function closeWithin(node) {
+  for (const e of [...stack].reverse()) if (node.contains(e.content)) e.close();
+}
+
 export function float(content, anchor, { kind = 'pop', onClose } = {}) {
   // The pane's own mount first, so its overlays go when it does; then the kit root.
   const root = anchor?.closest?.('.mq-mount, .mq') || document.querySelector('.mq') || document.body;
@@ -399,7 +404,7 @@ export function float(content, anchor, { kind = 'pop', onClose } = {}) {
   }
   const back = document.activeElement;
   const outside = (e) => { if (!content.contains(e.target) && e.target !== anchor) close(); };
-  const entry = { close };
+  const entry = { close, content };
   content.addEventListener('mq-close', close); // content asks to close itself after an act
   function close() {
     const i = stack.indexOf(entry); if (i < 0) return;
