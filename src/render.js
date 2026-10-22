@@ -134,7 +134,8 @@ function asks(f, host, r, help) {
   const err = el('div', 'err'); err.id = `${name}-err`; err.setAttribute('role', 'alert');
   const commit = () => {
     if (chosen) return host.onAct?.(f, 'answered', chosen);
-    fld.classList.add('bad'); err.textContent = 'Pick one reading, or "not my call".';
+    fld.classList.add('bad');
+    err.textContent = form.querySelector('input[type=radio]') ? 'Pick one reading, type an answer, or "not my call".' : 'Type an answer, or "not my call".';
     (form.querySelector('input[type=radio]') || free).focus();
   };
   const clear = () => { fld.classList.remove('bad'); err.textContent = ''; };

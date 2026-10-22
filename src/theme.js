@@ -91,7 +91,7 @@ export function check(root) {
   for (const [fg, bg, floor] of PAIRS) {
     // A translucent surface sits on the ground, and the ground on the page.
     const surface = over(read('surface'), over(read('ground'), [255, 255, 255]));
-    const back = over(read(bg), surface);
+    const back = bg === 'surface' ? surface : over(read(bg), surface); // the surface is composited once
     const m = ratio(over(read(fg), back), back);
     if (m >= floor) continue;
     // The host's token gives way; if both are the host's, both do.

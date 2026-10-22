@@ -313,4 +313,35 @@ assert.equal(view(derivedCab, record(empty(), 'a-cab', 'answered', { fields: { d
   assert.equal(d.findings.find((x) => x.id === P2).stale, undefined);
 }
 
+// A choice from the question's own options holds: ¶4 lists them in asks.options, not outcome.readings.
+{
+  const o = f(P4).asks.options[0];
+  const s = record(empty(), P4, 'answered', { reading: o, index: 0 }, undefined, snapshot(f(P4)));
+  assert.equal(view(f(P4), s).needs_person, 'none');
+  assert.deepEqual(docView(doc, s).document.pending, [P4]);
+}
+// "Change my answer" doesn't need a round trip: an answer to the reopened question holds while the take-back waits.
+{
+  let s = record(empty(), P3, 'answered', { reading: f(P3).outcome.readings[0], index: 0 }, undefined, snapshot(f(P3)));
+  s = linted(s);
+  const written = { ...f(P3), asks: null, needs_person: 'none', blocks: 'never', outcome: { ...f(P3).outcome, result: f(P3).outcome.readings[0].result } };
+  s = record(s, P3, 'changed', null, undefined, snapshot(written));
+  const reopened = view(written, s);
+  assert.equal(reopened.asks.text, f(P3).asks.text);
+  s = record(s, P3, 'answered', { reading: reopened.outcome.readings[1], index: 1 }, undefined, snapshot(reopened));
+  const now = view(written, s);
+  assert.equal(now.stale, undefined);
+  assert.equal(now.outcome.result.text, f(P3).outcome.readings[1].result.text);
+}
+// A stale answer moves no artifact: the banner keeps its own value.
+{
+  const r0 = f(P5).outcome.readings[0];
+  const s = record(empty(), P5, 'changed', { reading: r0, index: 0 }, undefined, snapshot(f(P5)));
+  const ban = (d) => d.document.artifacts.find((a) => a.id === 'a-banner').derived_value.text;
+  const base = ban(doc);
+  assert.notEqual(ban(docView(doc, s)), base);
+  const moved = { ...f(P5), outcome: { ...f(P5).outcome, readings: [{ ...r0, reading: 'something else' }] } };
+  assert.equal(ban(docView({ ...doc, findings: doc.findings.map((x) => (x.id === P5 ? moved : x)) }, s)), base);
+}
+
 console.log('state: ok');

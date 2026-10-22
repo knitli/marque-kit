@@ -100,9 +100,19 @@ const moved = (e, f) => !!e.about
   && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || JSON.stringify(e.about.asks ?? null) !== JSON.stringify(f.asks ?? null)
     || e.about.result !== (f.outcome?.result?.text ?? null));
 const stale = (e, f) => moved(e, f)
-  // A reading picked is stale once the finding no longer offers it.
+  // A reading picked is stale once the finding no longer offers it, from the readings or the question's own options.
   // The whole reading, not only its marking: what it asserts is what gets applied and audited.
-  || (!!e.value?.reading && !(f.outcome?.readings || []).some((r) => JSON.stringify(r) === JSON.stringify(e.value.reading)));
+  || (!!e.value?.reading && ![...(f.outcome?.readings || []), ...(Array.isArray(f.asks?.options) ? f.asks.options : [])]
+    .some((r) => JSON.stringify(r) === JSON.stringify(e.value.reading)));
+/** The finding as it was before a written act, from that act's snapshot. */
+const restore = (f, was) => ({ ...f, asks: was.asks ?? null, outcome: { ...f.outcome, ...was.outcome }, needs_person: was.needs_person, blocks: was.blocks });
+/** The finding the person answered: after a pending take-back of a written answer, the question it reopened. */
+function answeredOn(state, f, e) {
+  const h = history(state, f.id), prev = h[h.indexOf(e) - 1], n = state.linted ?? 0;
+  if (!prev || !edits(prev) || prev.value != null || state.log.lastIndexOf(prev) < n) return f;
+  const back = state.log.slice(0, n).findLast((x) => x.id === f.id && (settled(x) || x.act === 'kept_as_written'));
+  return back?.about?.outcome ? restore(f, back.about) : f;
+}
 /** An artifact op is stale once the artifact isn't the one it was taken on. */
 const staleOp = (e, a) => !!e.about && (e.about.state !== a.state || e.about.result !== (a.derived_value?.text ?? null)
   // A typed field is stale once the field is gone or asks for something else; its state and value are the overlay's.
@@ -110,23 +120,24 @@ const staleOp = (e, a) => !!e.about && (e.about.state !== a.state || e.about.res
 const schema = ({ state, value, source, ...fl }) => JSON.stringify(fl);
 
 /** One finding or artifact as it stands with the person's acts on it. */
-export function view(f, state) {
-  const v = overlay(f, state);
+export function view(f, state, took) {
+  const v = overlay(f, state, took);
   // Seen is of the result shown: a new one the person put there hasn't been looked at yet.
   return v.seen && shown(v) !== shown(f) ? { ...v, seen: wasSeen(state, v) } : v;
 }
 
-function overlay(f, state) {
+function overlay(f, state, took) {
   // `person` is the act still in force; `history` keeps every act for the audit.
   const e = live(state, f.id);
   const v = { ...f, seen: !!f.seen || wasSeen(state, f), person: e, history: history(state, f.id) };
-  if (f.kind) return artifactView(v, state);
+  if (f.kind) return artifactView(v, state, took);
   if (!e) return v;
   switch (e.act) {
     case 'answered':
     case 'changed': {
       // An answer taken on a different marking or question doesn't carry over: the finding is open again.
-      if (e.value != null && stale(e, f)) return { ...v, person: null, stale: true };
+      const on = e.value != null ? answeredOn(state, f, e) : f;
+      if (e.value != null && stale(e, on)) return { ...v, person: null, stale: true };
       if (e.value == null) {
         // Back to Marque's own result. Taking back one a lint already wrote reopens
         // the finding as it was before that act, question and readings included.
@@ -136,12 +147,12 @@ function overlay(f, state) {
         if (back && moved(back.act === 'kept_as_written' ? back : e, f)) return { ...v, person: null, stale: true };
         const was = back?.about;
         if (!was?.outcome) return v;
-        return { ...v, asks: was.asks ?? null, outcome: { ...f.outcome, ...was.outcome }, needs_person: was.needs_person, blocks: was.blocks };
+        return restore(v, was);
       }
       // A typed answer is a marking only when the question asks for one; prose waits for the re-lint.
-      const result = e.value.reading?.result ?? (f.asks?.field?.type === 'marking' ? { text: e.value.free } : f.outcome?.result);
+      const result = e.value.reading?.result ?? (on.asks?.field?.type === 'marking' ? { text: e.value.free } : on.outcome?.result);
       // The kind stays the engine's: the answer is generated until the host applies it.
-      return { ...v, asked: f.asks, outcome: { ...f.outcome, result, fallback: undefined }, asks: null, needs_person: 'none', blocks: 'never' };
+      return { ...v, asked: on.asks, outcome: { ...on.outcome, result, fallback: undefined }, asks: null, needs_person: 'none', blocks: 'never' };
     }
     case 'kept_as_written':
       // The person kept one marking against one fix; a different one under the same id is open again.
@@ -152,11 +163,12 @@ function overlay(f, state) {
   }
 }
 
-function artifactView(a, state) {
+function artifactView(a, state, took) {
   let out = a;
   // A banner moves with the alternatives taken, so the ops below are checked against the value shown.
   if (a.if_taken) {
-    const taken = Object.keys(a.if_taken).filter((fid) => settled(live(state, fid)));
+    // `took`: the findings whose answer still holds (docView passes the checked views); a stale answer moves nothing.
+    const taken = Object.keys(a.if_taken).filter((fid) => (took ? took.has(fid) : settled(live(state, fid))));
     if (taken.length) {
       const rest = Object.fromEntries(Object.entries(a.if_taken).filter(([fid]) => !taken.includes(fid)));
       out = { ...out, derived_value: a.if_taken[taken[taken.length - 1]], if_taken: Object.keys(rest).length ? rest : null };
@@ -191,7 +203,8 @@ function artifactView(a, state) {
  */
 export function docView(doc, state) {
   const findings = doc.findings.map((f) => view(f, state));
-  const artifacts = doc.document.artifacts.map((a) => view(a, state));
+  const took = new Set(findings.filter((x) => settled(x.person)).map((x) => x.id));
+  const artifacts = doc.document.artifacts.map((a) => view(a, state, took));
   const all = new Map([...findings, ...artifacts].map((x) => [x.id, x]));
   const blocking = doc.document.blocking.filter((id) => all.get(id)?.needs_person !== 'none');
   // Every write since the lint waits for it, blocker or not: an alternative taken moves the banner too.
