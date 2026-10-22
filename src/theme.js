@@ -19,6 +19,7 @@ export const PAIRS = [
   ['attn-on', 'attn', 4.5], ['attn-ink', 'surface', 4.5], ['attn-ink', 'attn-tint', 4.5],
   ['error-ink', 'surface', 4.5], ['focus', 'surface', 3.0],
   ['text', 'ground', 4.5], ['text-muted', 'ground', 4.5], // the pane's own headings sit on the ground
+  ['text', 'surface-sunken', 4.5], ['text-muted', 'surface-sunken', 4.5], // open rows, wells, notices
 ];
 export const SIZES = [['size-xs', 12], ['size-sm', 13]];
 /** The narrowest pane a card fits (docs/THEME.md); under it the kit shows rows only. */
@@ -106,12 +107,14 @@ export function check(root) {
   const fall = (t, measured, floor) => {
     const token = `--mq-${t}`;
     // fallback: false when theme.css couldn't be read (another origin without CORS): reported, not fixed.
-    const fallback = host(t);
-    if (!rejected.some((r) => r.token === token)) rejected.push({ token, measured: Math.round(measured * 100) / 100, floor, fallback });
+    let fallback = host(t);
     if (fallback) {
       pinned.get(root).push({ t: token, ship: ship[token], value: root.style.getPropertyValue(token), priority: root.style.getPropertyPriority(token) });
-      root.style.setProperty(token, ship[token]);
+      // Important, so a host rule marked !important gives way too; checked, not assumed.
+      root.style.setProperty(token, ship[token], 'important');
+      fallback = !host(t);
     }
+    if (!rejected.some((r) => r.token === token)) rejected.push({ token, measured: Math.round(measured * 100) / 100, floor, fallback });
     return fallback;
   };
   // Forced colours: the user's system palette is in force, and it isn't the host's to fail or ours to replace.

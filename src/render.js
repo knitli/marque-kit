@@ -95,7 +95,8 @@ const edit = (e) => (e?.act === 'answered' || e?.act === 'changed') ? e : null;
  *  view has no decision: the lint dropped the person's last one. Nor is a
  *  written answer whose marking the engine has since moved off. */
 const holds = (e, f) => {
-  const r = e?.value?.reading?.result?.text ?? e?.value?.free;
+  // A prose answer becomes a marking only once the engine derives one; only a typed marking compares.
+  const r = e?.value?.reading?.result?.text ?? (e?.about?.asks?.field?.type === 'marking' ? e.value.free : null);
   const norm = (t) => t.replace(/\s+/g, ' ').trim();
   return r == null || norm(r) === norm(f.outcome?.result?.text ?? '') ? e : null;
 };
@@ -184,7 +185,7 @@ function asks(f, host, r, help) {
   acts.append(button('attn', 'Answer', commit));
   // Blocking is the same card with defer removed (docs/DERIVATION.md).
   if (r !== 'blocking' && f.deferred !== 'deferred') acts.append(button('ghost', 'Ask me at finalize', () => host.onAct?.(f, 'deferred')));
-  acts.append(button('ghost', 'Not my call', () => host.onAct?.(f, 'declined')));
+  if (f.deferred !== 'declined') acts.append(button('ghost', 'Not my call', () => host.onAct?.(f, 'declined')));
   form.append(acts);
   return form;
 }
@@ -417,7 +418,9 @@ export function pane(doc, host = {}) {
   p.append(head);
 
   const down = host.engine && host.engine !== 'ok';
-  if (down || !doc) {
+  // Still checking with results in: they show as they arrive, under the checking notice.
+  const partial = host.engine === 'checking' && !!doc;
+  if (!partial && (down || !doc)) {
     head.append(el('span', `mq-stamp ${host.engine === 'failed' ? '' : 'quiet'}`.trim(),
       { checking: 'Checking', failed: 'Stopped' }[host.engine] || 'Not checked'));
     p.append(status(null, host), engineState(host));
@@ -426,10 +429,11 @@ export function pane(doc, host = {}) {
 
   const g = sections(doc, host.moment);
   const atGate = GATE.has(host.moment);
-  head.append(g.must.length
-    ? el('span', 'mq-stamp attn', atGate ? 'Blocked' : `${g.must.length} needs you`)
+  head.append(partial ? el('span', 'mq-stamp quiet', 'Checking')
+    : g.must.length ? el('span', 'mq-stamp attn', atGate ? 'Blocked' : `${g.must.length} needs you`)
     : el('span', 'mq-stamp', doc.document.ready ? 'Ready' : 'Not ready'));
   p.append(status(doc, host));
+  if (partial) p.append(engineState(host));
 
   if (host.readOnly) {
     // The host's state, not Marque's. Findings still show; a reader needs them too.
