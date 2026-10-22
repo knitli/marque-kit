@@ -106,7 +106,7 @@ function stampOf(f, r, moment) {
   if (f.overridden) return ['quiet', 'Reported'];
   if (settled(f)) return ['quiet', wasAsked(f) ? 'Answered' : 'Changed'];
   if (r === 'blocking') return ['attn', f.blocks === 'now' ? 'Blocks now' : moment === 'send' ? 'Blocks sending' : 'Blocks finalize'];
-  if (r === 'action' && f.deferred) return ['quiet', f.deferred === 'declined' ? 'Not my call' : 'At finalize'];
+  if ((r === 'action' || r === 'advisory') && f.deferred) return ['quiet', f.deferred === 'declined' ? 'Not my call' : 'At finalize'];
   if (waits(f, moment)) return ['quiet', 'At finalize'];
   return STAMP[r];
 }
@@ -325,7 +325,8 @@ export function sections(doc, moment = 'editing') {
     const r = rung(f, moment);
     if (r === 'blocking') g.must.push(f);
     // "Not my call" routes the question; it stays Action required for whoever gets it.
-    else if (waits(f, moment) || (r === 'action' && f.deferred === 'deferred')) g.later.push(f);
+    // Deferred, Advisory or Action required, it waits for finalize, where it blocks.
+    else if (waits(f, moment) || ((r === 'action' || r === 'advisory') && f.deferred === 'deferred')) g.later.push(f);
     else if (r === 'action') g.must.push(f);
     else if (r === 'advisory') g.can.push(f);
     else g.done.push(f);
@@ -626,7 +627,8 @@ export function receipt(doc, session = {}) {
   hd.append(el('span', null, `MARQUE · ${session.schema || 'audit'}`), el('span', 'who', session.classifier_id || 'classifier id not set'));
   r.append(hd);
   // Each act with what was said and when, so a changed answer keeps the one it replaced.
-  const said = (v) => v?.reading?.result?.text ?? v?.free
+  // A reading by its words and its marking: two readings can write the same marking.
+  const said = (v) => (v?.reading ? `${v.reading.result?.text ?? ''} (${v.reading.reading})`.trim() : null) ?? v?.free
     ?? (v?.fields ? Object.entries(v.fields).map(([k, t]) => `${k.replace(/_/g, ' ')} ${t}`).join(', ') : '');
   const op = (e) => (e.act === 'changed' && e.value == null ? 'back to Marque\u2019s result'
     : e.act === 'kept_as_written' ? (e.about?.result ? `instead of ${e.about.result}` : '')

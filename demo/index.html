@@ -63,9 +63,12 @@ const dec = new TextDecoder();
 const strip = ({ person, history, applying, ...x }) => (applying ? { ...x, state: x.state === 'present_not_required' ? 'absent_not_required' : 'present' } : x);
 // A written answer is applied, as the engine would report it.
 const written = (x) => (x.asked ? { ...strip(x), outcome: { ...x.outcome, kind: 'applied' } } : strip(x));
+// Each lint starts from the document as the last one left it, as a real re-lint reads the edited file.
+let applied = doc;
 const relint = (s) => {
-  const v = docView(doc, { ...s, linted: 0 });
-  return { ...v, findings: v.findings.map(written), document: { ...v.document, artifacts: v.document.artifacts.map(strip), pending: [] } };
+  const v = docView(applied, s);
+  applied = { ...v, findings: v.findings.map(written), document: { ...v.document, artifacts: v.document.artifacts.map(strip), pending: [], withdrawn: [] } };
+  return applied;
 };
 const p = mount($('#pane'), {
   doc,
