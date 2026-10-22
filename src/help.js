@@ -121,6 +121,10 @@ export function explain(code, vocab, host = {}) {
   return p;
 }
 
+/** The person's own answer stands on this finding, live or already written. */
+const answered = (f) => f.person?.value != null
+  || f.history?.findLast((e) => e.act === 'answered' || e.act === 'changed')?.value != null;
+
 /** Tier 2 for a finding: the rule in plain words, the manual's sentence, the
  *  citation with a way in, and only then what overriding costs, if it can be. */
 export function why(f, host = {}, rung = null) {
@@ -138,7 +142,7 @@ export function why(f, host = {}, rung = null) {
   if (f.says.caveat) p.append(el('p', 'mq-p', f.says.caveat));
   if (rung === 'advisory' && f.outcome?.kind === 'chosen_over' && f.outcome.readings?.length) {
     p.append(el('p', 'mq-keep', 'Both readings are ones you wrote. Choosing between them is yours, and neither is recorded as an override.'));
-  } else if ((rung === 'noticeable' || rung === 'quiet') && f.marking?.as_written && f.person?.value == null && !f.overridden) {
+  } else if ((rung === 'noticeable' || rung === 'quiet') && f.marking?.as_written && !answered(f) && !f.overridden) {
     // Only Marque's own fix can be overridden: never a person's answer, and never a mark nobody wrote.
     const k = el('div', 'mq-keep');
     // Recorded once: the popover closes, so the button can't record it again.
@@ -422,10 +426,15 @@ export function tips(root, vocab, host = {}) {
   const key = (e) => {
     const t = tokOf(e); if (!t) return;
     if (e.key === 'Escape' && shown) { e.stopPropagation(); hide(); }
-    if (e.key === 'Enter') { e.preventDefault(); hide(); host.onHelp?.({ kind: 'token', code: t.dataset.help, anchor: t }); }
+    if (e.key === 'Enter') { e.preventDefault(); deeper(t); }
+  };
+  // Countries and groups are tier 1 only: activating one keeps its tooltip rather than asking for nothing.
+  const deeper = (t) => {
+    if (entry(vocab, t.dataset.help)?.kind !== 'marking') return show(t);
+    hide(); host.onHelp?.({ kind: 'token', code: t.dataset.help, anchor: t });
   };
   // A token inside a reading's label opens help, never picks the reading.
-  const click = (e) => { const t = tokOf(e); if (t) { e.preventDefault(); e.stopPropagation(); hide(); host.onHelp?.({ kind: 'token', code: t.dataset.help, anchor: t }); } };
+  const click = (e) => { const t = tokOf(e); if (t) { e.preventDefault(); e.stopPropagation(); deeper(t); } };
   const on = [['pointerover', over], ['pointerout', out], ['focusin', focus], ['focusout', out], ['keydown', key], ['click', click]];
   on.forEach(([k, fn]) => root.addEventListener(k, fn));
   return () => { hide(); on.forEach(([k, fn]) => root.removeEventListener(k, fn)); };

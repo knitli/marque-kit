@@ -433,7 +433,7 @@ export function pane(doc, host = {}) {
     if (!list.length) continue;
     const sec = el('section', `mq-section ${k}`);
     const sh = el('div', 'mq-section-head');
-    const id = `mq-sec-${k}`;
+    const id = `mq-sec-${k}-${++uid}`;
     const title = el('span', 'mq-label', TITLES[k]); title.id = id;
     sh.append(title, el('span', 'mq-count-pill', String(list.length)));
     sec.setAttribute('aria-labelledby', id);
@@ -551,8 +551,10 @@ export function gate(doc, host = {}) {
   if (!ids.length) {
     // Still the last look before it goes out: what will be written, and what the person answered.
     const n = doc.document.pending?.length;
-    const will = doc.document.artifacts.filter((a) => (a.state === 'absent_but_required' && a.derived_value) || a.history?.length);
-    const answered = doc.findings.filter((f) => f.history?.some((e) => e.value != null));
+    // What still has to be written: pending acts, and a derived artifact nobody has written. Done acts are not future writes.
+    const pend = new Set(doc.document.pending || []);
+    const will = doc.document.artifacts.filter((a) => pend.has(a.id) || (a.state === 'absent_but_required' && a.derived_value && a.fixability === 'fixable'));
+    const answered = doc.findings.filter((f) => pend.has(f.id) || f.history?.some((e) => e.value != null));
     g.append(el('h3', 'mq-q', n ? `Waiting for ${plural(n, 'answer', 'answers')} to be written into the document.`
       : will.length ? `Ready. ${plural(will.length, 'thing', 'things')} will be applied as it goes out.` : 'Ready to finalize.'));
     will.forEach((a) => g.append(artifact(a, h)));
@@ -598,6 +600,7 @@ export function receipt(doc, session = {}) {
   const said = (v) => v?.reading?.result?.text ?? v?.free
     ?? (v?.fields ? Object.entries(v.fields).map(([k, t]) => `${k.replace(/_/g, ' ')} ${t}`).join(', ') : '');
   const op = (e) => (e.act === 'changed' && e.value == null ? 'back to Marque\u2019s result'
+    : e.act === 'kept_as_written' ? (e.about?.result ? `instead of ${e.about.result}` : '')
     : e.value?.apply ? 'apply' : e.value?.remove ? 'remove' : said(e.value));
   const acts = (x) => (x.history || []).map((e) => [e.act.replace(/_/g, ' '), op(e), e.at].filter(Boolean).join(' ')).join(' → ');
   for (const f of doc.findings) {

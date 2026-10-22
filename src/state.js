@@ -43,7 +43,7 @@ export function record(state, id, act, value = null, at = new Date().toISOString
 }
 
 /** What an act is about, kept with it: markings, rule and place, never body text. */
-export const snapshot = (f) => ({
+export const snapshot = (f) => structuredClone({ // a record, not a view of a document that may change in place
   rule: f.rule ? `${f.rule.scheme}:${f.rule.predicate}` : f.kind, anchor: f.anchor, kind: f.kind,
   as_written: f.marking?.as_written?.text ?? null, result: f.outcome?.result?.text ?? f.derived_value?.text ?? null,
   // What taking the act back restores: Marque's own words, never body text.
@@ -92,6 +92,9 @@ function reversed(state, id) {
 /** The host re-linted: the first `n` acts are in the new findings. Never moves back. */
 export const linted = (state, n = state.log.length) => ({ ...state, linted: Math.max(state.linted ?? 0, Math.min(n, state.log.length)) });
 
+const stale = (e, f) => !!e.about
+  && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || (e.about.asks?.text ?? null) !== (f.asks?.text ?? null));
+
 /** One finding or artifact as it stands with the person's acts on it. */
 export function view(f, state) {
   // `person` is the act still in force; `history` keeps every act for the audit.
@@ -102,6 +105,8 @@ export function view(f, state) {
   switch (e.act) {
     case 'answered':
     case 'changed': {
+      // An answer taken on a different marking or question doesn't carry over: the finding is open again.
+      if (e.value != null && stale(e, f)) return { ...v, person: null, stale: true };
       if (e.value == null) {
         // Back to Marque's own result. Taking back one a lint already wrote reopens
         // the finding as it was before that act, question and readings included.
@@ -163,7 +168,7 @@ export function docView(doc, state) {
   const blocking = doc.document.blocking.filter((id) => all.get(id)?.needs_person !== 'none');
   // Every write since the lint waits for it, blocker or not: an alternative taken moves the banner too.
   // A write to a finding the lint withdrew has nowhere to go; its acts stay in `withdrawn`.
-  const pending = [...new Set(since(state).map((e) => e.id))].filter((id) => all.has(id) && writes(state, id));
+  const pending = [...new Set(since(state).map((e) => e.id))].filter((id) => all.has(id) && !all.get(id).stale && writes(state, id));
   const withdrawn = [...new Set(state.log.map((e) => e.id))].filter((id) => !all.has(id))
     .map((id) => ({ id, about: history(state, id).findLast((e) => e.about)?.about, history: history(state, id) }));
   return { ...doc, findings, document: { ...doc.document, artifacts, blocking, pending, withdrawn, ready: !blocking.length && !pending.length } };

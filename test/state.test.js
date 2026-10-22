@@ -196,6 +196,15 @@ const gone = docView({ ...doc, findings: doc.findings.filter((x) => x.id !== P3)
 assert.deepEqual(gone.document.pending, []);
 assert.equal(gone.document.withdrawn[0].id, P3);
 
+// An answer taken on a different question under the same id doesn't carry over.
+s = record(empty(), P3, 'answered', { reading, index: 0 }, 't', snapshot(f(P3)));
+const reworded = { ...f(P3), asks: { ...f(P3).asks, text: 'Who owns paragraph 3?' } };
+assert.equal(view(reworded, s).needs_person, 'required');
+assert.deepEqual(docView({ ...doc, findings: doc.findings.map((x) => x.id === P3 ? reworded : x) }, s).document.pending, []);
+// A snapshot is a copy.
+const src = structuredClone(f(P3)); const snap = snapshot(src); src.asks.text = 'changed in place';
+assert.equal(snap.asks.text, f(P3).asks.text);
+
 // A withdrawn finding keeps what it was about.
 s = record(empty(), P3, 'declined', null, 't', snapshot(f(P3)));
 const w = docView({ ...doc, findings: doc.findings.filter((x) => x.id !== P3) }, s).document.withdrawn[0];
