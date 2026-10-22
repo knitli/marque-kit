@@ -172,7 +172,7 @@ function asks(f, host, r, help) {
   fs.append(el('legend', null, a.text));
   options.forEach((o, i) => {
     const lab = el('label', 'mq-opt');
-    const inp = el('input'); inp.type = 'radio'; inp.name = name; inp.value = String(i); inp.dataset.draft = `${f.id}:reading`;
+    const inp = el('input'); inp.type = 'radio'; inp.name = name; inp.value = String(i); inp.dataset.draft = `${f.id}:reading`; inp.dataset.asked = canon(a); // a draft is for this question only
     inp.dataset.reading = canon(o); // a draft is the reading itself, not its place in the list
     inp.addEventListener('change', () => { chosen = { reading: o, index: i }; free.value = ''; clear(); });
     const txt = el('div', 'mq-txt');
@@ -186,7 +186,7 @@ function asks(f, host, r, help) {
   const fld = el('div', 'mq-field');
   const lab = el('label', null, a.field?.type === 'marking' ? 'Or type the marking' : 'Or type your answer');
   lab.htmlFor = `${name}-free`;
-  const free = el('input', 'mono'); free.id = `${name}-free`; free.type = 'text'; free.dataset.draft = `${f.id}:free`;
+  const free = el('input', 'mono'); free.id = `${name}-free`; free.type = 'text'; free.dataset.draft = `${f.id}:free`; free.dataset.asked = canon(a);
   free.placeholder = a.field?.hint || 'Type an answer';
   free.addEventListener('input', () => {
     const t = free.value.trim();
@@ -586,7 +586,7 @@ export function artifact(a, host = {}) {
     // A field a person fills: labelled by its key, committed on Enter or Fill in.
     const entry = (k, fld, key) => {
       const v = el('span', 'v blank mq-field');
-      const inp = el('input', 'mono'); inp.type = 'text'; inp.id = `${a.id}-${k}-${++uid}`; inp.dataset.draft = `${a.id}:${k}`;
+      const inp = el('input', 'mono'); inp.type = 'text'; inp.id = `${a.id}-${k}-${++uid}`; inp.dataset.draft = `${a.id}:${k}`; inp.dataset.asked = canon(fld); // and this field as given
       key.id = `${inp.id}-k`; inp.setAttribute('aria-labelledby', key.id);
       inp.placeholder = fld.format || ''; inp.defaultValue = fld.value || '';
       const err = el('span', 'err'); err.id = `${inp.id}-err`; err.setAttribute('role', 'alert'); inp.setAttribute('aria-describedby', err.id);
@@ -615,7 +615,7 @@ export function artifact(a, host = {}) {
       // Read-only too: the correction waits with the other answers.
       if (has) {
         const change = button('ghost', 'Change', () => { const n = entry(k, fld, key); v.replaceWith(n); const i = n.querySelector('input'); i.dataset.opened = '1'; i.focus(); });
-        change.dataset.change = `${a.id}:${k}`;
+        change.dataset.change = `${a.id}:${k}`; change.dataset.asked = canon(fld);
         v.append(' ', change);
       }
       dl.append(v);
@@ -877,13 +877,13 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     .filter((x) => !acting || !x.dataset.draft.startsWith(`${acting}:`))
     // An opened correction counts as soon as it's open, typed in or not.
     .filter((x) => (x.type === 'radio' ? x.checked : x.dataset.opened || (x.value.trim() && x.value !== x.defaultValue)))
-    .map((x) => ({ key: x.dataset.draft, value: x.type === 'radio' ? x.dataset.reading : x.value, radio: x.type === 'radio', focused: x === document.activeElement }));
+    .map((x) => ({ key: x.dataset.draft, asked: x.dataset.asked, value: x.type === 'radio' ? x.dataset.reading : x.value, radio: x.type === 'radio', focused: x === document.activeElement }));
   function restore(list) {
-    const find = (d) => [...body.querySelectorAll('[data-draft]')].find((x) => x.dataset.draft === d.key && (d.radio ? x.type === 'radio' && x.dataset.reading === d.value : x.type !== 'radio'));
+    const find = (d) => [...body.querySelectorAll('[data-draft]')].find((x) => x.dataset.draft === d.key && x.dataset.asked === d.asked && (d.radio ? x.type === 'radio' && x.dataset.reading === d.value : x.type !== 'radio'));
     for (const d of list) {
       let n = find(d);
       // A correction under way to a filled field: open it again for the person.
-      if (!n && !d.radio) { [...body.querySelectorAll('[data-change]')].find((x) => x.dataset.change === d.key)?.click(); n = find(d); }
+      if (!n && !d.radio) { [...body.querySelectorAll('[data-change]')].find((x) => x.dataset.change === d.key && x.dataset.asked === d.asked)?.click(); n = find(d); }
       if (!n) continue;
       if (d.radio) { n.checked = true; n.dispatchEvent(new Event('change')); } else { n.value = d.value; n.dispatchEvent(new Event('input')); }
       if (d.focused) n.focus();

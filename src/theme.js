@@ -104,17 +104,20 @@ function backdrop(root) {
   return layers.reduceRight((under, c) => over(c, under), [255, 255, 255, 1]);
 }
 
-/** The print palette theme.css sets (its @media print token block), by token. */
+/** The print palette theme.css sets (its @media print token block), by token. Only that block, the
+ *  first under its selector: a host's print rule is the host's, not a fallback. */
+const PRINT = norm('.mq, [data-mq-theme]');
 function printPalette() {
-  const out = {};
+  let block = null;
   const walk = (rules, inPrint) => {
     for (const r of rules) {
-      if (r.style && r.selectorText) { if (inPrint) for (const p of r.style) if (p.startsWith('--mq-')) out[p] = r.style.getPropertyValue(p).trim(); }
+      if (block) return;
+      if (r.style && r.selectorText) { if (inPrint && norm(r.selectorText) === PRINT) block = r; }
       else if (r.cssRules) walk(r.cssRules, inPrint || /\bprint\b/.test(r.media?.mediaText ?? ''));
     }
   };
   for (const sheet of document.styleSheets) { try { walk(sheet.cssRules, false); } catch { /* unreadable */ } }
-  return out;
+  return Object.fromEntries(block ? [...block.style].filter((p) => p.startsWith('--mq-')).map((p) => [p, block.style.getPropertyValue(p).trim()]) : []);
 }
 
 // root → the fallbacks check() set inline, with what the host had there, so a re-check can put it back
@@ -204,18 +207,24 @@ export function watch(root, onTheme) {
   const run = () => { onTheme(check(root)); last = sig(); };
   // A root moved under another ancestor (removed and put back) may be under another theme.
   let parent = root.parentElement;
+  // shortcut: rules changed through the CSSOM (insertRule, adoptedStyleSheets) aren't seen; a host that does so re-mounts.
+  const sheet = (n) => n.nodeName === 'STYLE' || (n.nodeName === 'LINK' && /\bstylesheet\b/i.test(n.rel));
   const mo = new MutationObserver((ms) => {
     if (!root.isConnected) return;
     const moved = root.parentElement !== parent || ms.some((m) => [...m.addedNodes].some((n) => n === root || n.contains?.(root)));
     if (moved) { narrow = under(); if (ro) { ro.disconnect(); ro.observe(root); if (root.parentElement) ro.observe(root.parentElement); } }
     parent = root.parentElement;
     const themed = ms.some((m) => m.type === 'attributes' && m.attributeName === 'data-mq-theme');
-    if (themed || moved || !done || sig() !== last) { done = true; run(); }
+    // A stylesheet put in, taken out or rewritten can set tokens; a linked one is checked once it loads.
+    for (const m of ms) for (const n of m.addedNodes) if (n.nodeName === 'LINK') n.addEventListener('load', loaded, { once: true });
+    const styled = ms.some((m) => (m.type === 'childList' && ([...m.addedNodes, ...m.removedNodes].some(sheet) || m.target.nodeName === 'STYLE'))
+      || (m.type === 'characterData' && m.target.parentNode?.nodeName === 'STYLE'));
+    if (themed || styled || moved || !done || sig() !== last) { done = true; run(); }
   });
   const mqs = ['(prefers-color-scheme: dark)', '(forced-colors: active)'].map((q) => matchMedia(q));
   // One registration (a second on the same node would replace the first); the signature sorts out
   // which class or style changes are on the root's own line.
-  mo.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-mq-theme', 'class', 'style'], childList: true });
+  mo.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-mq-theme', 'class', 'style'], childList: true, characterData: true });
   mqs.forEach((q) => q.addEventListener('change', run));
   // Print has its own black-on-white palette: the screen fallbacks step aside for it, then come back.
   // A rejected value stays out of print, the root's own or one inherited from above: each pinned token

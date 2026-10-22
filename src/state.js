@@ -134,9 +134,16 @@ function answeredOn(state, f, e) {
 const staleOp = (e, a) => !!e.about && (e.about.state !== a.state || e.about.result !== textOf(a.derived_value)
   || (e.about.content ?? null) !== typed(a.derived_value)
   || ('placement' in e.about && (e.about.placement !== (a.placement ?? null) || e.about.scope !== (a.scope ?? null)))
-  // A typed field is stale once the field is gone or asks for something else; its state and value are the overlay's.
-  || Object.keys(e.value?.fields || {}).some((k) => !a.fields?.[k] || (e.about.fields?.[k] && schema(e.about.fields[k]) !== schema(a.fields[k]))));
-const schema = ({ state, value, source, ...fl }) => canon(fl);
+  // A typed field is stale once the field is gone, asks for something else, or the lint now gives it another
+  // value than the one the person edited: not the source (under any earlier local act, by `from`), not the
+  // field as the person saw it, and not the person's own value written in.
+  || Object.keys(e.value?.fields || {}).some((k) => {
+    const was = e.about.fields?.[k], now = a.fields?.[k];
+    return !now || (was && (schema(was) !== schema(now)
+      || (![was.from, source(was)].includes(source(now)) && now.value !== e.value.fields[k])));
+  }));
+const schema = ({ state, value, source, from, ...fl }) => canon(fl);
+const source = (fl) => canon({ state: fl.state ?? null, value: fl.value ?? null, source: fl.source ?? null });
 
 const edited = (e) => (e?.act === 'answered' || e?.act === 'changed') ? e : null;
 /** On a view (render and help share it): the person's decision on this finding: the act in force, or, once a lint has
@@ -223,12 +230,13 @@ function artifactView(a, state, took) {
   if (ops.length && !valid.length) return { ...out, person: null, stale: true };
   if (a.fields) {
     const typed = Object.assign({}, ...valid.filter((e) => e.value?.fields).map((e) => e.value.fields));
+    // `from`: the field as the lint gave it, so a later act on it is checked against the source, not this overlay.
     const fields = Object.fromEntries(Object.entries(a.fields).map(([k, fl]) =>
-      [k, typed[k] ? { ...fl, state: 'known', value: typed[k], source: 'person' } : fl]));
+      [k, typed[k] ? { ...fl, state: 'known', value: typed[k], source: 'person', from: source(fl) } : fl]));
     const has = (fl) => fl?.state === 'known' || fl?.state === 'derived';
     // A field that waited on one now filled is the person's to fill next.
     for (const [k, fl] of Object.entries(fields)) {
-      if (fl.state === 'waiting' && has(fields[fl.waits_on])) fields[k] = { ...fl, state: 'blank' };
+      if (fl.state === 'waiting' && has(fields[fl.waits_on])) fields[k] = { ...fl, state: 'blank', from: source(fl) };
     }
     const open = Object.values(fields).some((fl) => !has(fl));
     out = { ...out, fields, needs_person: open ? a.needs_person : 'none' };

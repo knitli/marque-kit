@@ -276,6 +276,21 @@ assert.equal(view(derivedCab, record(empty(), 'a-cab', 'answered', { fields: { d
   assert.equal(view({ ...cab, fields: rest }, s).stale, true);
   assert.equal(view({ ...cab, fields: { ...cab.fields, derived_from: { ...derived_from, hint: 'a source list' } } }, s).stale, true);
 }
+// A correction to a filled field is of the value the lint gave; a new value there drops it.
+{
+  const s = record(empty(), 'a-cab', 'answered', { fields: { classified_by: 'J Roe' } }, undefined, snapshot(cab));
+  assert.equal(view(cab, s).fields.classified_by.value, 'J Roe');
+  const moved = { ...cab, fields: { ...cab.fields, classified_by: { ...cab.fields.classified_by, value: 'Jane Roe' } } };
+  assert.equal(view(moved, s).stale, true);
+}
+// A field opened by an earlier local act is checked against the lint's own state, not the overlay.
+{
+  let s = record(empty(), 'a-cab', 'answered', { fields: { derived_from: 'Multiple Sources' } }, undefined, snapshot(cab));
+  s = record(s, 'a-cab', 'answered', { fields: { declassify_on: '20490115' } }, undefined, snapshot(view(cab, s)));
+  const v = view(cab, s);
+  assert.notEqual(v.stale, true);
+  assert.equal(v.fields.declassify_on.value, '20490115');
+}
 // A deferral, or an answer, on another question or rule under the same id doesn't carry over.
 {
   const p3 = f(P3);
