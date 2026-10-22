@@ -66,7 +66,7 @@ export const snapshot = (f) => structuredClone({ // a record, not a view of a do
 /** Seen only quiets (docs/DERIVATION.md): a Noticeable becomes Quiet; nothing else moves. */
 /** Seen is of a result, not an id: ids survive re-lints, so a new result
  *  under the same id is unseen again. */
-const shown = (f) => f.outcome?.result?.text ?? textOf(f.derived_value) ?? typed(f.derived_value); // typed content by its whole value
+const shown = (f) => { const r = f.outcome?.result ?? f.derived_value; return r == null ? null : typeof r === 'string' ? r : canon(r); }; // whole: masks and layers too // typed content by its whole value
 const wasSeen = (state, f) => state.seen.some((s) => s.id === f.id && s.result === shown(f));
 export function see(state, f) {
   return wasSeen(state, f) ? state : { ...state, seen: [...state.seen, { id: f.id, result: shown(f) }] };
@@ -114,7 +114,10 @@ const moved = (e, f) => !!e.about
   // The whole question, not only its words: a new field type or format changes what an answer means.
   // Another rule under the same id is another finding, whatever it says.
   && ((e.about.rule ?? null) !== ruleOf(f) || e.about.as_written !== (f.marking?.as_written?.text ?? null) || canon(e.about.asks ?? null) !== canon(f.asks ?? null)
-    || e.about.result !== (f.outcome?.result?.text ?? null));
+    || e.about.result !== (f.outcome?.result?.text ?? null)
+    // Another place is another finding; a span moves with edits above it, so only the paragraph or page counts.
+    || ('anchor' in e.about && place(e.about.anchor) !== place(f.anchor)));
+const place = (a) => canon({ kind: a?.kind ?? null, portion: a?.portion ?? null, page: a?.page ?? null });
 const stale = (e, f) => moved(e, f)
   // A reading picked is stale once the finding no longer offers it, from the readings or the question's own options.
   // The whole reading, not only its marking: what it asserts is what gets applied and audited.
@@ -226,7 +229,18 @@ function artifactView(a, state, took) {
   const ops = since(state).filter((e) => e.id === a.id);
   // An apply, a removal or a typed field taken on another value or state of this artifact doesn't carry over.
   // Each op is checked on its own: a stale later field leaves an earlier one that still holds.
-  const valid = ops.filter((e) => !staleOp(e, out));
+  let valid = ops.filter((e) => !staleOp(e, out));
+  // A field opened by a local answer to the one it waits on goes with that answer: it was filled in its context.
+  const typedOf = (list) => Object.assign({}, ...list.filter((e) => e.value?.fields).map((e) => e.value.fields));
+  for (let keep = valid; ; valid = keep) {
+    const t = typedOf(valid);
+    const now = (j) => t[j] ?? (['known', 'derived'].includes(out.fields?.[j]?.state) ? out.fields[j].value : null);
+    keep = valid.filter((e) => Object.keys(e.value?.fields || {}).every((k) => {
+      const was = e.about?.fields?.[k];
+      return !was?.from || !was.waits_on || now(was.waits_on) === (e.about.fields[was.waits_on]?.value ?? null);
+    }));
+    if (keep.length === valid.length) break;
+  }
   if (ops.length && !valid.length) return { ...out, person: null, stale: true };
   if (a.fields) {
     const typed = Object.assign({}, ...valid.filter((e) => e.value?.fields).map((e) => e.value.fields));

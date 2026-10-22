@@ -67,7 +67,9 @@ const written = (x) => (x.asked ? { ...strip(x), outcome: { ...x.outcome, kind: 
 let applied = doc;
 const relint = (s) => {
   const v = docView(applied, s);
-  applied = { ...v, findings: v.findings.map(written), document: { ...v.document, artifacts: v.document.artifacts.map(strip), pending: [], withdrawn: [] } };
+  // What blocks is what still needs a person and blocks finalize: an answer taken back blocks again.
+  const blocking = [...v.findings, ...v.document.artifacts].filter((x) => x.needs_person === 'required' && x.blocks !== 'never').map((x) => x.id);
+  applied = { ...v, findings: v.findings.map(written), document: { ...v.document, artifacts: v.document.artifacts.map(strip), blocking, pending: [], withdrawn: [] } };
   return applied;
 };
 const p = mount($('#pane'), {

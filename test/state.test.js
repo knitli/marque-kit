@@ -421,4 +421,28 @@ for (const act of ['deferred', 'declined']) {
   assert.equal(snap.content, undefined);
 }
 
+// An answer taken on one paragraph doesn't carry to another under the same id; a moved span does.
+{
+  const p3 = f(P3);
+  const s = record(empty(), p3.id, 'answered', { reading: p3.outcome.readings[0], index: 0 }, undefined, snapshot(p3));
+  assert.equal(view({ ...p3, anchor: { ...p3.anchor, portion: 4 } }, s).stale, true);
+  assert.notEqual(view({ ...p3, anchor: { ...p3.anchor, span: [0, 1] } }, s).stale, true);
+}
+// A field filled after a local answer to the one it waits on goes when that answer does.
+{
+  let s = record(empty(), 'a-cab', 'answered', { fields: { derived_from: 'Multiple Sources' } }, undefined, snapshot(cab));
+  s = record(s, 'a-cab', 'answered', { fields: { declassify_on: '20490115' } }, undefined, snapshot(view(cab, s)));
+  const reasked = { ...cab, fields: { ...cab.fields, derived_from: { ...cab.fields.derived_from, hint: 'a source list' } } };
+  const v = view(reasked, s);
+  assert.equal(v.stale, true);
+}
+// The same text with other masks is a new result: seen again.
+{
+  const p2 = f('f-p2-rel-to-separator');
+  const s = see(empty(), p2);
+  assert.equal(view(p2, s).seen, true);
+  const masked = { ...p2, outcome: { ...p2.outcome, result: { ...p2.outcome.result, masks: [{ kind: 'concealed', start: 0, end: 1 }] } } };
+  assert.equal(view(masked, s).seen, false);
+}
+
 console.log('state: ok');

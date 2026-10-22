@@ -244,7 +244,7 @@ export function passage(c, manual, host = {}, { plain } = {}) {
   // Matched against the rendered text, so the quote loses the same markup the manual does.
   const bare = (t) => flat(t.replace(/<br\s*\/?>|<\/?b>/g, '').replace(/\*\*([^*]+)\*\*|\*([^*]+)\*/g, '$1$2'));
   const frags = (c.short || '').split('…').map(bare).filter(Boolean);
-  const blocks = [...doc.querySelectorAll('p, li, h4')];
+  const blocks = [...doc.querySelectorAll('p, li, h4, td, th')];
   for (const fr of frags) {
     for (const b of blocks) {
       const t = b.textContent, i = t.indexOf(fr);
