@@ -35,6 +35,7 @@
 import { render as mark, settle } from './marking.js';
 import { empty, record, see, linted, snapshot, docView } from './state.js';
 import { cite, hasTip, tips } from './help.js';
+import { check } from './theme.js';
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 const el = (tag, cls, text) => {
@@ -601,7 +602,7 @@ export function receipt(doc, session = {}) {
     ?? (v?.fields ? Object.entries(v.fields).map(([k, t]) => `${k.replace(/_/g, ' ')} ${t}`).join(', ') : '');
   const op = (e) => (e.act === 'changed' && e.value == null ? 'back to Marque\u2019s result'
     : e.act === 'kept_as_written' ? (e.about?.result ? `instead of ${e.about.result}` : '')
-    : e.value?.apply ? 'apply' : e.value?.remove ? 'remove' : said(e.value));
+    : e.value?.apply ? `apply${e.about?.result ? ` ${e.about.result}` : ''}` : e.value?.remove ? 'remove' : said(e.value));
   const acts = (x) => (x.history || []).map((e) => [e.act.replace(/_/g, ' '), op(e), e.at].filter(Boolean).join(' ')).join(' → ');
   for (const f of doc.findings) {
     const ln = el('div', 'ln');
@@ -617,7 +618,10 @@ export function receipt(doc, session = {}) {
   for (const a of doc.document.artifacts) {
     const ln = el('div', 'ln');
     const did = acts(a);
-    ln.append(el('span', 't', where(a)), el('div', 'b', `${a.kind} · ${a.state.replace(/_/g, ' ')}${did ? ` · ${did}` : ''}`));
+    const b = el('div', 'b');
+    b.append(el('span', null, `${a.kind} · ${a.state.replace(/_/g, ' ')}${did ? ` · ${did}` : ''}`));
+    if (a.derived_value) b.append(mark(a.derived_value, { size: 'xs', state: 'changed' }));
+    ln.append(el('span', 't', where(a)), b);
     r.append(ln);
   }
   // Acts on findings a later lint withdrew stay in the audit.
@@ -663,6 +667,8 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   const live = el('div', 'mq-sr'); live.setAttribute('aria-live', 'polite');
   const body = el('div');
   root.replaceChildren(body, live);
+  const theme = check(root); // before the first draw, so a failing host token never shows
+  host.onTheme?.(theme);
   if (host.vocab) tips(body, host.vocab, host);
 
   const h = {
@@ -724,6 +730,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   draw();
 
   return {
+    theme, // the gate's report: { checked, rejected: [{ token, measured, floor }] }
     update({ linted: upTo, seq, ...next }) {
       // A lint that began before the one already shown is stale: keep the newer document.
       // `seq` orders lints that began at the same point in the log.

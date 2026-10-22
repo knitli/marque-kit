@@ -216,4 +216,20 @@ const derivedCab = { ...cab, fields: { ...cab.fields, derived_from: { state: 'de
 assert.equal(view(derivedCab, empty()).fields.declassify_on.state, 'blank');
 assert.equal(view(derivedCab, record(empty(), 'a-cab', 'answered', { fields: { declassify_on: '20490115' } })).needs_person, 'none');
 
+// A reading picked that the finding no longer offers doesn't carry over.
+{
+  const s = record(empty(), P3, 'answered', { reading: f(P3).outcome.readings[0], index: 0 }, undefined, snapshot(f(P3)));
+  assert.equal(view(f(P3), s).needs_person, 'none');
+  const moved = { ...f(P3), outcome: { ...f(P3).outcome, readings: f(P3).outcome.readings.slice(1) } };
+  assert.equal(view(moved, s).stale, true);
+  assert.deepEqual(docView({ ...doc, findings: doc.findings.map((x) => (x.id === P3 ? moved : x)) }, s).document.pending, []);
+}
+// Seen is of the result shown: taking the alternative after opening the card is a new, unseen result.
+{
+  const s = record(see(empty(), f(P5)), P5, 'changed', { reading: f(P5).outcome.readings[0], index: 0 });
+  assert.equal(view(f(P5), see(empty(), f(P5))).seen, true);
+  assert.equal(view(f(P5), s).seen, false);
+  assert.equal(rung(view(f(P5), s)), 'noticeable');
+}
+
 console.log('state: ok');

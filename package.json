@@ -10,13 +10,14 @@
     "./marking": "./src/marking.js",
     "./state": "./src/state.js",
     "./help": "./src/help.js",
+    "./theme": "./src/theme.js",
     "./theme.css": "./src/theme.css",
     "./kit.css": "./src/kit.css"
   },
   "files": ["src", "docs", "fixtures", "LICENSE.md", "README.md"],
   "scripts": {
     "demo": "python3 -m http.server 8765",
-    "check": "node --check src/marking.js && node --check src/render.js && node --check src/state.js && node --check src/help.js && node test/marking.test.js && node test/state.test.js && node test/help.test.js"
+    "check": "node --check src/marking.js && node --check src/render.js && node --check src/state.js && node --check src/help.js && node --check src/theme.js && node test/marking.test.js && node test/state.test.js && node test/help.test.js && node test/theme.test.js"
   },
   "repository": { "type": "git", "url": "https://github.com/knitli/marque-kit.git" },
   "author": "Knitli Inc.",

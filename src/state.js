@@ -92,11 +92,19 @@ function reversed(state, id) {
 /** The host re-linted: the first `n` acts are in the new findings. Never moves back. */
 export const linted = (state, n = state.log.length) => ({ ...state, linted: Math.max(state.linted ?? 0, Math.min(n, state.log.length)) });
 
-const stale = (e, f) => !!e.about
-  && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || (e.about.asks?.text ?? null) !== (f.asks?.text ?? null));
+const stale = (e, f) => (!!e.about
+  && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || (e.about.asks?.text ?? null) !== (f.asks?.text ?? null)))
+  // A reading picked is stale once the finding no longer offers it.
+  || (!!e.value?.reading && !(f.outcome?.readings || []).some((r) => r.result?.text === e.value.reading.result?.text));
 
 /** One finding or artifact as it stands with the person's acts on it. */
 export function view(f, state) {
+  const v = overlay(f, state);
+  // Seen is of the result shown: a new one the person put there hasn't been looked at yet.
+  return v.seen && shown(v) !== shown(f) ? { ...v, seen: wasSeen(state, v) } : v;
+}
+
+function overlay(f, state) {
   // `person` is the act still in force; `history` keeps every act for the audit.
   const e = live(state, f.id);
   const v = { ...f, seen: !!f.seen || wasSeen(state, f), person: e, history: history(state, f.id) };
