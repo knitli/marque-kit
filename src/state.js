@@ -74,7 +74,8 @@ export function view(f, state) {
     case 'answered':
     case 'changed': {
       if (e.value == null) return v; // back to Marque's own result
-      const result = e.value.reading?.result ?? { text: e.value.free };
+      // A typed answer is a marking only when the question asks for one; prose waits for the re-lint.
+      const result = e.value.reading?.result ?? (f.asks?.field?.type === 'marking' ? { text: e.value.free } : f.outcome?.result);
       // The kind stays the engine's: the answer is generated until the host applies it.
       return { ...v, asked: f.asks, outcome: { ...f.outcome, result, fallback: undefined }, asks: null, needs_person: 'none', blocks: 'never' };
     }
@@ -99,6 +100,7 @@ function artifactView(a, state) {
     const open = Object.values(fields).some((fl) => !has(fl));
     out = { ...out, fields, needs_person: open ? a.needs_person : 'none' };
   }
+  if (live(state, a.id)?.value?.apply) out = { ...out, applying: true };
   if (a.if_taken) {
     const taken = Object.keys(a.if_taken).filter((fid) => settled(live(state, fid)));
     if (taken.length) {
@@ -111,8 +113,8 @@ function artifactView(a, state) {
 
 /**
  * The whole document with the person's acts on it. `blocking` keeps the
- * engine's list and drops what the person has answered; those wait in
- * `pending` until the host applies them and re-lints. `ready` needs both
+ * engine's list and drops what the person has answered; every edit since
+ * the lint waits in `pending` until the host applies it and re-lints. `ready` needs both
  * empty. Nothing appears here the engine didn't list.
  */
 export function docView(doc, state) {
@@ -120,7 +122,7 @@ export function docView(doc, state) {
   const artifacts = doc.document.artifacts.map((a) => view(a, state));
   const all = new Map([...findings, ...artifacts].map((x) => [x.id, x]));
   const blocking = doc.document.blocking.filter((id) => all.get(id)?.needs_person !== 'none');
-  const answered = new Set(since(state).filter(settled).map((e) => e.id));
-  const pending = doc.document.blocking.filter((id) => !blocking.includes(id) && answered.has(id));
+  // Every edit since the lint waits for it, blocker or not: an alternative taken moves the banner too.
+  const pending = [...new Set(since(state).map((e) => e.id))].filter((id) => settled(live(state, id)));
   return { ...doc, findings, document: { ...doc.document, artifacts, blocking, pending, ready: !blocking.length && !pending.length } };
 }

@@ -134,6 +134,18 @@ assert.ok(docView(doc, s).document.blocking.includes(P3));
 assert.equal(doc.document.ready, false);
 assert.equal(f(P3).needs_person, 'required');
 
+// Every edit waits for the lint, not only blockers.
+s = record(empty(), P5, 'changed', { reading: f(P5).outcome.readings[0], index: 0 });
+assert.deepEqual(docView(doc, s).document.pending, [P5]);
+// Applying the derived banner is an edit too; the host writes it.
+s = record(empty(), 'a-banner', 'answered', { apply: true });
+assert.equal(docView(doc, s).document.artifacts.find((a) => a.id === 'a-banner').applying, true);
+assert.deepEqual(docView(doc, s).document.pending, ['a-banner']);
+// A typed answer to a prose question is not a marking.
+v = view(f(P3), record(empty(), P3, 'answered', { free: 'The UK alone' }));
+assert.notEqual(v.outcome.result?.text, 'The UK alone');
+assert.equal(view(f(P4), record(empty(), P4, 'answered', { free: '(U)' })).outcome.result.text, '(U)');
+
 // A derived field counts as filled.
 const derivedCab = { ...cab, fields: { ...cab.fields, derived_from: { state: 'derived', value: 'DIA SCG 2024-01' } } };
 assert.equal(view(derivedCab, empty()).fields.declassify_on.state, 'blank');

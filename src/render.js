@@ -122,7 +122,14 @@ function asks(f, host, r) {
   const form = el('form', 'mq-ask');
   const name = `ask-${f.id}`;
   let chosen = null;
-  const commit = () => { if (chosen) host.onAct?.(f, 'answered', chosen); };
+  // Answer is never disabled: pressed with nothing chosen, it says what's missing (docs/COMPONENTS.md, C4).
+  const err = el('div', 'err'); err.id = `${name}-err`; err.setAttribute('role', 'alert');
+  const commit = () => {
+    if (chosen) return host.onAct?.(f, 'answered', chosen);
+    fld.classList.add('bad'); err.textContent = 'Pick one reading, or "not my call".';
+    (form.querySelector('input[type=radio]') || free).focus();
+  };
+  const clear = () => { fld.classList.remove('bad'); err.textContent = ''; };
   form.addEventListener('submit', (e) => { e.preventDefault(); commit(); });
   const options = a.options === 'outcome.readings' ? f.outcome.readings : (a.options || []);
 
@@ -131,7 +138,7 @@ function asks(f, host, r) {
   options.forEach((o, i) => {
     const lab = el('label', 'mq-opt');
     const inp = el('input'); inp.type = 'radio'; inp.name = name; inp.value = String(i);
-    inp.addEventListener('change', () => { chosen = { reading: o, index: i }; free.value = ''; go.disabled = false; });
+    inp.addEventListener('change', () => { chosen = { reading: o, index: i }; free.value = ''; clear(); });
     const txt = el('div', 'mq-txt');
     txt.append(el('div', 'mq-pr', o.reading));
     if (o.result) txt.append(placed(mark(o.result, { size: 'sm' })));
@@ -148,17 +155,16 @@ function asks(f, host, r) {
   free.addEventListener('input', () => {
     const t = free.value.trim();
     chosen = t ? { free: t } : null;
-    if (t) form.querySelectorAll('input[type=radio]').forEach((x) => { x.checked = false; });
-    go.disabled = !t;
+    if (t) { form.querySelectorAll('input[type=radio]').forEach((x) => { x.checked = false; }); clear(); }
   });
-  fld.append(lab, free);
+  free.setAttribute('aria-describedby', err.id);
+  fld.append(lab, free, err);
   if (a.field?.waits_on) fld.append(el('div', 'hint', `Waits on ${a.field.waits_on.replace(/_/g, ' ')}.`));
   if (f.deferred === 'declined') fld.append(el('div', 'hint', 'Marked not your call. Someone still has to answer it before the document goes out.'));
   form.append(fld);
 
   const acts = el('div', 'mq-acts');
-  const go = button('attn', 'Answer', commit); go.disabled = true;
-  acts.append(go);
+  acts.append(button('attn', 'Answer', commit));
   // Blocking is the same card with defer removed (docs/DERIVATION.md).
   if (r !== 'blocking' && f.deferred !== 'deferred') acts.append(button('ghost', 'Ask me at finalize', () => host.onAct?.(f, 'deferred')));
   acts.append(button('ghost', 'Not my call', () => host.onAct?.(f, 'declined')));
@@ -250,6 +256,7 @@ export function card(f, host = {}) {
  *  written yet, or an artifact that isn't required, is Advisory; anything
  *  else (a non-canonical fix, a block the person filled in) is done. */
 const artRung = (a, moment) => a.needs_person !== 'none' ? rung(a, moment)
+  : a.applying ? 'quiet'
   : a.state === 'present_not_required' || (a.state === 'absent_but_required' && a.derived_value) ? 'advisory' : 'quiet';
 /** A required artifact that only blocks at finalize waits for it, like an absent mark. */
 const artWaits = (a, moment) => a.blocks === 'finalize' && !GATE.has(moment);
@@ -323,7 +330,7 @@ export function status(doc, host = {}) {
   s.append(el('span', 'sep'));
   // The strip exists before Marque has run, so the host's layout never jumps.
   if (!doc || (host.engine && host.engine !== 'ok')) {
-    s.append(el('span', 'mq-ui', '—'), el('span', 'mq-stamp quiet', host.engine === 'checking' ? 'Checking' : 'Not checked'));
+    s.append(el('span', 'mq-ui', '—'), el('span', 'mq-stamp quiet', { checking: 'Checking', failed: 'Stopped' }[host.engine] || 'Not checked'));
     return s;
   }
   const banner = doc.document.artifacts.find((a) => a.kind === 'front_marking');
@@ -461,6 +468,13 @@ export function artifact(a, host = {}) {
   if (a.derived_value) {
     c.append(placed(mark(a.derived_value, { size: 'lg', state: 'derived' })));
     if (a.placement) c.append(el('span', 'mq-place', `Placed: ${a.placement.replace(/_/g, ' ')}`));
+    // Generated, not applied: the person can apply it; the host writes it (docs/COMPONENTS.md, C9).
+    if (a.applying) c.append(el('p', 'mq-p', 'Waiting to be written into the document.'));
+    else if (a.fixability === 'fixable' && a.state !== 'present' && !host.readOnly) {
+      const acts = el('div', 'mq-acts');
+      acts.append(button('act', 'Apply', () => host.onAct?.(a, 'answered', { apply: true })));
+      c.append(acts);
+    }
   }
   if (a.fields) {
     const dl = el('div', 'mq-cab');
@@ -481,8 +495,9 @@ export function artifact(a, host = {}) {
         dl.append(v);
         continue;
       }
-      const v = el('span', `v ${fld.state === 'known' ? 'derived' : ''}`.trim(),
-        fld.state === 'known' ? fld.value : fld.state === 'waiting' ? `Waits on ${fld.waits_on.replace(/_/g, ' ')}` : fld.format || '');
+      const has = fld.state === 'known' || fld.state === 'derived';
+      const v = el('span', `v ${has ? 'derived' : ''}`.trim(),
+        has ? fld.value : fld.state === 'waiting' ? `Waits on ${fld.waits_on.replace(/_/g, ' ')}` : fld.format || '');
       if (fld.hint) v.title = fld.hint;
       dl.append(v);
     }

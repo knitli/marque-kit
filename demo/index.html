@@ -60,7 +60,7 @@ const dec = new TextDecoder();
    (src/state.js) and hands each one here; a real host persists the state,
    applies the edit, re-lints and calls p.update({ doc }). There is no engine
    here, so the stand-in re-lint is the kit's own overlay on the fixture. */
-const strip = ({ person, history, ...x }) => x;
+const strip = ({ person, history, applying, ...x }) => (applying ? { ...x, state: 'present' } : x);
 const relint = (s) => {
   const v = docView(doc, { ...s, linted: 0 });
   return { ...v, findings: v.findings.map(strip), document: { ...v.document, artifacts: v.document.artifacts.map(strip), pending: [] } };
