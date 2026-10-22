@@ -61,7 +61,7 @@
 .mq-field.bad input { border-color: var(--mq-error-ink); }
 
 /* ── The pane ───────────────────────────────────────────────────────────── */
-.mq-pane  { display: flex; flex-direction: column; gap: calc(var(--mq-unit) * 3.5); padding: calc(var(--mq-unit) * 3); }
+.mq-pane  { background: var(--mq-ground); display: flex; flex-direction: column; gap: calc(var(--mq-unit) * 3.5); padding: calc(var(--mq-unit) * 3); }
 .mq-pane-head { display: flex; justify-content: space-between; align-items: center; gap: calc(var(--mq-unit) * 2);
             padding-bottom: calc(var(--mq-unit) * 2.5); border-bottom: var(--mq-border) solid var(--mq-rule-strong); flex-wrap: wrap; }
 .mq-brand { font-family: var(--mq-font-mark), ui-monospace, monospace; font-size: var(--mq-size-md); letter-spacing: .04em; color: var(--mq-text); }

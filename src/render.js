@@ -316,7 +316,13 @@ export function row(f, host = {}) {
     if (open) host.onJump?.(f);
   };
   li.addEventListener('click', click);
-  li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); click(); } });
+  li.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault(); click();
+    // Opened from the keyboard: on to the question, its chosen or first reading, else the field.
+    const d = li.classList.contains('open') && li.nextElementSibling;
+    (d?.querySelector('input[type=radio]:checked') || d?.querySelector('input, button'))?.focus();
+  });
   if (host.open === f.id && !host.narrow) queueMicrotask(() => toggle(true));
   return li;
 }

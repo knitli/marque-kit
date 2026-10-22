@@ -92,11 +92,11 @@ function room(root) {
   return w;
 }
 
-/** What `root` paints on: its own background and its ancestors', laid down from the page's white.
- *  shortcut: background images and gradients are not seen; measure them if a host needs it. */
+/** What `root` sits on: its ancestors' backgrounds, laid down from the page's white. The pane paints
+ *  its own ground over that. shortcut: background images and gradients are not seen; measure them if a host needs it. */
 function backdrop(root) {
   const layers = [];
-  for (let n = root; n; n = n.parentElement) layers.push(srgb(getComputedStyle(n).backgroundColor));
+  for (let n = root.parentElement; n; n = n.parentElement) layers.push(srgb(getComputedStyle(n).backgroundColor));
   return layers.reduceRight((under, c) => over(c, under), [255, 255, 255, 1]);
 }
 
@@ -145,7 +145,8 @@ export function check(root) {
   for (let pass = 0, moved = !forced; moved && pass < PAIRS.length; pass++) {
     moved = false;
     for (const [fg, bg, floor] of PAIRS) {
-      const page = backdrop(root); // the ground is root's own background
+      // The pane paints the ground from root's own tokens, over whatever is above it.
+      const page = over(read('ground'), backdrop(root));
       const surface = over(read('surface'), page);
       const back = bg === 'ground' ? page : bg === 'surface' ? surface : over(read(bg), surface); // each layer composited once
       const m = ratio(over(read(fg), back), back);
