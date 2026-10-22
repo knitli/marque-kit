@@ -124,7 +124,8 @@ export function render(marking, o = {}) {
       const text = (hidden.length && i === shown.length - 1) ? t.t.replace(/[, ]+$/, '') : t.t;
       const span = el('span', 'mq-i', text);
       const help = t.help || (o.help?.includes(bare(t.t)) ? bare(t.t) : null);
-      if (help) { span.classList.add('mq-tok'); span.tabIndex = 0; span.dataset.help = help; }
+      // Enter opens its help: a button that opens a dialog, to a screen reader too.
+      if (help) { span.classList.add('mq-tok'); span.tabIndex = 0; span.dataset.help = help; span.setAttribute('role', 'button'); span.setAttribute('aria-haspopup', 'dialog'); }
       L.appendChild(span);
     });
     if (hidden.length) {

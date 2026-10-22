@@ -241,7 +241,9 @@ export function passage(c, manual, host = {}, { plain } = {}) {
   doc.append(...manualBlocks(s.text));
   body.append(doc);
   // Land on the quote: each fragment between ellipses, wherever it sits.
-  const frags = (c.short || '').split('…').map(flat).filter(Boolean);
+  // Matched against the rendered text, so the quote loses the same markup the manual does.
+  const bare = (t) => flat(t.replace(/<br\s*\/?>|<\/?b>/g, '').replace(/\*\*([^*]+)\*\*|\*([^*]+)\*/g, '$1$2'));
+  const frags = (c.short || '').split('…').map(bare).filter(Boolean);
   const blocks = [...doc.querySelectorAll('p, li, h4')];
   for (const fr of frags) {
     for (const b of blocks) {
@@ -408,7 +410,8 @@ export function float(content, anchor, { kind = 'pop', onClose } = {}) {
   }
   stack.push(entry);
   if (!escBound) { document.addEventListener('keydown', onEsc, true); escBound = true; }
-  if (kind === 'pop') setTimeout(() => document.addEventListener('pointerdown', outside, true));
+  // Not if it closed before the timer ran: the listener would outlive it.
+  if (kind === 'pop') setTimeout(() => { if (stack.includes(entry)) document.addEventListener('pointerdown', outside, true); });
   const first = content.querySelector('button, a[href], input, summary, [tabindex]');
   content.tabIndex = -1;
   (kind === 'window' ? content.querySelector('input') || content : first || content).focus({ preventScroll: true });

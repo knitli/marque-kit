@@ -539,7 +539,8 @@ export function artifact(a, host = {}) {
         has ? fld.value : fld.state === 'waiting' ? `Waits on ${fld.waits_on.replace(/_/g, ' ')}` : fld.format || '');
       if (fld.hint) v.title = fld.hint;
       // A filled field stays correctable: a typo, or Classified By when someone else made the call.
-      if (has && !host.readOnly) {
+      // Read-only too: the correction waits with the other answers.
+      if (has) {
         v.append(' ', button('ghost', 'Change', () => { const n = entry(k, fld, key); v.replaceWith(n); n.querySelector('input').focus(); }));
       }
       dl.append(v);

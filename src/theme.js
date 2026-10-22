@@ -71,13 +71,15 @@ function shipped(root) {
   for (const sheet of document.styleSheets) {
     try { walk(sheet.cssRules); } catch { /* another origin without CORS: unreadable */ }
   }
-  // Tokens inherit, and the nearest declaration wins: root takes the blocks on the nearest element
-  // they style (its own `.mq` before an ancestor's theme), later ones over earlier, as the cascade does.
+  // Tokens inherit, and the nearest declaration wins: each token comes from the nearest element a
+  // block styles (its own `.mq` before an ancestor's theme), later blocks over earlier, as the cascade does.
+  const out = {};
   for (let n = root; n; n = n.parentElement) {
-    const own = blocks.filter((r) => applies(n, r.selectorText));
-    if (own.length) return Object.fromEntries(own.flatMap((r) => [...r.style].filter((p) => p.startsWith('--mq-')).map((p) => [p, r.style.getPropertyValue(p).trim()])));
+    const own = Object.fromEntries(blocks.filter((r) => applies(n, r.selectorText))
+      .flatMap((r) => [...r.style].filter((p) => p.startsWith('--mq-')).map((p) => [p, r.style.getPropertyValue(p).trim()])));
+    for (const [p, v] of Object.entries(own)) if (!(p in out)) out[p] = v;
   }
-  return {};
+  return out;
 }
 
 /** The room the host gives the pane: root's own width, and no more than its parent's.
