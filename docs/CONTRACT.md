@@ -123,6 +123,34 @@ Answer
 Ask me at finalize
 Actions follow outcome.kind: applied → undo · available → apply · chosen_over → switch · choices or needs_fact → answer, defer · withheld → none, or the host's own edit.
 _K · U_
+
+### F.1 · The host loop — how acts reach the document
+
+The kit records; the host writes; Marque re-lints. `src/state.js` and `mount()` in `src/render.js` implement this; the tests in `test/state.test.js` are its examples.
+
+**The state.** Plain JSON the host persists whole: `{ log, seen, linted }`.
+- `log` is append-only: `{ id, act, value, at, about }`. `act` is one of answered · changed · kept_as_written · deferred · declined (marque-dev#2643). A `changed` with a null value takes the last decision back to Marque's result. `about` is a snapshot of what the act was about: rule, place, the marking as written, Marque's outcome and question. Markings and Marque's words only, never body text.
+- `seen` is `[{ id, result }]`. Seeing is of a result, not an id, so a new result under a stable id is unseen again.
+- `linted` is how many log lines the current lint already reflects.
+
+**The loop.**
+1. The person acts. The kit appends to the log and calls `onChange(state, act)`. `act` is null when only bookkeeping moved (seen, the checkpoint); persist the state either way.
+2. The host writes what the act asks for. The kit never edits the document.
+3. The host re-lints and calls `update({ doc, linted, seq })`. `linted` is `state.log.length` when that lint began, and `seq` is the host's request counter. A synchronous host can omit both. A response whose `linted` is behind the checkpoint, or whose `seq` is not newer than the last one shown, is stale and ignored. The checkpoint never moves back.
+
+**Between steps 1 and 3** the act is generated, not applied (DECISIONS #4).
+- The card shows it: the answer as the headline, the marking it asks for, and "Waiting to be written" on an artifact.
+- `document.pending` lists it, and `ready` is false until a lint that includes it arrives.
+- Pending means the act writes something: an answer, an override, an artifact applied or removed, or a take-back of one a lint already wrote. Taking back one nobody wrote cancels it and writes nothing.
+- A take-back of a written act reopens the finding from that act's snapshot: the question, the readings and the rung it had.
+
+**After step 3** the new findings are the truth.
+- Edits before the checkpoint no longer overlay, so a renewed question under the same id is open again.
+- Overrides, deferrals and declines still overlay, because the engine has no shape for them yet (#2643).
+- An override holds only while the as-written marking and Marque's result match its snapshot.
+- Acts on ids the lint no longer lists move to `document.withdrawn` for the receipt, with their snapshots. They are never pending.
+
+**Ready** = nothing in `blocking` and nothing in `pending`. Marque decides `blocking`; the kit only removes what the person has settled. A fixable artifact Marque derived (the banner) is not a blocker, because the host may write it at the gate (C10).
 Who supplies each slot
 M — Marque emits it
 K — the kit derives or keeps it

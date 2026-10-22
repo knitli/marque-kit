@@ -46,6 +46,9 @@ export function record(state, id, act, value = null, at = new Date().toISOString
 export const snapshot = (f) => ({
   rule: f.rule ? `${f.rule.scheme}:${f.rule.predicate}` : f.kind, anchor: f.anchor, kind: f.kind,
   as_written: f.marking?.as_written?.text ?? null, result: f.outcome?.result?.text ?? f.derived_value?.text ?? null,
+  // What taking the act back restores: Marque's own words, never body text.
+  ...(f.outcome && { outcome: { kind: f.outcome.kind, result: f.outcome.result, readings: f.outcome.readings } }),
+  ...(f.asks && { asks: f.asks }), needs_person: f.needs_person, blocks: f.blocks,
 });
 
 /** Seen only quiets (docs/DERIVATION.md): a Noticeable becomes Quiet; nothing else moves. */
@@ -74,12 +77,16 @@ function live(state, id) {
  *  answer or an override does; so does undoing one a lint already wrote.
  *  Undoing one nobody wrote yet cancels it and writes nothing. */
 function writes(state, id) {
-  const n = state.linted ?? 0;
-  const e = last(state, id), at = state.log.lastIndexOf(e);
-  if (!e || at < n) return false;
-  if (settled(e) || e.act === 'kept_as_written') return true;
-  if (!edits(e)) return false;
-  return state.log.slice(0, n).some((x) => x.id === id && (settled(x) || x.act === 'kept_as_written'));
+  const e = last(state, id);
+  if (!e || state.log.lastIndexOf(e) < (state.linted ?? 0)) return false;
+  return settled(e) || e.act === 'kept_as_written' || (edits(e) && !!reversed(state, id));
+}
+
+/** The written answer or override a null `changed` since the lint takes back, if any. */
+function reversed(state, id) {
+  const e = last(state, id), n = state.linted ?? 0;
+  if (!edits(e) || e.value != null || state.log.lastIndexOf(e) < n) return null;
+  return state.log.slice(0, n).findLast((x) => x.id === id && (settled(x) || x.act === 'kept_as_written')) || null;
 }
 
 /** The host re-linted: the first `n` acts are in the new findings. Never moves back. */
@@ -95,7 +102,13 @@ export function view(f, state) {
   switch (e.act) {
     case 'answered':
     case 'changed': {
-      if (e.value == null) return v; // back to Marque's own result
+      if (e.value == null) {
+        // Back to Marque's own result. Taking back one a lint already wrote reopens
+        // the finding as it was before that act, question and readings included.
+        const was = reversed(state, f.id)?.about;
+        if (!was?.outcome) return v;
+        return { ...v, asks: was.asks ?? null, outcome: { ...f.outcome, ...was.outcome }, needs_person: was.needs_person, blocks: was.blocks };
+      }
       // A typed answer is a marking only when the question asks for one; prose waits for the re-lint.
       const result = e.value.reading?.result ?? (f.asks?.field?.type === 'marking' ? { text: e.value.free } : f.outcome?.result);
       // The kind stays the engine's: the answer is generated until the host applies it.
@@ -149,7 +162,8 @@ export function docView(doc, state) {
   const all = new Map([...findings, ...artifacts].map((x) => [x.id, x]));
   const blocking = doc.document.blocking.filter((id) => all.get(id)?.needs_person !== 'none');
   // Every write since the lint waits for it, blocker or not: an alternative taken moves the banner too.
-  const pending = [...new Set(since(state).map((e) => e.id))].filter((id) => writes(state, id));
+  // A write to a finding the lint withdrew has nowhere to go; its acts stay in `withdrawn`.
+  const pending = [...new Set(since(state).map((e) => e.id))].filter((id) => all.has(id) && writes(state, id));
   const withdrawn = [...new Set(state.log.map((e) => e.id))].filter((id) => !all.has(id))
     .map((id) => ({ id, about: history(state, id).findLast((e) => e.about)?.about, history: history(state, id) }));
   return { ...doc, findings, document: { ...doc.document, artifacts, blocking, pending, withdrawn, ready: !blocking.length && !pending.length } };

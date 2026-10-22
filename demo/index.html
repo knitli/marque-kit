@@ -61,9 +61,11 @@ const dec = new TextDecoder();
    applies the edit, re-lints and calls p.update({ doc }). There is no engine
    here, so the stand-in re-lint is the kit's own overlay on the fixture. */
 const strip = ({ person, history, applying, ...x }) => (applying ? { ...x, state: x.state === 'present_not_required' ? 'absent_not_required' : 'present' } : x);
+// A written answer is applied, as the engine would report it.
+const written = (x) => (x.asked ? { ...strip(x), outcome: { ...x.outcome, kind: 'applied' } } : strip(x));
 const relint = (s) => {
   const v = docView(doc, { ...s, linted: 0 });
-  return { ...v, findings: v.findings.map(strip), document: { ...v.document, artifacts: v.document.artifacts.map(strip), pending: [] } };
+  return { ...v, findings: v.findings.map(written), document: { ...v.document, artifacts: v.document.artifacts.map(strip), pending: [] } };
 };
 const p = mount($('#pane'), {
   doc,
@@ -179,7 +181,8 @@ function setMoment(m) { $('#moment').value = m; p.update({ moment: m }); draw();
 $('#theme').addEventListener('change', (e) => { if (e.target.value) document.body.dataset.mqTheme = e.target.value; else delete document.body.dataset.mqTheme; });
 $('#moment').addEventListener('change', (e) => setMoment(e.target.value));
 $('#engine').addEventListener('change', (e) => p.update({ engine: e.target.value }));
-$('#ro').addEventListener('change', (e) => p.update({ readOnly: e.target.checked }));
+// Leaving read-only writes the answers that waited.
+$('#ro').addEventListener('change', (e) => { p.update(e.target.checked ? { readOnly: true } : { readOnly: false, doc: relint(p.state) }); draw(); });
 $('#finalize').addEventListener('click', () => p.host.onGate());
 tips($('#gate'), vocab, p.host); // the gate renders outside the pane
 draw();

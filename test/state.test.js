@@ -180,6 +180,22 @@ s = record(empty(), P2, 'kept_as_written', null, 't', snapshot(f(P2)));
 assert.equal(view(f(P2), s).overridden, true);
 const p2new = { ...f(P2), marking: { ...f(P2).marking, as_written: { text: '(S//REL TO USA FVEY NZL)' } } };
 assert.equal(view(p2new, s).overridden, undefined, 'a changed marking under the same id is open again');
+// Taking back a written answer reopens the question it answered.
+s = record(empty(), P3, 'answered', { reading, index: 0 }, 't1', snapshot(f(P3)));
+s = linted(s);
+const writtenP3 = { ...view(f(P3), record(empty(), P3, 'answered', { reading, index: 0 })), person: undefined, history: undefined, asks: null, outcome: { ...f(P3).outcome, kind: 'applied', result: reading.result } };
+s = record(s, P3, 'changed', null, 't2', snapshot(writtenP3));
+v = view(writtenP3, s);
+assert.equal(v.asks.text, f(P3).asks.text);
+assert.equal(v.needs_person, 'required');
+assert.equal(v.outcome.kind, 'choices');
+assert.deepEqual(docView({ ...doc, findings: doc.findings.map((x) => x.id === P3 ? writtenP3 : x) }, s).document.pending, [P3]);
+// A write to a withdrawn finding is not pending; its acts stay in withdrawn.
+s = record(empty(), P3, 'answered', { reading, index: 0 });
+const gone = docView({ ...doc, findings: doc.findings.filter((x) => x.id !== P3) }, s);
+assert.deepEqual(gone.document.pending, []);
+assert.equal(gone.document.withdrawn[0].id, P3);
+
 // A withdrawn finding keeps what it was about.
 s = record(empty(), P3, 'declined', null, 't', snapshot(f(P3)));
 const w = docView({ ...doc, findings: doc.findings.filter((x) => x.id !== P3) }, s).document.withdrawn[0];

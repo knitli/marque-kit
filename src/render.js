@@ -224,7 +224,7 @@ export function card(f, host = {}) {
   }
 
   // The alternative the author also wrote (advisory): one action away.
-  if (f.outcome?.kind === 'chosen_over' && f.outcome.readings?.length && !f.overridden) {
+  if (f.outcome?.kind === 'chosen_over' && f.outcome.readings?.length && !f.overridden && !settled(f)) {
     const alt = f.outcome.readings[0];
     const dep = el('div', 'mq-dep');
     dep.append(el('span', null, 'Or, as you also wrote:'), placed(mark(alt.result, { size: 'sm' })));
