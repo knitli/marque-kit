@@ -344,4 +344,19 @@ assert.equal(view(derivedCab, record(empty(), 'a-cab', 'answered', { fields: { d
   assert.equal(ban(docView({ ...doc, findings: doc.findings.map((x) => (x.id === P5 ? moved : x)) }, s)), base);
 }
 
+// Deferring or declining a reopened question keeps it reopened, and the take-back still waits to be written.
+for (const act of ['deferred', 'declined']) {
+  let s = record(empty(), P3, 'answered', { reading: f(P3).outcome.readings[0], index: 0 }, undefined, snapshot(f(P3)));
+  s = linted(s);
+  const written = { ...f(P3), asks: null, needs_person: 'none', blocks: 'never', outcome: { ...f(P3).outcome, result: f(P3).outcome.readings[0].result } };
+  s = record(s, P3, 'changed', null, undefined, snapshot(written));
+  s = record(s, P3, act, null, undefined, snapshot(view(written, s)));
+  const d = docView({ ...doc, findings: doc.findings.map((x) => (x.id === P3 ? written : x)) }, s);
+  const v = d.findings.find((x) => x.id === P3);
+  assert.equal(v.asks?.text, f(P3).asks.text, act);
+  assert.equal(v.needs_person, f(P3).needs_person, act);
+  assert.ok(d.document.pending.includes(P3), act);
+  assert.equal(d.document.ready, false, act);
+}
+
 console.log('state: ok');

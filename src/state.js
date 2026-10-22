@@ -65,6 +65,7 @@ export function see(state, f) {
 export const last = (state, id) => state.log.findLast((e) => e.id === id) || null;
 const history = (state, id) => state.log.filter((e) => e.id === id);
 const edits = (e) => e?.act === 'answered' || e?.act === 'changed';
+const putOff = (e) => e?.act === 'deferred' || e?.act === 'declined';
 /** The person said what it is, rather than putting it off. */
 const settled = (e) => edits(e) && e.value != null;
 /** Log lines the current lint hasn't seen. */
@@ -79,14 +80,16 @@ function live(state, id) {
  *  answer or an override does; so does undoing one a lint already wrote.
  *  Undoing one nobody wrote yet cancels it and writes nothing. */
 function writes(state, id) {
-  const e = last(state, id);
+  let e = last(state, id);
+  // Deferring a reopened question doesn't cancel the take-back before it: that still has to be written.
+  if (putOff(e)) { const p = history(state, id).findLast((x) => !putOff(x)); if (edits(p) && p.value == null) e = p; }
   if (!e || state.log.lastIndexOf(e) < (state.linted ?? 0)) return false;
-  return settled(e) || e.act === 'kept_as_written' || (edits(e) && !!reversed(state, id));
+  return settled(e) || e.act === 'kept_as_written' || (edits(e) && !!reversed(state, id, e));
 }
 
 /** The written answer or override a null `changed` since the lint takes back, if any. */
-function reversed(state, id) {
-  const e = last(state, id), n = state.linted ?? 0;
+function reversed(state, id, e = last(state, id)) {
+  const n = state.linted ?? 0;
   if (!edits(e) || e.value != null || state.log.lastIndexOf(e) < n) return null;
   return state.log.slice(0, n).findLast((x) => x.id === id && (settled(x) || x.act === 'kept_as_written')) || null;
 }
@@ -108,7 +111,8 @@ const stale = (e, f) => moved(e, f)
 const restore = (f, was) => ({ ...f, asks: was.asks ?? null, outcome: { ...f.outcome, ...was.outcome }, needs_person: was.needs_person, blocks: was.blocks });
 /** The finding the person answered: after a pending take-back of a written answer, the question it reopened. */
 function answeredOn(state, f, e) {
-  const h = history(state, f.id), prev = h[h.indexOf(e) - 1], n = state.linted ?? 0;
+  const h = history(state, f.id), n = state.linted ?? 0;
+  const prev = h.slice(0, h.indexOf(e)).findLast((x) => !putOff(x)); // a deferral in between keeps the question reopened
   if (!prev || !edits(prev) || prev.value != null || state.log.lastIndexOf(prev) < n) return f;
   const back = state.log.slice(0, n).findLast((x) => x.id === f.id && (settled(x) || x.act === 'kept_as_written'));
   return back?.about?.outcome ? restore(f, back.about) : f;
@@ -158,8 +162,10 @@ function overlay(f, state, took) {
       // The person kept one marking against one fix; a different one under the same id is open again.
       if (e.about && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || e.about.result !== (f.outcome?.result?.text ?? null))) return { ...v, person: null, stale: true };
       return { ...v, overridden: true, outcome: { ...f.outcome, kind: 'kept_as_written', result: f.marking?.as_written, readings: [] }, needs_person: 'none', blocks: 'never' };
-    default: // deferred, declined: still open
-      return { ...v, deferred: e.act };
+    default: { // deferred, declined: still open, as the question a pending take-back reopened if there is one
+      const on = answeredOn(state, f, e);
+      return { ...v, ...(on !== f && { asks: on.asks, outcome: on.outcome, needs_person: on.needs_person, blocks: on.blocks }), deferred: e.act };
+    }
   }
 }
 
