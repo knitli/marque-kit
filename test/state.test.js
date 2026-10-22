@@ -160,6 +160,17 @@ assert.equal(view(notice, record(empty(), 'a-notice', 'answered', { apply: true 
 const extra = { ...notice, state: 'present_not_required' };
 assert.ok(sections({ ...doc, document: { ...doc.document, artifacts: [extra] } }, 'editing').can.some((a) => a.id === 'a-notice'));
 
+// Acts on a finding a later lint withdrew stay for the receipt.
+s = record(empty(), P3, 'declined');
+const lessDoc = { ...doc, findings: doc.findings.filter((x) => x.id !== P3) };
+assert.deepEqual(docView(lessDoc, s).document.withdrawn.map((x) => x.history[0].act), ['declined']);
+assert.deepEqual(docView(doc, s).document.withdrawn, []);
+// An artifact's seen is of its value: a new value under the same id is unseen again.
+const ban = doc.document.artifacts.find((a) => a.id === 'a-banner');
+s = see(empty(), ban);
+assert.equal(view(ban, s).seen, true);
+assert.equal(view({ ...ban, derived_value: { text: 'SECRET//NOFORN' } }, s).seen, false);
+
 // A derived field counts as filled.
 const derivedCab = { ...cab, fields: { ...cab.fields, derived_from: { state: 'derived', value: 'DIA SCG 2024-01' } } };
 assert.equal(view(derivedCab, empty()).fields.declassify_on.state, 'blank');

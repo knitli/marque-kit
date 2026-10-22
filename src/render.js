@@ -88,7 +88,12 @@ function visiblyChanged(f) {
   return norm(was) !== norm(now);
 }
 
-const settled = (f) => (f.person?.act === 'answered' || f.person?.act === 'changed') && f.person.value != null;
+const edit = (e) => (e?.act === 'answered' || e?.act === 'changed') ? e : null;
+/** The person's decision on this finding: the act in force, or, once a lint has
+ *  written it and nothing is asked again, the last one in the history. */
+const decided = (f) => edit(f.person) || (f.needs_person === 'none' && !f.asks ? edit(f.history?.findLast((e) => edit(e))) : null);
+const settled = (f) => decided(f)?.value != null;
+const wasAsked = (f) => !!f.asked || !!f.history?.some((e) => e.act === 'answered');
 const SHAPE = { quiet: '', noticeable: '', advisory: 'can-act', action: 'must-act', blocking: 'must-act' };
 const STAMP = {
   quiet: ['quiet', 'Done'], noticeable: ['quiet', 'Changed'], advisory: ['act', 'Alternative'],
@@ -101,7 +106,7 @@ const waits = (f, moment) => f.marking?.shape === 'absent' && f.needs_person !==
 const shapeOf = (f, r, moment) => (waits(f, moment) ? 'absent' : SHAPE[r]);
 function stampOf(f, r, moment) {
   if (f.overridden) return ['quiet', 'Reported'];
-  if (settled(f)) return ['quiet', f.asked ? 'Answered' : 'Changed'];
+  if (settled(f)) return ['quiet', wasAsked(f) ? 'Answered' : 'Changed'];
   if (r === 'blocking') return ['attn', moment === 'send' ? 'Blocks sending' : 'Blocks finalize'];
   if (r === 'action' && f.deferred) return ['quiet', f.deferred === 'declined' ? 'Not my call' : 'At finalize'];
   if (waits(f, moment)) return ['quiet', 'At finalize'];
@@ -195,8 +200,8 @@ export function card(f, host = {}) {
 
   if (settled(f)) {
     // The answer becomes the headline; changing it is first-class, not an override.
-    const v = f.person.value;
-    c.append(el('h3', 'mq-q', v.reading?.reading || (f.asked ? `You wrote ${v.free}.` : 'Changed.')));
+    const v = decided(f).value;
+    c.append(el('h3', 'mq-q', v.reading?.reading || (wasAsked(f) && v.free ? `You wrote ${v.free}.` : 'Changed.')));
   } else if (f.overridden) {
     c.append(el('p', 'mq-p', 'Kept as written. Marque will report it.'));
   } else {
@@ -206,7 +211,8 @@ export function card(f, host = {}) {
   }
 
   // As written → result, when there is a result and it differs.
-  if (f.marking?.as_written && f.outcome?.result && f.outcome.kind !== 'choices' && !f.overridden) {
+  // A pending choice shows the marking it asked the host to write.
+  if (f.marking?.as_written && f.outcome?.result && (f.outcome.kind !== 'choices' || settled(f)) && !f.overridden) {
     const was = el('div', 'mq-was');
     was.append(el('span', null, 'Was'), placed(mark(f.marking.as_written, { size: 'sm', help })), el('span', null, '→'));
     was.append(placed(mark(f.outcome.result, { size: 'sm', help, state: r === 'noticeable' || r === 'quiet' ? 'changed' : undefined })));
@@ -244,7 +250,7 @@ export function card(f, host = {}) {
   const ct = cite(f.says.citation, host); if (ct) foot.append(ct);
   // Back to what Marque said: "Change my answer", "Undo" on a choice the
   // person made, "Fix it after all" on an override. Each is a new line in the log.
-  if (settled(f)) foot.append(button('ghost', f.asked ? 'Change my answer' : 'Undo', () => host.onAct?.(f, 'changed', null)));
+  if (settled(f)) foot.append(button('ghost', wasAsked(f) ? 'Change my answer' : 'Undo', () => host.onAct?.(f, 'changed', null)));
   else if (f.overridden) foot.append(button('ghost', 'Fix it after all', () => host.onAct?.(f, 'changed', null)));
   // No Undo on a fix the person must own; an override is recorded, not hidden.
   else if (r === 'noticeable' || r === 'advisory') foot.append(button('ghost', 'Keep as written', () => host.onAct?.(f, 'kept_as_written')));
@@ -590,7 +596,8 @@ export function receipt(doc, session = {}) {
   // Each act with what was said and when, so a changed answer keeps the one it replaced.
   const said = (v) => v?.reading?.result?.text ?? v?.free
     ?? (v?.fields ? Object.entries(v.fields).map(([k, t]) => `${k.replace(/_/g, ' ')} ${t}`).join(', ') : '');
-  const acts = (x) => (x.history || []).map((e) => [e.act.replace(/_/g, ' '), said(e.value), e.at].filter(Boolean).join(' ')).join(' → ');
+  const op = (v) => (v?.apply ? 'apply' : v?.remove ? 'remove' : said(v));
+  const acts = (x) => (x.history || []).map((e) => [e.act.replace(/_/g, ' '), op(e.value), e.at].filter(Boolean).join(' ')).join(' → ');
   for (const f of doc.findings) {
     const ln = el('div', 'ln');
     ln.append(el('span', 't', where(f)));
@@ -604,6 +611,12 @@ export function receipt(doc, session = {}) {
   for (const a of doc.document.artifacts.filter((x) => x.history?.length)) {
     const ln = el('div', 'ln');
     ln.append(el('span', 't', where(a)), el('div', 'b', `${a.kind} · ${acts(a)}`));
+    r.append(ln);
+  }
+  // Acts on findings a later lint withdrew stay in the audit.
+  for (const x of doc.document.withdrawn || []) {
+    const ln = el('div', 'ln');
+    ln.append(el('span', 't', '—'), el('div', 'b', `no longer reported · ${acts(x)}`));
     r.append(ln);
   }
   const ft = el('div', 'ft');

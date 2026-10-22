@@ -42,7 +42,7 @@ export function record(state, id, act, value = null, at = new Date().toISOString
 /** Seen only quiets (docs/DERIVATION.md): a Noticeable becomes Quiet; nothing else moves. */
 /** Seen is of a result, not an id: ids survive re-lints, so a new result
  *  under the same id is unseen again. */
-const shown = (f) => f.outcome?.result?.text ?? null;
+const shown = (f) => f.outcome?.result?.text ?? f.derived_value?.text ?? null;
 const wasSeen = (state, f) => state.seen.some((s) => s.id === f.id && s.result === shown(f));
 export function see(state, f) {
   return wasSeen(state, f) ? state : { ...state, seen: [...state.seen, { id: f.id, result: shown(f) }] };
@@ -117,7 +117,8 @@ function artifactView(a, state) {
  * The whole document with the person's acts on it. `blocking` keeps the
  * engine's list and drops what the person has answered; every edit since
  * the lint waits in `pending` until the host applies it and re-lints. `ready` needs both
- * empty. Nothing appears here the engine didn't list.
+ * empty. `withdrawn` keeps the acts on ids the latest lint no longer lists,
+ * for the receipt. Nothing else appears here the engine didn't list.
  */
 export function docView(doc, state) {
   const findings = doc.findings.map((f) => view(f, state));
@@ -126,5 +127,6 @@ export function docView(doc, state) {
   const blocking = doc.document.blocking.filter((id) => all.get(id)?.needs_person !== 'none');
   // Every edit since the lint waits for it, blocker or not: an alternative taken moves the banner too.
   const pending = [...new Set(since(state).map((e) => e.id))].filter((id) => settled(live(state, id)));
-  return { ...doc, findings, document: { ...doc.document, artifacts, blocking, pending, ready: !blocking.length && !pending.length } };
+  const withdrawn = [...new Set(state.log.map((e) => e.id))].filter((id) => !all.has(id)).map((id) => ({ id, history: history(state, id) }));
+  return { ...doc, findings, document: { ...doc.document, artifacts, blocking, pending, withdrawn, ready: !blocking.length && !pending.length } };
 }
