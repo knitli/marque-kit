@@ -107,7 +107,7 @@ export function render(marking, o = {}) {
   root.setAttribute('dir', 'ltr');
   root.dataset.text = m.text;
   // Read out as words, not slashes: a labelled group, so its help tokens are still reachable inside.
-  root.setAttribute('role', 'group'); root.setAttribute('aria-label', spoken(m, o.vocab));
+  root.setAttribute('role', 'group'); root.setAttribute('aria-label', spoken(m, o.vocab)); models.set(root, m);
   if (o.form === 'summary') return summary(m, root);
   m.layers.forEach((layer, li) => {
     if (li > 0) root.appendChild(document.createElement('wbr'));
@@ -204,13 +204,15 @@ const word = (vocab, tok) => {
   const banner = vocab.help?.[tok]?.examples?.find((x) => x.kind === 'banner')?.form;
   return named || (banner && banner !== tok ? banner : null);
 };
-// shortcut: one vocabulary for every marking on the page (the last mount's); pass o.vocab for another.
-let said = null;
-/** The vocabulary markings are read out with when none is passed. */
-export const speakWith = (vocab) => { said = vocab || null; };
+// Each rendered marking keeps its model, so a pane can say its markings in its own vocabulary.
+const models = new WeakMap();
+/** Say every marking under `node` again with `vocab` (a mount's own). */
+export function relabel(node, vocab) {
+  for (const n of node.querySelectorAll('.mq-mark')) if (models.has(n)) n.setAttribute('aria-label', spoken(models.get(n), vocab));
+}
 
 /** Spoken form for assistive tech: "Secret, releasable to U-S-A and F-V-E-Y". */
-export function spoken(marking, vocab = said) {
+export function spoken(marking, vocab = {}) {
   const m = normalise(marking);
   const words = [];
   for (const layer of m.layers) for (const { t } of layer.tokens) {

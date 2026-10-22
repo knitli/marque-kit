@@ -106,7 +106,8 @@ const pinned = new WeakMap();
 /** Put back what the host had on `root` before check() pinned fallbacks there. */
 export function release(root) {
   for (const { t, ship, value, priority } of pinned.get(root) || []) {
-    if (!same(root.style.getPropertyValue(t), ship)) continue; // the host has set it again since
+    const now = root.style.getPropertyValue(t);
+    if (now && !same(now, ship)) continue; // the host has set it again since
     if (value) root.style.setProperty(t, value, priority); else root.style.removeProperty(t);
   }
   pinned.delete(root);
@@ -200,7 +201,8 @@ export function watch(root, onTheme) {
   mo.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-mq-theme', 'class', 'style'], childList: true });
   mqs.forEach((q) => q.addEventListener('change', run));
   // Print has its own black-on-white palette: the screen fallbacks step aside for it, then come back.
-  const printing = () => { release(root); last = sig(); };
+  // The host's rejected value stays out of print too: both step aside, and come back after.
+  const printing = () => { for (const { t } of pinned.get(root) || []) root.style.removeProperty(t); last = sig(); };
   addEventListener('beforeprint', printing); addEventListener('afterprint', run);
   // Re-checked when the pane crosses the width floor, not on every resize.
   const under = () => room(root) < FLOOR;

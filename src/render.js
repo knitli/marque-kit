@@ -32,7 +32,7 @@
  * engine's document as-is.
  */
 
-import { render as mark, settle, resettle, speakWith } from './marking.js';
+import { render as mark, settle, resettle, relabel } from './marking.js';
 import { empty, record, see, linted, snapshot, docView, decision, canon } from './state.js';
 import { cite, hasTip, tips } from './help.js';
 import { check, watch, release } from './theme.js';
@@ -94,7 +94,7 @@ function visiblyChanged(f) {
 
 const decided = decision;
 const settled = (f) => decided(f)?.value != null;
-const wasAsked = (f) => !!f.asked || !!f.history?.some((e) => e.act === 'answered');
+const wasAsked = (f) => !!f.asked || !!f.history?.some((e) => e.act === 'answered' && !e.value?.apply); // an apply isn't an answer
 const SHAPE = { quiet: '', noticeable: '', advisory: 'can-act', action: 'must-act', blocking: 'must-act' };
 const STAMP = {
   quiet: ['quiet', 'Done'], noticeable: ['quiet', 'Changed'], advisory: ['act', 'Alternative'],
@@ -279,7 +279,14 @@ export function card(f, host = {}) {
   if (settled(f)) foot.append(button('ghost', wasAsked(f) ? 'Change my answer' : 'Undo', () => host.onAct?.(f, 'changed', null)));
   else if (f.overridden) foot.append(button('ghost', 'Fix it after all', () => host.onAct?.(f, 'changed', null)));
   // No Undo on a fix the person must own; an override is recorded, not hidden.
-  else if (r === 'noticeable' || r === 'advisory') foot.append(button('ghost', 'Keep as written', () => host.onAct?.(f, 'kept_as_written')));
+  // An available fix isn't applied yet: leaving it is the default, so there's nothing to keep.
+  else if ((r === 'noticeable' || r === 'advisory') && f.outcome?.kind !== 'available') foot.append(button('ghost', 'Keep as written', () => host.onAct?.(f, 'kept_as_written')));
+  // Available: Marque has the fix and the person applies it (CONTRACT: available → apply); the host writes it.
+  if (f.outcome?.kind === 'available' && f.outcome.result && !settled(f) && !f.overridden && !host.readOnly) {
+    const acts = el('div', 'mq-acts');
+    acts.append(button('act', 'Apply', () => host.onAct?.(f, 'answered', { apply: true })));
+    c.append(acts);
+  }
   c.append(foot);
   return c;
 }
@@ -325,6 +332,7 @@ export function row(f, host = {}) {
     // One card open at a time.
     li.closest('.mq-pane')?.querySelectorAll('.mq-row-item.open').forEach((o) => { if (o !== li) { o.nextElementSibling?.remove(); o.classList.remove('open'); o.setAttribute('aria-expanded', 'false'); } });
     const d = el('div', 'mq-row-detail'); d.append(isArtifact ? artifact(f, host) : card(f, host));
+    if (host.vocab) relabel(d, host.vocab);
     // Escape from inside the card closes it and goes back to its row.
     // A token's open tooltip takes the first Escape.
     d.addEventListener('keydown', (e) => {
@@ -617,6 +625,7 @@ export function gate(doc, host = {}) {
   const ids = doc.document.blocking;
   const g = el('div', 'mq-gate');
   g.setAttribute('role', 'region'); g.setAttribute('aria-label', 'Before this can go out');
+  if (host.vocab) queueMicrotask(() => relabel(g, host.vocab)); // once its cards are in
   if (!ids.length) {
     // Still the last look before it goes out: what will be written, and what the person answered.
     const n = doc.document.pending?.length;
@@ -754,7 +763,6 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   if (added) root.classList.add('mq');
   // Every mount is its own query container, so the card's narrow rules follow this pane, not a wider ancestor.
   root.classList.add('mq-mount');
-  if (host.vocab) speakWith(host.vocab);
   root.replaceChildren(body, live);
   let theme = check(root); // before the first draw, so a failing host token never shows
   // Under the floor, rows only, in the room there is: the root's own minimum steps aside.
@@ -843,7 +851,9 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   }
 
   // `fresh`: the person just acted, so what they had in the form went with it.
+  let dead = false; // destroyed: a draw queued before it (onOpen, a resize) draws nothing
   function draw(focusId = focusedId(), { fresh = false } = {}) {
+    if (dead) return;
     const kept = fresh ? [] : drafts();
     const v = cur.doc && docView(cur.doc, cur.state);
     let say = '';
@@ -859,6 +869,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     // Never leave an old announcement behind for someone to find later.
     live.textContent = say;
     body.replaceChildren(pane(v, h));
+    if (host.vocab) relabel(body, host.vocab); // this pane's own vocabulary
     refocus(focusId);
     // After the open card is back (a microtask) and focus with it.
     // Only into this draw: a later one collects its own.
@@ -870,7 +881,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   return {
     get theme() { return theme; }, // the gate's report: { checked, rejected: [{ token, measured, floor, fallback }] }
     /** Take the pane down: its theme watchers go, and so does what it drew. */
-    destroy() { unwatch(); if (sized) sized.disconnect(); untips(); release(root); root.replaceChildren(); root.classList.remove('mq-narrow', 'mq-mount'); if (added) root.classList.remove('mq'); },
+    destroy() { dead = true; unwatch(); if (sized) sized.disconnect(); untips(); release(root); root.replaceChildren(); root.classList.remove('mq-narrow', 'mq-mount'); if (added) root.classList.remove('mq'); },
     update({ linted: upTo, seq, ...next }) {
       // A lint that began before the one already shown is stale: keep the newer document.
       // `seq` orders lints that began at the same point in the log. A stale lint's
