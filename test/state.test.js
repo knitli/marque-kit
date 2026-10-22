@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { rung, sections } from '../src/render.js';
-import { empty, record, see, linted, view, docView, ACTS } from '../src/state.js';
+import { empty, record, see, linted, snapshot, view, docView, ACTS } from '../src/state.js';
 
 /* Table 2, row by row. */
 const T = [
@@ -170,6 +170,21 @@ const ban = doc.document.artifacts.find((a) => a.id === 'a-banner');
 s = see(empty(), ban);
 assert.equal(view(ban, s).seen, true);
 assert.equal(view({ ...ban, derived_value: { text: 'SECRET//NOFORN' } }, s).seen, false);
+
+// Undoing a written answer is a write; undoing an unwritten one cancels it.
+s = record(empty(), P5, 'changed', { reading: f(P5).outcome.readings[0], index: 0 });
+assert.deepEqual(docView(doc, record(s, P5, 'changed', null)).document.pending, [], 'cancelled before any lint');
+assert.deepEqual(docView(doc, record(linted(s), P5, 'changed', null)).document.pending, [P5], 'reversing a written edit waits for the lint');
+// An override holds only for the marking and fix it was taken on.
+s = record(empty(), P2, 'kept_as_written', null, 't', snapshot(f(P2)));
+assert.equal(view(f(P2), s).overridden, true);
+const p2new = { ...f(P2), marking: { ...f(P2).marking, as_written: { text: '(S//REL TO USA FVEY NZL)' } } };
+assert.equal(view(p2new, s).overridden, undefined, 'a changed marking under the same id is open again');
+// A withdrawn finding keeps what it was about.
+s = record(empty(), P3, 'declined', null, 't', snapshot(f(P3)));
+const w = docView({ ...doc, findings: doc.findings.filter((x) => x.id !== P3) }, s).document.withdrawn[0];
+assert.equal(w.about.rule, `${f(P3).rule.scheme}:${f(P3).rule.predicate}`);
+assert.equal(w.about.as_written, f(P3).marking.as_written.text);
 
 // A derived field counts as filled.
 const derivedCab = { ...cab, fields: { ...cab.fields, derived_from: { state: 'derived', value: 'DIA SCG 2024-01' } } };

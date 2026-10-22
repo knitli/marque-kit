@@ -33,7 +33,7 @@
  */
 
 import { render as mark, settle } from './marking.js';
-import { empty, record, see, linted, docView } from './state.js';
+import { empty, record, see, linted, snapshot, docView } from './state.js';
 import { cite, hasTip, tips } from './help.js';
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
@@ -478,8 +478,9 @@ export function artifact(a, host = {}) {
     c.append(placed(mark(a.derived_value, { size: 'lg', state: 'derived' })));
     if (a.placement) c.append(el('span', 'mq-place', `Placed: ${a.placement.replace(/_/g, ' ')}`));
     // Generated, not applied: the person can apply it; the host writes it (docs/COMPONENTS.md, C9).
-    if (a.applying && a.state === 'absent_but_required') c.append(el('p', 'mq-p', 'Waiting to be written into the document.'));
-    else if (a.fixability === 'fixable' && a.state === 'absent_but_required' && !host.readOnly) {
+    const fixes = a.state === 'absent_but_required' || a.state === 'present_not_canonical';
+    if (a.applying && fixes) c.append(el('p', 'mq-p', 'Waiting to be written into the document.'));
+    else if (a.fixability === 'fixable' && fixes && !host.readOnly) {
       const acts = el('div', 'mq-acts');
       acts.append(button('act', 'Apply', () => host.onAct?.(a, 'answered', { apply: true })));
       c.append(acts);
@@ -616,7 +617,12 @@ export function receipt(doc, session = {}) {
   // Acts on findings a later lint withdrew stay in the audit.
   for (const x of doc.document.withdrawn || []) {
     const ln = el('div', 'ln');
-    ln.append(el('span', 't', '—'), el('div', 'b', `no longer reported · ${acts(x)}`));
+    const a = x.about || {};
+    ln.append(el('span', 't', a.anchor || a.kind ? where(a) : '—'));
+    const b = el('div', 'b');
+    b.append(el('span', null, `${a.rule ? `${a.rule} · ` : ''}no longer reported · ${acts(x)}`));
+    if (a.as_written) b.append(mark({ text: a.as_written }, { size: 'xs' }));
+    ln.append(b);
     r.append(ln);
   }
   const ft = el('div', 'ft');
@@ -665,7 +671,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
       host.onOpen?.(f);
     },
     onAct(f, act, value = null) {
-      cur.state = record(cur.state, f.id, act, value);
+      cur.state = record(cur.state, f.id, act, value, undefined, snapshot(f));
       // The card stays open where the finding now lives, and keeps focus if it had it.
       const inPane = body.contains(document.activeElement);
       cur.open = f.id;
@@ -709,6 +715,8 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
 
   return {
     update({ linted: upTo, ...next }) {
+      // A lint that began before the one already shown is stale: keep the newer document.
+      if (next.doc && upTo != null && upTo < (cur.state.linted ?? 0)) delete next.doc;
       Object.assign(cur, next);
       // A new lint is the host saying it applied what the person answered: everything
       // up to `upTo`, the log length when the host started that lint (default: all of it).

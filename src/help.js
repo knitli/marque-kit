@@ -422,7 +422,8 @@ export function tips(root, vocab, host = {}) {
     if (e.key === 'Escape' && shown) { e.stopPropagation(); hide(); }
     if (e.key === 'Enter') { e.preventDefault(); hide(); host.onHelp?.({ kind: 'token', code: t.dataset.help, anchor: t }); }
   };
-  const click = (e) => { const t = tokOf(e); if (t) { hide(); host.onHelp?.({ kind: 'token', code: t.dataset.help, anchor: t }); } };
+  // A token inside a reading's label opens help, never picks the reading.
+  const click = (e) => { const t = tokOf(e); if (t) { e.preventDefault(); e.stopPropagation(); hide(); host.onHelp?.({ kind: 'token', code: t.dataset.help, anchor: t }); } };
   const on = [['pointerover', over], ['pointerout', out], ['focusin', focus], ['focusout', out], ['keydown', key], ['click', click]];
   on.forEach(([k, fn]) => root.addEventListener(k, fn));
   return () => { hide(); on.forEach(([k, fn]) => root.removeEventListener(k, fn)); };

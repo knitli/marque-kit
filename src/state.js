@@ -8,7 +8,10 @@
  *
  * A state is plain JSON so a host can keep it anywhere (document properties,
  * a server, localStorage):
- *   { log: [{ id, act, value, at }], seen: [{ id, result }], linted: n }
+ *   { log: [{ id, act, value, at, about }], seen: [{ id, result }], linted: n }
+ * `about` is what the act was about when it was taken (snapshot()), so the
+ * receipt can name a finding a later lint withdrew and an override is
+ * reopened when the marking it kept changes.
  * The log is append-only. Changing an answer adds a line and never rewrites
  * one, so the receipt shows both answers (docs/COMPONENTS.md, "Answered").
  *
@@ -34,10 +37,16 @@ export const ACTS = Object.freeze(['answered', 'changed', 'kept_as_written', 'de
 export const empty = () => ({ log: [], seen: [] });
 
 /** Append one act. Returns a new state; the old one is untouched. */
-export function record(state, id, act, value = null, at = new Date().toISOString()) {
+export function record(state, id, act, value = null, at = new Date().toISOString(), about = undefined) {
   if (!ACTS.includes(act)) throw new Error(`Unknown act "${act}"; expected one of ${ACTS.join(', ')}`);
-  return { ...state, log: [...state.log, { id, act, value, at }] };
+  return { ...state, log: [...state.log, { id, act, value, at, ...(about && { about }) }] };
 }
+
+/** What an act is about, kept with it: markings, rule and place, never body text. */
+export const snapshot = (f) => ({
+  rule: f.rule ? `${f.rule.scheme}:${f.rule.predicate}` : f.kind, anchor: f.anchor, kind: f.kind,
+  as_written: f.marking?.as_written?.text ?? null, result: f.outcome?.result?.text ?? f.derived_value?.text ?? null,
+});
 
 /** Seen only quiets (docs/DERIVATION.md): a Noticeable becomes Quiet; nothing else moves. */
 /** Seen is of a result, not an id: ids survive re-lints, so a new result
@@ -61,6 +70,18 @@ function live(state, id) {
   return edits(e) && state.log.lastIndexOf(e) < (state.linted ?? 0) ? null : e;
 }
 
+/** Does the act in force on `id` ask the host to change the document? An
+ *  answer or an override does; so does undoing one a lint already wrote.
+ *  Undoing one nobody wrote yet cancels it and writes nothing. */
+function writes(state, id) {
+  const n = state.linted ?? 0;
+  const e = last(state, id), at = state.log.lastIndexOf(e);
+  if (!e || at < n) return false;
+  if (settled(e) || e.act === 'kept_as_written') return true;
+  if (!edits(e)) return false;
+  return state.log.slice(0, n).some((x) => x.id === id && (settled(x) || x.act === 'kept_as_written'));
+}
+
 /** The host re-linted: the first `n` acts are in the new findings. Never moves back. */
 export const linted = (state, n = state.log.length) => ({ ...state, linted: Math.max(state.linted ?? 0, Math.min(n, state.log.length)) });
 
@@ -81,6 +102,8 @@ export function view(f, state) {
       return { ...v, asked: f.asks, outcome: { ...f.outcome, result, fallback: undefined }, asks: null, needs_person: 'none', blocks: 'never' };
     }
     case 'kept_as_written':
+      // The person kept one marking against one fix; a different one under the same id is open again.
+      if (e.about && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || e.about.result !== (f.outcome?.result?.text ?? null))) return v;
       return { ...v, overridden: true, outcome: { ...f.outcome, kind: 'kept_as_written', result: f.marking?.as_written, readings: [] }, needs_person: 'none', blocks: 'never' };
     default: // deferred, declined: still open
       return { ...v, deferred: e.act };
@@ -125,8 +148,9 @@ export function docView(doc, state) {
   const artifacts = doc.document.artifacts.map((a) => view(a, state));
   const all = new Map([...findings, ...artifacts].map((x) => [x.id, x]));
   const blocking = doc.document.blocking.filter((id) => all.get(id)?.needs_person !== 'none');
-  // Every edit since the lint waits for it, blocker or not: an alternative taken moves the banner too.
-  const pending = [...new Set(since(state).map((e) => e.id))].filter((id) => settled(live(state, id)));
-  const withdrawn = [...new Set(state.log.map((e) => e.id))].filter((id) => !all.has(id)).map((id) => ({ id, history: history(state, id) }));
+  // Every write since the lint waits for it, blocker or not: an alternative taken moves the banner too.
+  const pending = [...new Set(since(state).map((e) => e.id))].filter((id) => writes(state, id));
+  const withdrawn = [...new Set(state.log.map((e) => e.id))].filter((id) => !all.has(id))
+    .map((id) => ({ id, about: history(state, id).findLast((e) => e.about)?.about, history: history(state, id) }));
   return { ...doc, findings, document: { ...doc.document, artifacts, blocking, pending, withdrawn, ready: !blocking.length && !pending.length } };
 }
