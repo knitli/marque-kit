@@ -161,6 +161,7 @@
       font-family: var(--mq-font-body); font-size: var(--mq-size-base); line-height: 1.5;
       container-type: inline-size; container-name: mq;
       -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+.mq-mount { container-type: inline-size; container-name: mq; }   /* each pane its own container */
 .mq *, .mq *::before, .mq *::after { box-sizing: border-box; min-width: 0; }
 
 /* ═══ 3 · FIT ═════════════════════════════════════════════════════════ */

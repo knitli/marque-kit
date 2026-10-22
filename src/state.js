@@ -59,7 +59,7 @@ export const snapshot = (f) => structuredClone({ // a record, not a view of a do
 /** Seen only quiets (docs/DERIVATION.md): a Noticeable becomes Quiet; nothing else moves. */
 /** Seen is of a result, not an id: ids survive re-lints, so a new result
  *  under the same id is unseen again. */
-const shown = (f) => f.outcome?.result?.text ?? f.derived_value?.text ?? null;
+const shown = (f) => f.outcome?.result?.text ?? f.derived_value?.text ?? (f.derived_value ? canon(f.derived_value) : null); // typed content by its whole value
 const wasSeen = (state, f) => state.seen.some((s) => s.id === f.id && s.result === shown(f));
 export function see(state, f) {
   return wasSeen(state, f) ? state : { ...state, seen: [...state.seen, { id: f.id, result: shown(f) }] };
@@ -236,7 +236,9 @@ function artifactView(a, state, took) {
  * for the receipt. Nothing else appears here the engine didn't list.
  */
 export function docView(doc, state) {
-  const findings = doc.findings.map((f) => view(f, state));
+  // What each finding's decision moves: the artifacts that depend on it, by kind.
+  const moves = (id) => doc.document.artifacts.filter((a) => a.depends_on?.includes(id)).map((a) => a.kind);
+  const findings = doc.findings.map((f) => { const v = view(f, state), m = moves(f.id); return m.length ? { ...v, moves: m } : v; });
   const took = new Set(findings.filter((x) => settled(x.person)).map((x) => x.id));
   const artifacts = doc.document.artifacts.map((a) => view(a, state, took));
   const all = new Map([...findings, ...artifacts].map((x) => [x.id, x]));

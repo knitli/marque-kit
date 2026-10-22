@@ -32,7 +32,7 @@
  * engine's document as-is.
  */
 
-import { render as mark, settle, resettle } from './marking.js';
+import { render as mark, settle, resettle, speakWith } from './marking.js';
 import { empty, record, see, linted, snapshot, docView, decision, canon } from './state.js';
 import { cite, hasTip, tips } from './help.js';
 import { check, watch, release } from './theme.js';
@@ -157,6 +157,7 @@ function asks(f, host, r, help) {
   options.forEach((o, i) => {
     const lab = el('label', 'mq-opt');
     const inp = el('input'); inp.type = 'radio'; inp.name = name; inp.value = String(i); inp.dataset.draft = `${f.id}:reading`;
+    inp.dataset.reading = canon(o); // a draft is the reading itself, not its place in the list
     inp.addEventListener('change', () => { chosen = { reading: o, index: i }; free.value = ''; clear(); });
     const txt = el('div', 'mq-txt');
     txt.append(el('div', 'mq-pr', o.reading));
@@ -226,7 +227,12 @@ export function card(f, host = {}) {
 
   // As written → result, when there is a result and it differs.
   // A pending choice shows the marking it asked the host to write.
-  if (f.marking?.as_written && f.outcome?.result && (f.outcome.kind !== 'choices' || settled(f)) && !f.overridden) {
+  if (f.marking?.as_written && !(f.outcome?.result && (f.outcome.kind !== 'choices' || settled(f))) && !f.overridden) {
+    // Still to be decided: the marking it's about, as context for the readings below.
+    const ctx = el('div', 'mq-was');
+    ctx.append(el('span', null, 'As written'), placed(mark(f.marking.as_written, { size: 'sm', help })));
+    c.append(ctx);
+  } else if (f.marking?.as_written && f.outcome?.result && (f.outcome.kind !== 'choices' || settled(f)) && !f.overridden) {
     const was = el('div', 'mq-was');
     was.append(el('span', null, 'Was'), placed(mark(f.marking.as_written, { size: 'sm', help })), el('span', null, '→'));
     was.append(placed(mark(f.outcome.result, { size: 'sm', help, state: r === 'noticeable' || r === 'quiet' ? 'changed' : undefined })));
@@ -235,6 +241,12 @@ export function card(f, host = {}) {
     const now = el('div', 'mq-was');
     now.append(el('span', null, 'Now'), placed(mark(f.outcome.result, { size: 'sm' })));
     c.append(now);
+  }
+
+  // A decision here moves an artifact (its depends_on): say so beside the decision, the gate included.
+  if (f.moves?.length && !settled(f) && !f.overridden) {
+    const names = [...new Set(f.moves)].map((k) => `the ${(NAME[k] || k.replace(/_/g, ' ')).toLowerCase()}`);
+    c.append(el('p', 'mq-p', `What you decide here changes ${names.join(' and ')}.`));
   }
 
   // The alternative the author also wrote (advisory): one action away.
@@ -526,11 +538,9 @@ export function artifact(a, host = {}) {
   head.append(el('span', `mq-stamp ${tone}`, word));
   c.append(head);
   c.append(el('p', 'mq-p', a.says.text));
-  if (a.derived_value && !isMarking(a.derived_value)) {
-    // Typed notice content: its words are the host's to show; Marque says it's derived.
-    c.append(el('p', 'mq-p', 'Marque has a notice to add here.'));
-  } else if (a.derived_value) {
-    c.append(placed(mark(a.derived_value, { size: 'lg', state: 'derived' })));
+  if (a.derived_value) {
+    // Typed notice content isn't a marking: its words are the host's to show. Either way it can be applied.
+    c.append(isMarking(a.derived_value) ? placed(mark(a.derived_value, { size: 'lg', state: 'derived' })) : el('p', 'mq-p', 'Marque has a notice to add here.'));
     if (a.placement) c.append(el('span', 'mq-place', `Placed: ${a.placement.replace(/_/g, ' ')}`));
     // Generated, not applied: the person can apply it; the host writes it (docs/COMPONENTS.md, C9).
     const fixes = a.state === 'absent_but_required' || a.state === 'present_not_canonical';
@@ -742,6 +752,9 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   // The kit root carries the tokens; one above it (with its theme) wins, so only add it when there is none.
   const added = !root.closest('.mq');
   if (added) root.classList.add('mq');
+  // Every mount is its own query container, so the card's narrow rules follow this pane, not a wider ancestor.
+  root.classList.add('mq-mount');
+  if (host.vocab) speakWith(host.vocab);
   root.replaceChildren(body, live);
   let theme = check(root); // before the first draw, so a failing host token never shows
   // Under the floor, rows only, in the room there is: the root's own minimum steps aside.
@@ -816,9 +829,9 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     .filter((x) => !acting || !x.dataset.draft.startsWith(`${acting}:`))
     // An opened correction counts as soon as it's open, typed in or not.
     .filter((x) => (x.type === 'radio' ? x.checked : x.dataset.opened || (x.value.trim() && x.value !== x.defaultValue)))
-    .map((x) => ({ key: x.dataset.draft, value: x.value, radio: x.type === 'radio', focused: x === document.activeElement }));
+    .map((x) => ({ key: x.dataset.draft, value: x.type === 'radio' ? x.dataset.reading : x.value, radio: x.type === 'radio', focused: x === document.activeElement }));
   function restore(list) {
-    const find = (d) => [...body.querySelectorAll('[data-draft]')].find((x) => x.dataset.draft === d.key && (d.radio ? x.type === 'radio' && x.value === d.value : x.type !== 'radio'));
+    const find = (d) => [...body.querySelectorAll('[data-draft]')].find((x) => x.dataset.draft === d.key && (d.radio ? x.type === 'radio' && x.dataset.reading === d.value : x.type !== 'radio'));
     for (const d of list) {
       let n = find(d);
       // A correction under way to a filled field: open it again for the person.
@@ -857,7 +870,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   return {
     get theme() { return theme; }, // the gate's report: { checked, rejected: [{ token, measured, floor, fallback }] }
     /** Take the pane down: its theme watchers go, and so does what it drew. */
-    destroy() { unwatch(); if (sized) sized.disconnect(); untips(); release(root); root.replaceChildren(); root.classList.remove('mq-narrow'); if (added) root.classList.remove('mq'); },
+    destroy() { unwatch(); if (sized) sized.disconnect(); untips(); release(root); root.replaceChildren(); root.classList.remove('mq-narrow', 'mq-mount'); if (added) root.classList.remove('mq'); },
     update({ linted: upTo, seq, ...next }) {
       // A lint that began before the one already shown is stale: keep the newer document.
       // `seq` orders lints that began at the same point in the log. A stale lint's

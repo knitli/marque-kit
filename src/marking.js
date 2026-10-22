@@ -195,14 +195,28 @@ export function settle(root) {
   return root;
 }
 
+/** A code's words from the kit's vocabulary (help, trigraphs, tetragraphs), or a plain { code: words } map:
+ *  a country or group by its name, a marking by its banner form. */
+const word = (vocab, tok) => {
+  if (!vocab) return null;
+  if (typeof vocab[tok] === 'string') return vocab[tok];
+  const named = [...(vocab.trigraphs || []), ...(vocab.tetragraphs || [])].find((x) => x.code === tok)?.name;
+  const banner = vocab.help?.[tok]?.examples?.find((x) => x.kind === 'banner')?.form;
+  return named || (banner && banner !== tok ? banner : null);
+};
+// shortcut: one vocabulary for every marking on the page (the last mount's); pass o.vocab for another.
+let said = null;
+/** The vocabulary markings are read out with when none is passed. */
+export const speakWith = (vocab) => { said = vocab || null; };
+
 /** Spoken form for assistive tech: "Secret, releasable to U-S-A and F-V-E-Y". */
-export function spoken(marking, vocab = {}) {
+export function spoken(marking, vocab = said) {
   const m = normalise(marking);
   const words = [];
   for (const layer of m.layers) for (const { t } of layer.tokens) {
     const tok = bare(t);
     if (!tok) continue;
-    words.push(vocab[tok] || (/^[A-Z]{3,4}$/.test(tok) ? tok.split('').join('-') : tok));
+    words.push(word(vocab, tok) || (/^[A-Z]{3,4}$/.test(tok) ? tok.split('').join('-') : tok));
   }
   // Masks are said as what they are, never as what they cover.
   for (const mask of m.masks || []) words.push(mask.kind === 'concealed' ? 'source concealed' : `${mask.len} characters not identified`);
