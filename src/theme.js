@@ -177,9 +177,10 @@ export function check(root) {
 export function watch(root, onTheme) {
   // A root mounted detached is checked once it's in the document.
   let done = root.isConnected;
-  // A host can retheme the root itself: its class, or tokens in its style. The gate's own pins
-  // are in the signature it leaves behind, so they don't set it off again.
-  const sig = () => `${root.className}|${[...root.style].filter((p) => p.startsWith('--mq-')).map((p) => `${p}:${root.style.getPropertyValue(p)}`).join(';')}`;
+  // A host can retheme the root or anything above it: a class, or tokens in a style. The gate's
+  // own pins are in the signature it leaves behind, so they don't set it off again.
+  const chain = () => { const ns = []; for (let n = root; n; n = n.parentElement) ns.push(n); return ns; };
+  const sig = () => chain().map((n) => `${n.className}|${n.style.cssText}`).join('\n');
   let last = sig();
   const run = () => { onTheme(check(root)); last = sig(); };
   // A root moved under another ancestor (removed and put back) may be under another theme.
@@ -193,8 +194,9 @@ export function watch(root, onTheme) {
     if (themed || moved || !done || sig() !== last) { done = true; run(); }
   });
   const mqs = ['(prefers-color-scheme: dark)', '(forced-colors: active)'].map((q) => matchMedia(q));
-  mo.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-mq-theme'], childList: true });
-  mo.observe(root, { attributes: true, attributeFilter: ['class', 'style'] });
+  // One registration (a second on the same node would replace the first); the signature sorts out
+  // which class or style changes are on the root's own line.
+  mo.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-mq-theme', 'class', 'style'], childList: true });
   mqs.forEach((q) => q.addEventListener('change', run));
   // Print has its own black-on-white palette: the screen fallbacks step aside for it, then come back.
   const printing = () => { release(root); last = sig(); };
