@@ -123,6 +123,22 @@ const staleOp = (e, a) => !!e.about && (e.about.state !== a.state || e.about.res
   || Object.keys(e.value?.fields || {}).some((k) => !a.fields?.[k] || (e.about.fields?.[k] && schema(e.about.fields[k]) !== schema(a.fields[k]))));
 const schema = ({ state, value, source, ...fl }) => JSON.stringify(fl);
 
+const edited = (e) => (e?.act === 'answered' || e?.act === 'changed') ? e : null;
+/** On a view (render and help share it): the person's decision on this finding: the act in force, or, once a lint has
+ *  written it and nothing is asked again, the last one in the history. A stale
+ *  view has no decision: the lint dropped the person's last one. Nor is a
+ *  written answer whose marking the engine has since moved off. */
+const holds = (e, f) => {
+  // A prose answer becomes a marking only once the engine derives one; only a typed marking compares.
+  const r = e?.value?.reading?.result?.text ?? (e?.about?.asks?.field?.type === 'marking' ? e.value.free : null);
+  const norm = (t) => (t ?? '').replace(/\s+/g, ' ').trim();
+  const now = norm(f.outcome?.result?.text), was = norm(f.marking?.as_written?.text);
+  // Asked of this marking: the one it was asked about, or the one a marking answer wrote.
+  // A prose answer's written marking can't be told from a new one, so it holds only on its own.
+  const same = !e?.about || was === norm(e.about.as_written) || (r != null && was === now);
+  return same && (r == null || norm(r) === now) ? e : null;
+};
+export const decision = (f) => edited(f.person) || (!f.stale && f.needs_person === 'none' && !f.asks ? holds(edited(f.history?.findLast((e) => edited(e))), f) : null);
 /** One finding or artifact as it stands with the person's acts on it. */
 export function view(f, state, took) {
   const v = overlay(f, state, took);

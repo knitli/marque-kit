@@ -136,7 +136,7 @@ The kit records; the host writes; Marque re-lints. `src/state.js` and `mount()` 
 **The loop.**
 1. The person acts. The kit appends to the log and calls `onChange(state, act)`. `act` is null when only bookkeeping moved (seen, the checkpoint); persist the state either way.
 2. The host writes what the act asks for. The kit never edits the document.
-3. The host re-lints and calls `update({ doc, linted, seq })`. `linted` is `state.log.length` when that lint began, and `seq` is the host's request counter. A synchronous host can omit both. A response whose `linted` is behind the checkpoint, or whose `seq` is not newer than the last one shown, is stale and ignored. The checkpoint never moves back.
+3. The host re-lints and calls `update({ doc, linted, seq })`. `linted` is `state.log.length` when that lint began, and `seq` is the host's request counter. A synchronous host can omit both. A response whose `linted` is behind the checkpoint, or whose `seq` is older than the last one shown, is stale and ignored; updates with the same `seq` are one lint sending partial results, then the rest. The checkpoint never moves back.
 
 **Between steps 1 and 3** the act is generated, not applied (DECISIONS #4).
 - The card shows it: the answer as the headline, the marking it asks for, and "Waiting to be written" on an artifact.

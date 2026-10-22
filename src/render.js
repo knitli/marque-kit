@@ -33,7 +33,7 @@
  */
 
 import { render as mark, settle } from './marking.js';
-import { empty, record, see, linted, snapshot, docView } from './state.js';
+import { empty, record, see, linted, snapshot, docView, decision } from './state.js';
 import { cite, hasTip, tips } from './help.js';
 import { check, watch, release } from './theme.js';
 
@@ -89,22 +89,7 @@ function visiblyChanged(f) {
   return norm(was) !== norm(now);
 }
 
-const edit = (e) => (e?.act === 'answered' || e?.act === 'changed') ? e : null;
-/** The person's decision on this finding: the act in force, or, once a lint has
- *  written it and nothing is asked again, the last one in the history. A stale
- *  view has no decision: the lint dropped the person's last one. Nor is a
- *  written answer whose marking the engine has since moved off. */
-const holds = (e, f) => {
-  // A prose answer becomes a marking only once the engine derives one; only a typed marking compares.
-  const r = e?.value?.reading?.result?.text ?? (e?.about?.asks?.field?.type === 'marking' ? e.value.free : null);
-  const norm = (t) => (t ?? '').replace(/\s+/g, ' ').trim();
-  const now = norm(f.outcome?.result?.text), was = norm(f.marking?.as_written?.text);
-  // Asked of this marking: the one it was asked about, or the one a marking answer wrote.
-  // A prose answer's written marking can't be told from a new one, so it holds only on its own.
-  const same = !e?.about || was === norm(e.about.as_written) || (r != null && was === now);
-  return same && (r == null || norm(r) === now) ? e : null;
-};
-const decided = (f) => edit(f.person) || (!f.stale && f.needs_person === 'none' && !f.asks ? holds(edit(f.history?.findLast((e) => edit(e))), f) : null);
+const decided = decision;
 const settled = (f) => decided(f)?.value != null;
 const wasAsked = (f) => !!f.asked || !!f.history?.some((e) => e.act === 'answered');
 const SHAPE = { quiet: '', noticeable: '', advisory: 'can-act', action: 'must-act', blocking: 'must-act' };
@@ -359,6 +344,9 @@ const due = (a) => a.state === 'absent_but_required' && a.derived_value && a.fix
 /** Read-only, nothing can be written, so a due artifact holds the document up. */
 const unwritable = (doc, host) => (host.readOnly ? doc.document.artifacts.filter(due).length : 0);
 const ready = (doc, host) => doc.document.ready && !unwritable(doc, host);
+/** What the gate lists: blockers and the writes still waiting, once each. A required
+ *  finding that never blocks needs the person but holds nothing up. */
+const held = (doc) => new Set([...doc.document.blocking, ...(doc.document.pending || [])]).size;
 
 export function status(doc, host = {}) {
   const s = el('div', 'mq-status');
@@ -387,10 +375,9 @@ export function status(doc, host = {}) {
     s.append(el('span', 'mq-stamp', 'Not ready'), words(`${plural(doc.document.pending.length, 'answer', 'answers')} waiting to be written into the document`));
   } else if (!g.must.length && stuck) {
     s.append(el('span', 'mq-stamp', 'Not ready'), words(`${plural(stuck, 'thing', 'things')} can't be written while the document is read-only`));
-  } else if (GATE.has(host.moment)) {
+  } else if (GATE.has(host.moment) && held(doc)) {
     s.classList.add('must');
-    // What the gate lists: blockers and the writes still waiting, once each.
-    const n = new Set([...doc.document.blocking, ...(doc.document.pending || [])]).size;
+    const n = held(doc);
     s.append(el('span', 'mq-stamp attn', 'Blocked'), words(`${plural(n, 'thing has', 'things have')} to be settled before it can go out`));
   } else {
     if (g.must.length) { s.classList.add('must'); s.append(el('span', 'mq-stamp attn', `${g.must.length} needs you`)); }
@@ -444,7 +431,7 @@ export function pane(doc, host = {}) {
   const g = sections(doc, host.moment);
   const atGate = GATE.has(host.moment);
   head.append(partial ? el('span', 'mq-stamp quiet', 'Checking')
-    : g.must.length ? el('span', 'mq-stamp attn', atGate ? 'Blocked' : `${g.must.length} needs you`)
+    : g.must.length ? el('span', 'mq-stamp attn', atGate && held(doc) ? 'Blocked' : `${g.must.length} needs you`)
     : el('span', 'mq-stamp', ready(doc, host) ? 'Ready' : 'Not ready'));
   p.append(status(doc, host));
   if (partial) p.append(engineState(host));
@@ -732,7 +719,8 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
       // Opening it is seeing it. Recorded now and drawn when the row closes, so rows never move under the pointer.
       if (f) {
         const s = see(cur.state, f);
-        if (s !== cur.state) { cur.state = s; unseen = true; host.onChange?.(s, null); }
+        // Narrow, there's no card to close, so the row is drawn as seen now.
+        if (s !== cur.state) { cur.state = s; host.onChange?.(s, null); if (theme?.narrow) queueMicrotask(() => draw()); else unseen = true; }
       } else if (unseen) { unseen = false; queueMicrotask(() => draw()); }
       host.onOpen?.(f);
     },
@@ -792,7 +780,8 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
       // `seq` orders lints that began at the same point in the log. A stale lint's
       // failure is as stale as its document: neither replaces the newer one.
       const lint = 'doc' in next || 'engine' in next;
-      if (lint && ((upTo != null && upTo < (cur.state.linted ?? 0)) || (seq != null && cur.seq != null && seq <= cur.seq))) { delete next.doc; delete next.engine; }
+      // One request may send several updates (partial results, then done): an equal `seq` is the same lint.
+      if (lint && ((upTo != null && upTo < (cur.state.linted ?? 0)) || (seq != null && cur.seq != null && seq < cur.seq))) { delete next.doc; delete next.engine; }
       else if (lint && seq != null) cur.seq = seq;
       Object.assign(cur, next);
       // A new lint is the host saying it applied what the person answered: everything

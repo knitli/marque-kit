@@ -24,6 +24,7 @@
  */
 
 import { render as mark } from './marking.js';
+import { decision } from './state.js';
 
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -122,8 +123,7 @@ export function explain(code, vocab, host = {}) {
 }
 
 /** The person's own answer stands on this finding, live or already written. */
-const answered = (f) => f.person?.value != null
-  || f.history?.findLast((e) => e.act === 'answered' || e.act === 'changed')?.value != null;
+const answered = (f) => decision(f)?.value != null;
 
 /** Tier 2 for a finding: the rule in plain words, the manual's sentence, the
  *  citation with a way in, and only then what overriding costs, if it can be. */

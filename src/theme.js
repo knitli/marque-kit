@@ -18,7 +18,7 @@ export const PAIRS = [
   ['act-ink', 'surface', 4.5], ['act-on', 'act', 4.5], ['act-on', 'act-hover', 4.5], ['act-ink', 'act-tint', 4.5],
   ['attn-on', 'attn', 4.5], ['attn-ink', 'surface', 4.5], ['attn-ink', 'attn-tint', 4.5],
   ['error-ink', 'surface', 4.5], ['focus', 'surface', 3.0],
-  ['text', 'ground', 4.5], ['text-muted', 'ground', 4.5], // the pane's own headings sit on the ground
+  ['text', 'ground', 4.5], ['text-muted', 'ground', 4.5], ['act-ink', 'ground', 4.5], // the pane's headings, footer links and section marks sit on the ground
   ['text', 'surface-sunken', 4.5], ['text-muted', 'surface-sunken', 4.5], // open rows, wells, notices
   ['rule-strong', 'surface', 3.0], // card, option and input borders: a non-text part
 ];
@@ -55,12 +55,15 @@ const same = (a, b) => a.replace(/\s+/g, '') === b.replace(/\s+/g, '');
 
 /** The --mq-* values theme.css gives `root`, ignoring anything a host set. */
 function shipped(root) {
-  const blocks = [];
-  const walk = (rules) => {
+  const blocks = [], first = new Set();
+  const walk = (rules, at = '') => {
     for (const r of rules) {
       // A style rule has cssRules too (nesting), so it is matched first.
-      if (r.style && r.selectorText) { if (THEMES.has(norm(r.selectorText))) blocks.push(r); }
-      else if (r.cssRules && (!r.media || matchMedia(r.media.mediaText).matches)) walk(r.cssRules);
+      if (r.style && r.selectorText) {
+        // theme.css declares each block once; the same selector again, later, is a host's override.
+        const key = `${at}|${norm(r.selectorText)}`;
+        if (THEMES.has(norm(r.selectorText)) && !first.has(key)) { first.add(key); blocks.push(r); }
+      } else if (r.cssRules && (!r.media || matchMedia(r.media.mediaText).matches)) walk(r.cssRules, `${at}@${r.media?.mediaText ?? ''}`);
     }
   };
   // Found by the kit's own theme selectors, so a bundled, inlined or renamed theme.css still counts.
@@ -74,6 +77,16 @@ function shipped(root) {
     if (own.length) return Object.fromEntries(own.flatMap((r) => [...r.style].filter((p) => p.startsWith('--mq-')).map((p) => [p, r.style.getPropertyValue(p).trim()])));
   }
   return {};
+}
+
+/** The room the host gives the pane: root's own width, and no more than its parent's.
+ *  `.mq`'s min-width is set aside to measure it; it would only overflow the room. */
+function room(root) {
+  const [v, pr] = [root.style.getPropertyValue('min-width'), root.style.getPropertyPriority('min-width')];
+  root.style.setProperty('min-width', '0px', 'important');
+  const w = Math.min(root.clientWidth, (root.parentElement || root).clientWidth);
+  if (v) root.style.setProperty('min-width', v, pr); else root.style.removeProperty('min-width');
+  return w;
 }
 
 /** What `root` paints on: its own background and its ancestors', laid down from the page's white.
@@ -150,8 +163,7 @@ export function check(root) {
   }
   probe.remove();
   for (const r of rejected) console.warn(`Marque theme: ${r.token} measured ${r.measured}, floor ${r.floor}; ${r.fallback ? 'shipped value used' : 'no shipped value could be read to fall back to'}`);
-  // The room the host gives the pane; `.mq`'s own min-width would only overflow it.
-  const width = (root.parentElement || root).clientWidth;
+  const width = room(root);
   const narrow = width < FLOOR;
   if (narrow) console.warn(`Marque theme: the pane is ${width}px wide, under ${FLOOR}px; cards can't be laid out, so only rows are shown`);
   return { checked: (forced ? 0 : PAIRS.length) + SIZES.length + 2, rejected, width, narrow };
@@ -168,7 +180,7 @@ export function watch(root, onTheme) {
   const mo = new MutationObserver((ms) => {
     if (!root.isConnected) return;
     const moved = root.parentElement !== parent || ms.some((m) => [...m.addedNodes].some((n) => n === root || n.contains?.(root)));
-    if (moved) { narrow = under(); if (ro) { ro.disconnect(); ro.observe(root.parentElement || root); } }
+    if (moved) { narrow = under(); if (ro) { ro.disconnect(); ro.observe(root); if (root.parentElement) ro.observe(root.parentElement); } }
     parent = root.parentElement;
     if (ms.some((m) => m.type === 'attributes') || moved || !done) { done = true; run(); }
   });
@@ -179,13 +191,13 @@ export function watch(root, onTheme) {
   const printing = () => release(root);
   addEventListener('beforeprint', printing); addEventListener('afterprint', run);
   // Re-checked when the pane crosses the width floor, not on every resize.
-  const under = () => (root.parentElement || root).clientWidth < FLOOR;
+  const under = () => room(root) < FLOOR;
   let narrow = under();
   const ro = typeof ResizeObserver !== 'undefined' && new ResizeObserver(() => {
     if (!root.isConnected || under() === narrow) return;
     narrow = under(); run();
   });
-  if (ro) ro.observe(root.parentElement || root);
+  if (ro) { ro.observe(root); if (root.parentElement) ro.observe(root.parentElement); }
   return () => {
     mo.disconnect(); mqs.forEach((q) => q.removeEventListener('change', run)); if (ro) ro.disconnect();
     removeEventListener('beforeprint', printing); removeEventListener('afterprint', run);
