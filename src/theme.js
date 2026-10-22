@@ -20,6 +20,7 @@ export const PAIRS = [
   ['error-ink', 'surface', 4.5], ['focus', 'surface', 3.0],
   ['text', 'ground', 4.5], ['text-muted', 'ground', 4.5], // the pane's own headings sit on the ground
   ['text', 'surface-sunken', 4.5], ['text-muted', 'surface-sunken', 4.5], // open rows, wells, notices
+  ['rule-strong', 'surface', 3.0], // card, option and input borders: a non-text part
 ];
 export const SIZES = [['size-xs', 12], ['size-sm', 13]];
 /** The narrowest pane a card fits (docs/THEME.md); under it the kit shows rows only. */
@@ -162,7 +163,7 @@ export function watch(root, onTheme) {
   const mo = new MutationObserver((ms) => {
     if (!root.isConnected) return;
     const moved = root.parentElement !== parent || ms.some((m) => [...m.addedNodes].some((n) => n === root || n.contains?.(root)));
-    if (moved && ro) { ro.disconnect(); ro.observe(root.parentElement || root); }
+    if (moved) { narrow = under(); if (ro) { ro.disconnect(); ro.observe(root.parentElement || root); } }
     parent = root.parentElement;
     if (ms.some((m) => m.type === 'attributes') || moved || !done) { done = true; run(); }
   });

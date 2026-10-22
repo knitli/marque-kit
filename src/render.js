@@ -97,8 +97,11 @@ const edit = (e) => (e?.act === 'answered' || e?.act === 'changed') ? e : null;
 const holds = (e, f) => {
   // A prose answer becomes a marking only once the engine derives one; only a typed marking compares.
   const r = e?.value?.reading?.result?.text ?? (e?.about?.asks?.field?.type === 'marking' ? e.value.free : null);
-  const norm = (t) => t.replace(/\s+/g, ' ').trim();
-  return r == null || norm(r) === norm(f.outcome?.result?.text ?? '') ? e : null;
+  const norm = (t) => (t ?? '').replace(/\s+/g, ' ').trim();
+  const now = norm(f.outcome?.result?.text), was = norm(f.marking?.as_written?.text);
+  // Asked of this marking: the one it was asked about, or the one the answer wrote.
+  const same = !e?.about || was === norm(e.about.as_written) || was === now;
+  return same && (r == null || norm(r) === now) ? e : null;
 };
 const decided = (f) => edit(f.person) || (!f.stale && f.needs_person === 'none' && !f.asks ? holds(edit(f.history?.findLast((e) => edit(e))), f) : null);
 const settled = (f) => decided(f)?.value != null;
@@ -116,7 +119,7 @@ const shapeOf = (f, r, moment) => (waits(f, moment) ? 'absent' : SHAPE[r]);
 function stampOf(f, r, moment) {
   if (f.overridden) return ['quiet', 'Reported'];
   if (settled(f)) return ['quiet', wasAsked(f) ? 'Answered' : 'Changed'];
-  if (r === 'blocking') return ['attn', moment === 'send' ? 'Blocks sending' : 'Blocks finalize'];
+  if (r === 'blocking') return ['attn', f.blocks === 'now' ? 'Blocks now' : moment === 'send' ? 'Blocks sending' : 'Blocks finalize'];
   if (r === 'action' && f.deferred) return ['quiet', f.deferred === 'declined' ? 'Not my call' : 'At finalize'];
   if (waits(f, moment)) return ['quiet', 'At finalize'];
   return STAMP[r];
@@ -206,7 +209,8 @@ export function card(f, host = {}) {
   c.append(head);
 
   if (r === 'blocking') {
-    c.append(el('p', 'mq-p', moment === 'send' ? 'You tried to send. This has to be answered first.' : 'This has to be answered before the document can be finalized.'));
+    c.append(el('p', 'mq-p', f.blocks === 'now' ? 'Marque stopped here. Nothing else is fixed until this is settled.'
+      : moment === 'send' ? 'You tried to send. This has to be answered first.' : 'This has to be answered before the document can be finalized.'));
   }
 
   if (settled(f)) {
@@ -349,6 +353,12 @@ export function sections(doc, moment = 'editing') {
 }
 
 /* ── C7 · document status ────────────────────────────────────────────── */
+/** A required artifact Marque derived and nobody has written: it goes in as the document goes out. */
+const due = (a) => a.state === 'absent_but_required' && a.derived_value && a.fixability === 'fixable';
+/** Read-only, nothing can be written, so a due artifact holds the document up. */
+const unwritable = (doc, host) => (host.readOnly ? doc.document.artifacts.filter(due).length : 0);
+const ready = (doc, host) => doc.document.ready && !unwritable(doc, host);
+
 export function status(doc, host = {}) {
   const s = el('div', 'mq-status');
   s.setAttribute('role', 'status');
@@ -365,7 +375,8 @@ export function status(doc, host = {}) {
   const g = sections(doc, host.moment);
   const overrides = doc.findings.filter((f) => f.overridden).length;
   const words = (t) => el('span', 'mq-small', t);
-  if (doc.document.ready && !g.must.length) {
+  const stuck = unwritable(doc, host);
+  if (ready(doc, host) && !g.must.length) {
     // Plain, not celebratory: the Ready stamp is outlined because there is nothing to act on.
     s.append(el('span', 'mq-stamp', 'Ready'));
     if (overrides) s.append(el('span', 'mq-stamp', `${overrides} reported`), words(overrides === 1 ? 'one marking kept as written' : `${overrides} markings kept as written`));
@@ -373,6 +384,8 @@ export function status(doc, host = {}) {
   } else if (!g.must.length && doc.document.pending?.length) {
     // Everything is answered; the host hasn't written it yet.
     s.append(el('span', 'mq-stamp', 'Not ready'), words(`${plural(doc.document.pending.length, 'answer', 'answers')} waiting to be written into the document`));
+  } else if (!g.must.length && stuck) {
+    s.append(el('span', 'mq-stamp', 'Not ready'), words(`${plural(stuck, 'thing', 'things')} can't be written while the document is read-only`));
   } else if (GATE.has(host.moment)) {
     s.classList.add('must');
     // What the gate lists: blockers and the writes still waiting, once each.
@@ -431,7 +444,7 @@ export function pane(doc, host = {}) {
   const atGate = GATE.has(host.moment);
   head.append(partial ? el('span', 'mq-stamp quiet', 'Checking')
     : g.must.length ? el('span', 'mq-stamp attn', atGate ? 'Blocked' : `${g.must.length} needs you`)
-    : el('span', 'mq-stamp', doc.document.ready ? 'Ready' : 'Not ready'));
+    : el('span', 'mq-stamp', ready(doc, host) ? 'Ready' : 'Not ready'));
   p.append(status(doc, host));
   if (partial) p.append(engineState(host));
 
@@ -576,9 +589,11 @@ export function gate(doc, host = {}) {
     const n = doc.document.pending?.length;
     // What still has to be written: pending acts, and a derived artifact nobody has written. Done acts are not future writes.
     const pend = new Set(doc.document.pending || []);
-    const will = doc.document.artifacts.filter((a) => pend.has(a.id) || (a.state === 'absent_but_required' && a.derived_value && a.fixability === 'fixable'));
+    const will = doc.document.artifacts.filter((a) => pend.has(a.id) || due(a));
     const answered = doc.findings.filter((f) => pend.has(f.id) || f.history?.some((e) => e.value != null));
+    const stuck = unwritable(doc, host);
     g.append(el('h3', 'mq-q', n ? `Waiting for ${plural(n, 'answer', 'answers')} to be written into the document.`
+      : stuck ? `Not ready. The document is read-only, so ${plural(stuck, 'thing', 'things')} can't be written into it.`
       : will.length ? `Ready. ${plural(will.length, 'thing', 'things')} will be applied as it goes out.` : 'Ready to finalize.'));
     will.forEach((a) => g.append(artifact(a, h)));
     answered.forEach((f) => g.append(card(f, h)));

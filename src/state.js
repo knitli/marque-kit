@@ -127,7 +127,8 @@ const schema = ({ state, value, source, ...fl }) => JSON.stringify(fl);
 export function view(f, state, took) {
   const v = overlay(f, state, took);
   // Seen is of the result shown: a new one the person put there hasn't been looked at yet.
-  return v.seen && shown(v) !== shown(f) ? { ...v, seen: wasSeen(state, v) } : v;
+  // A copy: a host that edits the view mustn't reach into the log.
+  return structuredClone(v.seen && shown(v) !== shown(f) ? { ...v, seen: wasSeen(state, v) } : v);
 }
 
 function overlay(f, state, took) {

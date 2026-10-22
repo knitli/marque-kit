@@ -276,6 +276,14 @@ assert.equal(view(derivedCab, record(empty(), 'a-cab', 'answered', { fields: { d
   assert.equal(view({ ...cab, fields: rest }, s).stale, true);
   assert.equal(view({ ...cab, fields: { ...cab.fields, derived_from: { ...derived_from, hint: 'a source list' } } }, s).stale, true);
 }
+// A host editing a view doesn't edit the log.
+{
+  const s = record(empty(), 'a-cab', 'answered', { fields: { derived_from: 'Multiple Sources' } });
+  const v = view(cab, s);
+  v.history[0].value.fields.derived_from = 'changed'; v.person.act = 'declined';
+  assert.equal(s.log[0].value.fields.derived_from, 'Multiple Sources');
+  assert.equal(s.log[0].act, 'answered');
+}
 // A block filled in to the last field waits to be written; one still open doesn't yet.
 {
   let s = record(empty(), 'a-cab', 'answered', { fields: { derived_from: 'Multiple Sources' } }, undefined, snapshot(cab));
