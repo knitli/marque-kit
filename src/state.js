@@ -61,14 +61,15 @@ function live(state, id) {
   return edits(e) && state.log.lastIndexOf(e) < (state.linted ?? 0) ? null : e;
 }
 
-/** The host re-linted: every act so far is in the new findings. */
-export const linted = (state) => ({ ...state, linted: state.log.length });
+/** The host re-linted: the first `n` acts are in the new findings. Never moves back. */
+export const linted = (state, n = state.log.length) => ({ ...state, linted: Math.max(state.linted ?? 0, Math.min(n, state.log.length)) });
 
 /** One finding or artifact as it stands with the person's acts on it. */
 export function view(f, state) {
-  const v = { ...f, seen: !!f.seen || wasSeen(state, f), person: last(state, f.id), history: history(state, f.id) };
-  if (f.fields || f.if_taken) return artifactView(v, state);
+  // `person` is the act still in force; `history` keeps every act for the audit.
   const e = live(state, f.id);
+  const v = { ...f, seen: !!f.seen || wasSeen(state, f), person: e, history: history(state, f.id) };
+  if (f.kind) return artifactView(v, state);
   if (!e) return v;
   switch (e.act) {
     case 'answered':
@@ -100,7 +101,8 @@ function artifactView(a, state) {
     const open = Object.values(fields).some((fl) => !has(fl));
     out = { ...out, fields, needs_person: open ? a.needs_person : 'none' };
   }
-  if (live(state, a.id)?.value?.apply) out = { ...out, applying: true };
+  const asked = live(state, a.id)?.value;
+  if (asked?.apply || asked?.remove) out = { ...out, applying: true };
   if (a.if_taken) {
     const taken = Object.keys(a.if_taken).filter((fid) => settled(live(state, fid)));
     if (taken.length) {

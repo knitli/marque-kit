@@ -146,6 +146,20 @@ v = view(f(P3), record(empty(), P3, 'answered', { free: 'The UK alone' }));
 assert.notEqual(v.outcome.result?.text, 'The UK alone');
 assert.equal(view(f(P4), record(empty(), P4, 'answered', { free: '(U)' })).outcome.result.text, '(U)');
 
+// A lint covers only the acts made before it began.
+s = record(empty(), P3, 'answered', { reading, index: 0 });
+s = record(s, P5, 'changed', { reading: f(P5).outcome.readings[0], index: 0 });
+s = linted(s, 1);
+assert.deepEqual(docView(doc, s).document.pending, [P5], 'an edit made during the lint is still pending');
+assert.equal(view(f(P3), s).person, null, 'an answer the lint reflects is no longer the current act');
+assert.equal(view(f(P3), s).history.length, 1, 'but stays in the audit');
+assert.equal(linted(s, 0).linted, 1, 'the checkpoint never moves back');
+// Any artifact takes artifact handling, fields or not.
+const notice = { id: 'a-notice', kind: 'notice', state: 'absent_but_required', fixability: 'fixable', needs_person: 'none', blocks: 'never' };
+assert.equal(view(notice, record(empty(), 'a-notice', 'answered', { apply: true })).applying, true);
+const extra = { ...notice, state: 'present_not_required' };
+assert.ok(sections({ ...doc, document: { ...doc.document, artifacts: [extra] } }, 'editing').can.some((a) => a.id === 'a-notice'));
+
 // A derived field counts as filled.
 const derivedCab = { ...cab, fields: { ...cab.fields, derived_from: { state: 'derived', value: 'DIA SCG 2024-01' } } };
 assert.equal(view(derivedCab, empty()).fields.declassify_on.state, 'blank');

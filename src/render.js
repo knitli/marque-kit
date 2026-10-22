@@ -47,6 +47,8 @@ const button = (cls, text, onClick) => {
   const b = el('button', `mq-btn ${cls}`, text); b.type = 'button';
   b.addEventListener('click', onClick); return b;
 };
+/** DOM ids per rendered copy: the gate and the pane can show the same finding at once. */
+let uid = 0;
 const placed = (m) => { queueMicrotask(() => settle(m)); return m; };
 const SHORT = { front_marking: 'BANNER', authority_block: 'CAB' };
 const NAME = { front_marking: 'Banner', authority_block: 'Authority block' };
@@ -117,10 +119,10 @@ export function markClass(f, moment = 'editing') {
 }
 
 /* ── C4 · the asks renderer ──────────────────────────────────────────── */
-function asks(f, host, r) {
+function asks(f, host, r, help) {
   const a = f.asks; if (!a) return null;
   const form = el('form', 'mq-ask');
-  const name = `ask-${f.id}`;
+  const name = `ask-${f.id}-${++uid}`;
   let chosen = null;
   // Answer is never disabled: pressed with nothing chosen, it says what's missing (docs/COMPONENTS.md, C4).
   const err = el('div', 'err'); err.id = `${name}-err`; err.setAttribute('role', 'alert');
@@ -141,7 +143,7 @@ function asks(f, host, r) {
     inp.addEventListener('change', () => { chosen = { reading: o, index: i }; free.value = ''; clear(); });
     const txt = el('div', 'mq-txt');
     txt.append(el('div', 'mq-pr', o.reading));
-    if (o.result) txt.append(placed(mark(o.result, { size: 'sm' })));
+    if (o.result) txt.append(placed(mark(o.result, { size: 'sm', help })));
     lab.append(inp, txt); fs.append(lab);
   });
   form.append(fs);
@@ -224,7 +226,7 @@ export function card(f, host = {}) {
     c.append(dep);
   }
 
-  const ask = asks(f, host, r); if (ask) c.append(ask);
+  const ask = asks(f, host, r, help); if (ask) c.append(ask);
 
   // Conservative fallback, named, for the unattended boundary.
   if (f.outcome?.fallback && r === 'blocking') {
@@ -257,6 +259,7 @@ export function card(f, host = {}) {
  *  else (a non-canonical fix, a block the person filled in) is done. */
 const artRung = (a, moment) => a.needs_person !== 'none' ? rung(a, moment)
   : a.applying ? 'quiet'
+  : a.state === 'present_not_canonical' ? (a.seen ? 'quiet' : 'noticeable')
   : a.state === 'present_not_required' || (a.state === 'absent_but_required' && a.derived_value) ? 'advisory' : 'quiet';
 /** A required artifact that only blocks at finalize waits for it, like an absent mark. */
 const artWaits = (a, moment) => a.blocks === 'finalize' && !GATE.has(moment);
@@ -315,7 +318,7 @@ export function sections(doc, moment = 'editing') {
     else g.done.push(f);
   }
   for (const a of doc.document.artifacts) {
-    if (a.state === 'present') continue; // a receipt entry, not a card
+    if (a.state === 'present' || a.state === 'absent_not_required') continue; // receipt entries, not cards
     const r = artRung(a, moment);
     (r === 'blocking' ? g.must : r === 'action' ? (artWaits(a, moment) ? g.later : g.must) : r === 'advisory' ? g.can : g.done).push(a);
   }
@@ -469,36 +472,46 @@ export function artifact(a, host = {}) {
     c.append(placed(mark(a.derived_value, { size: 'lg', state: 'derived' })));
     if (a.placement) c.append(el('span', 'mq-place', `Placed: ${a.placement.replace(/_/g, ' ')}`));
     // Generated, not applied: the person can apply it; the host writes it (docs/COMPONENTS.md, C9).
-    if (a.applying) c.append(el('p', 'mq-p', 'Waiting to be written into the document.'));
-    else if (a.fixability === 'fixable' && a.state !== 'present' && !host.readOnly) {
+    if (a.applying && a.state === 'absent_but_required') c.append(el('p', 'mq-p', 'Waiting to be written into the document.'));
+    else if (a.fixability === 'fixable' && a.state === 'absent_but_required' && !host.readOnly) {
       const acts = el('div', 'mq-acts');
       acts.append(button('act', 'Apply', () => host.onAct?.(a, 'answered', { apply: true })));
       c.append(acts);
     }
   }
+  // Present but not required: an Advisory in its own right, one optional action. Leaving it is the other choice.
+  if (a.state === 'present_not_required' && !a.applying && !host.readOnly) {
+    const acts = el('div', 'mq-acts');
+    acts.append(button('act', 'Remove it', () => host.onAct?.(a, 'answered', { remove: true })));
+    c.append(acts);
+  } else if (a.state === 'present_not_required' && a.applying) c.append(el('p', 'mq-p', 'Waiting to be removed from the document.'));
   if (a.fields) {
     const dl = el('div', 'mq-cab');
+    // A field a person fills: labelled by its key, committed on Enter or Fill in.
+    const entry = (k, fld, key) => {
+      const v = el('span', 'v blank mq-field');
+      const inp = el('input', 'mono'); inp.type = 'text'; inp.id = `${a.id}-${k}-${++uid}`;
+      key.id = `${inp.id}-k`; inp.setAttribute('aria-labelledby', key.id);
+      inp.placeholder = fld.format || ''; inp.value = fld.value || '';
+      const fill = () => { const t = inp.value.trim(); if (t && t !== fld.value) host.onAct?.(a, 'answered', { fields: { [k]: t } }); };
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); fill(); } });
+      v.append(inp);
+      if (fld.hint) v.append(el('span', 'hint', fld.hint));
+      v.append(button('ghost', 'Fill in', fill));
+      return v;
+    };
     for (const [k, fld] of Object.entries(a.fields)) {
       const key = el('span', 'k', k.replace(/_/g, ' ').replace(/^\w/, (ch) => ch.toUpperCase()));
       dl.append(key);
-      if (fld.state === 'blank') {
-        // A blank a person fills: the field, labelled by its key, committed on Enter or Fill in.
-        const v = el('span', 'v blank mq-field');
-        const inp = el('input', 'mono'); inp.type = 'text'; inp.id = `${a.id}-${k}`;
-        key.id = `${inp.id}-k`; inp.setAttribute('aria-labelledby', key.id);
-        inp.placeholder = fld.format || '';
-        const fill = () => { const t = inp.value.trim(); if (t) host.onAct?.(a, 'answered', { fields: { [k]: t } }); };
-        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); fill(); } });
-        v.append(inp);
-        if (fld.hint) v.append(el('span', 'hint', fld.hint));
-        v.append(button('ghost', 'Fill in', fill));
-        dl.append(v);
-        continue;
-      }
+      if (fld.state === 'blank') { dl.append(entry(k, fld, key)); continue; }
       const has = fld.state === 'known' || fld.state === 'derived';
       const v = el('span', `v ${has ? 'derived' : ''}`.trim(),
         has ? fld.value : fld.state === 'waiting' ? `Waits on ${fld.waits_on.replace(/_/g, ' ')}` : fld.format || '');
       if (fld.hint) v.title = fld.hint;
+      // A filled field stays correctable: a typo, or Classified By when someone else made the call.
+      if (has && !host.readOnly) {
+        v.append(' ', button('ghost', 'Change', () => { const n = entry(k, fld, key); v.replaceWith(n); n.querySelector('input').focus(); }));
+      }
       dl.append(v);
     }
     c.append(dl);
@@ -529,8 +542,14 @@ export function gate(doc, host = {}) {
   const g = el('div', 'mq-gate');
   g.setAttribute('role', 'region'); g.setAttribute('aria-label', 'Before this can go out');
   if (!ids.length) {
+    // Still the last look before it goes out: what will be written, and what the person answered.
     const n = doc.document.pending?.length;
-    g.append(el('h3', 'mq-q', n ? `Waiting for ${plural(n, 'answer', 'answers')} to be written into the document.` : 'Ready to finalize.'));
+    const will = doc.document.artifacts.filter((a) => (a.state === 'absent_but_required' && a.derived_value) || a.history?.length);
+    const answered = doc.findings.filter((f) => f.history?.some((e) => e.value != null));
+    g.append(el('h3', 'mq-q', n ? `Waiting for ${plural(n, 'answer', 'answers')} to be written into the document.`
+      : will.length ? `Ready. ${plural(will.length, 'thing', 'things')} will be applied as it goes out.` : 'Ready to finalize.'));
+    will.forEach((a) => g.append(artifact(a, h)));
+    answered.forEach((f) => g.append(card(f, h)));
     return g;
   }
   g.append(el('h3', 'mq-q', ids.length === 1 ? 'One thing before this can go out.' : `${ids.length} things before this can go out.`));
@@ -588,7 +607,7 @@ export function receipt(doc, session = {}) {
     r.append(ln);
   }
   const ft = el('div', 'ft');
-  ft.append(el('span', null, `${doc.findings.length} findings · ${doc.document.blocking.length} open`), el('span', 'mq-hash', session.session_root || 'session root: computed by the engine at seal'));
+  ft.append(el('span', null, `${doc.findings.length} findings · ${doc.document.blocking.length} open${doc.document.pending?.length ? ` · ${doc.document.pending.length} waiting to be written` : ''}`), el('span', 'mq-hash', session.session_root || 'session root: computed by the engine at seal'));
   r.append(ft);
   return r;
 }
@@ -599,6 +618,7 @@ export function receipt(doc, session = {}) {
  *
  *   const p = mount(el, { doc, state, moment, onChange, onHelp, onJump, ... });
  *   p.update({ doc })       // after a re-lint
+ *   p.update({ doc, linted: n }) // async: n = p.state.log.length when that lint began
  *   p.update({ moment })    // the host's moment changed
  *   p.view()                // the document with the person's acts on it
  *
@@ -675,11 +695,12 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   draw();
 
   return {
-    update(next) {
+    update({ linted: upTo, ...next }) {
       Object.assign(cur, next);
-      // A new lint is the host saying it applied what the person answered.
+      // A new lint is the host saying it applied what the person answered: everything
+      // up to `upTo`, the log length when the host started that lint (default: all of it).
       if (next.doc) {
-        const s = linted(cur.state);
+        const s = linted(cur.state, upTo);
         if (s.linted !== cur.state.linted) { cur.state = s; host.onChange?.(s, null); }
       }
       draw();

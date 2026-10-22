@@ -406,7 +406,9 @@ export function tips(root, vocab, host = {}) {
     (tok.closest('[role=dialog], main, aside, section') || tok.closest('.mq') || document.body).append(t);
     const r = tok.closest('.mq-mark')?.getBoundingClientRect() || tok.getBoundingClientRect();
     const vw = document.documentElement.clientWidth;
-    t.style.top = `${r.bottom + 6}px`;
+    // Below the marking, or above it when there's no room below.
+    const vh = document.documentElement.clientHeight;
+    t.style.top = `${r.bottom + 6 + t.offsetHeight > vh - 8 ? Math.max(8, r.top - 6 - t.offsetHeight) : r.bottom + 6}px`;
     t.style.left = `${Math.max(8, Math.min(tok.getBoundingClientRect().left, vw - t.offsetWidth - 8))}px`;
     tok.setAttribute('aria-describedby', id);
     shown = { tok, t };
