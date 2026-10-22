@@ -21,7 +21,7 @@ export const PAIRS = [
   ['attn-ink', 'ground', 4.5], // the brand's gold and the Needs-you section mark
   ['text', 'ground', 4.5], ['text-muted', 'ground', 4.5], ['act-ink', 'ground', 4.5], // the pane's headings, footer links and section marks sit on the ground
   ['text', 'surface-sunken', 4.5], ['text-muted', 'surface-sunken', 4.5], ['act-ink', 'surface-sunken', 4.5], // open rows, wells, notices
-  ['rule-strong', 'surface', 3.0], // card, option and input borders: a non-text part
+  ['rule-strong', 'surface', 3.0], ['rule-strong', 'ground', 3.0], // borders on cards and on the pane itself: non-text parts
 ];
 export const SIZES = [['size-xs', 12], ['size-sm', 13], ['size-md', 13]]; // md carries banner markings
 /** The narrowest pane a card fits (docs/THEME.md); under it the kit shows rows only. */
