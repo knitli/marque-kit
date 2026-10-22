@@ -44,14 +44,17 @@ export function record(state, id, act, value = null, at = new Date().toISOString
 }
 
 /** What an act is about, kept with it: markings, rule and place, never body text. */
+/** A marking-valued derived value is a string or carries text; anything else is typed content, kept whole. */
+const textOf = (v) => (typeof v === 'string' ? v : typeof v?.text === 'string' ? v.text : null);
+const typed = (v) => (v && textOf(v) == null ? canon(v) : null);
 const ruleOf = (f) => (f.rule ? `${f.rule.scheme}:${f.rule.predicate}` : f.kind ?? null);
 export const snapshot = (f) => structuredClone({ // a record, not a view of a document that may change in place
   rule: ruleOf(f), anchor: f.anchor, kind: f.kind,
-  as_written: f.marking?.as_written?.text ?? null, result: f.outcome?.result?.text ?? f.derived_value?.text ?? null,
+  as_written: f.marking?.as_written?.text ?? null, result: f.outcome?.result?.text ?? textOf(f.derived_value),
   // The marking whole, layers and typed masks with it, so the receipt redraws it masked.
   ...(f.marking?.as_written && { marking: f.marking.as_written }),
   // A typed derived value (a notice's content) isn't text: kept whole, so an apply is of this one.
-  ...(f.derived_value && typeof f.derived_value.text !== 'string' && { content: canon(f.derived_value) }),
+  ...(typed(f.derived_value) && { content: typed(f.derived_value) }),
   // Where an artifact goes: an apply was approved for this place.
   ...(f.kind && { placement: f.placement ?? null, scope: f.scope ?? null }),
   // What taking the act back restores: Marque's own words, never body text.
@@ -63,7 +66,7 @@ export const snapshot = (f) => structuredClone({ // a record, not a view of a do
 /** Seen only quiets (docs/DERIVATION.md): a Noticeable becomes Quiet; nothing else moves. */
 /** Seen is of a result, not an id: ids survive re-lints, so a new result
  *  under the same id is unseen again. */
-const shown = (f) => f.outcome?.result?.text ?? f.derived_value?.text ?? (f.derived_value ? canon(f.derived_value) : null); // typed content by its whole value
+const shown = (f) => f.outcome?.result?.text ?? textOf(f.derived_value) ?? typed(f.derived_value); // typed content by its whole value
 const wasSeen = (state, f) => state.seen.some((s) => s.id === f.id && s.result === shown(f));
 export function see(state, f) {
   return wasSeen(state, f) ? state : { ...state, seen: [...state.seen, { id: f.id, result: shown(f) }] };
@@ -128,8 +131,8 @@ function answeredOn(state, f, e) {
   return back?.about?.outcome ? restore(f, back.about) : f;
 }
 /** An artifact op is stale once the artifact isn't the one it was taken on. */
-const staleOp = (e, a) => !!e.about && (e.about.state !== a.state || e.about.result !== (a.derived_value?.text ?? null)
-  || (e.about.content ?? null) !== (a.derived_value && typeof a.derived_value.text !== 'string' ? canon(a.derived_value) : null)
+const staleOp = (e, a) => !!e.about && (e.about.state !== a.state || e.about.result !== textOf(a.derived_value)
+  || (e.about.content ?? null) !== typed(a.derived_value)
   || ('placement' in e.about && (e.about.placement !== (a.placement ?? null) || e.about.scope !== (a.scope ?? null)))
   // A typed field is stale once the field is gone or asks for something else; its state and value are the overlay's.
   || Object.keys(e.value?.fields || {}).some((k) => !a.fields?.[k] || (e.about.fields?.[k] && schema(e.about.fields[k]) !== schema(a.fields[k]))));

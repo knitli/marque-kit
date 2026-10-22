@@ -398,4 +398,12 @@ for (const act of ['deferred', 'declined']) {
   assert.equal(d.document.ready, false, act);
 }
 
+// A marking given as a plain string is a marking result, not typed content.
+{
+  const a = { id: 'x', kind: 'front_marking', state: 'absent_but_required', derived_value: 'SECRET' };
+  const snap = snapshot(a);
+  assert.equal(snap.result, 'SECRET');
+  assert.equal(snap.content, undefined);
+}
+
 console.log('state: ok');

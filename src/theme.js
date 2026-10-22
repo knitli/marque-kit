@@ -227,6 +227,10 @@ export function watch(root, onTheme) {
   };
   const printed = () => { for (const { t, ship } of pinned.get(root) || []) root.style.setProperty(t, ship, 'important'); run(); };
   addEventListener('beforeprint', printing); addEventListener('afterprint', printed);
+  // A host web font for marks may load after the first check measured its fallback: check again once it has.
+  const fonts = document.fonts, loaded = () => { if (root.isConnected) run(); };
+  let live = true;
+  if (fonts) { fonts.addEventListener('loadingdone', loaded); fonts.ready.then(() => { if (live) loaded(); }); }
   // Re-checked when the pane crosses the width floor, not on every resize.
   const under = () => room(root) < FLOOR;
   let narrow = under();
@@ -238,5 +242,6 @@ export function watch(root, onTheme) {
   return () => {
     mo.disconnect(); mqs.forEach((q) => q.removeEventListener('change', run)); if (ro) ro.disconnect();
     removeEventListener('beforeprint', printing); removeEventListener('afterprint', printed);
+    live = false; if (fonts) fonts.removeEventListener('loadingdone', loaded);
   };
 }

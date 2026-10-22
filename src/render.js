@@ -58,7 +58,11 @@ const where = (f) => f.anchor?.portion ? `¶${f.anchor.portion}` : page(f) != nu
 const spokenWhere = (f) => f.anchor?.portion ? `Paragraph ${f.anchor.portion}` : page(f) != null ? `Page ${page(f)}` : NAME[f.kind] || 'The document';
 /** Field formats the kit can check, by the name a format string uses; one it doesn't know is the engine's to judge. */
 const FORMATS = {
-  YYYYMMDD: (t) => /^\d{8}$/.test(t) && +t.slice(4, 6) >= 1 && +t.slice(4, 6) <= 12 && +t.slice(6) >= 1 && +t.slice(6) <= 31,
+  YYYYMMDD: (t) => { // a real day: the date built from it is the same date back
+    if (!/^\d{8}$/.test(t)) return false;
+    const d = new Date(Date.UTC(+t.slice(0, 4), +t.slice(4, 6) - 1, +t.slice(6)));
+    return d.getUTCFullYear() === +t.slice(0, 4) && d.getUTCMonth() === +t.slice(4, 6) - 1 && d.getUTCDate() === +t.slice(6);
+  },
   event: (t) => /[A-Za-z]/.test(t) && /\S\s+\S/.test(t), // an event is described in words, not one token
   '25X#/50X#/75X#': (t) => /^(25|50|75)X\d+(-[A-Z]+)?$/.test(t),
 };
@@ -785,12 +789,15 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   if (added) root.classList.add('mq');
   // A theme set above on something that isn't a kit root: the root this mount made follows it, since
   // its own .mq light defaults would otherwise win over what it inherits. Kept in step as it changes.
-  const mirrors = added && !root.hasAttribute('data-mq-theme');
+  // A theme the host sets on the root later is the host's: mirroring stops and never removes it.
+  let mirrors = added && !root.hasAttribute('data-mq-theme'), mine = null;
   const follow = () => {
     if (!mirrors) return;
-    const t = root.parentElement?.closest('[data-mq-theme]')?.getAttribute('data-mq-theme');
-    if (t && root.getAttribute('data-mq-theme') !== t) root.setAttribute('data-mq-theme', t);
-    else if (!t && root.hasAttribute('data-mq-theme')) root.removeAttribute('data-mq-theme');
+    if (root.getAttribute('data-mq-theme') !== mine) { mirrors = false; return; }
+    const t = root.parentElement?.closest('[data-mq-theme]')?.getAttribute('data-mq-theme') ?? null;
+    if (t === mine) return;
+    if (t) root.setAttribute('data-mq-theme', t); else root.removeAttribute('data-mq-theme');
+    mine = t;
   };
   follow();
   // Every mount is its own query container, so the card's narrow rules follow this pane, not a wider ancestor.
@@ -914,7 +921,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   return {
     get theme() { return theme; }, // the gate's report: { checked, rejected: [{ token, measured, floor, fallback }] }
     /** Take the pane down: its theme watchers go, and so does what it drew. */
-    destroy() { dead = true; closeWithin(root); unwatch(); if (sized) sized.disconnect(); untips(); release(root); root.replaceChildren(); root.classList.remove('mq-narrow', 'mq-mount'); if (added) root.classList.remove('mq'); if (mirrors) root.removeAttribute('data-mq-theme'); },
+    destroy() { dead = true; closeWithin(root); unwatch(); if (sized) sized.disconnect(); untips(); release(root); root.replaceChildren(); root.classList.remove('mq-narrow', 'mq-mount'); if (added) root.classList.remove('mq'); if (mirrors && mine) root.removeAttribute('data-mq-theme'); },
     update({ linted: upTo, seq, ...next }) {
       // A lint that began before the one already shown is stale: keep the newer document.
       // `seq` orders lints that began at the same point in the log. A stale lint's
