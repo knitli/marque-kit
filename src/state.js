@@ -131,8 +131,9 @@ function overlay(f, state) {
         // Back to Marque's own result. Taking back one a lint already wrote reopens
         // the finding as it was before that act, question and readings included.
         const back = reversed(state, f.id);
-        // A take-back on a written finding that has since changed takes back nothing.
-        if (back && moved(e, f)) return { ...v, person: null, stale: true };
+        // A take-back on a written finding that has since changed takes back nothing. An override
+        // shows the marking as written, so taking one back is checked against the override's own snapshot.
+        if (back && moved(back.act === 'kept_as_written' ? back : e, f)) return { ...v, person: null, stale: true };
         const was = back?.about;
         if (!was?.outcome) return v;
         return { ...v, asks: was.asks ?? null, outcome: { ...f.outcome, ...was.outcome }, needs_person: was.needs_person, blocks: was.blocks };

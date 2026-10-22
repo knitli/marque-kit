@@ -271,6 +271,13 @@ const artRung = (a, moment) => a.needs_person !== 'none' ? rung(a, moment)
   : a.state === 'present_not_required' || (a.state === 'absent_but_required' && a.derived_value) ? 'advisory' : 'quiet';
 /** A required artifact that only blocks at finalize waits for it, like an absent mark. */
 const artWaits = (a, moment) => a.blocks === 'finalize' && !GATE.has(moment);
+/** An artifact's stamp says what it is: missing and derived, there but not required, changed, or done. */
+const artStamp = (a, r, moment) => (r === 'blocking' ? ['attn', stampOf(a, r, moment)[1]]
+  : r === 'action' ? (artWaits(a, moment) ? ['quiet', 'At finalize'] : ['attn', 'Needs you'])
+  : a.applying ? ['quiet', 'To be written']
+  : a.state === 'present_not_required' ? ['act', 'Not required']
+  : a.state === 'absent_but_required' && a.derived_value ? ['act', 'Derived']
+  : a.state === 'present_not_canonical' ? ['quiet', 'Changed'] : ['quiet', 'Done']);
 
 export function row(f, host = {}) {
   const isArtifact = !!f.kind;
@@ -283,10 +290,7 @@ export function row(f, host = {}) {
   if (m) what.append(mark(m, { form: 'folded', size: 'xs' }));
   li.append(what);
   const end = el('div', 'end');
-  const [tone, word] = isArtifact
-    ? (r === 'blocking' ? ['attn', stampOf(f, r, host.moment)[1]] : r === 'action' ? (artWaits(f, host.moment) ? ['quiet', 'At finalize'] : ['attn', 'Needs you'])
-      : r === 'advisory' ? ['act', 'Derived'] : ['quiet', 'Changed'])
-    : stampOf(f, r, host.moment);
+  const [tone, word] = isArtifact ? artStamp(f, r, host.moment) : stampOf(f, r, host.moment);
   end.append(el('span', `mq-stamp sm ${tone}`, word));
   li.append(end);
   const toggle = (open) => {
@@ -473,7 +477,8 @@ export function artifact(a, host = {}) {
   c.dataset.artifact = a.id;
   const head = el('div', 'mq-card-head');
   head.append(el('span', 'mq-label', NAME[a.kind] || a.kind));
-  head.append(el('span', `mq-stamp ${must ? (atGate ? 'attn' : 'quiet') : 'act'}`, must ? (atGate ? 'Needs you' : 'At finalize') : 'Derived'));
+  const [tone, word] = artStamp(a, r, host.moment);
+  head.append(el('span', `mq-stamp ${tone}`, word));
   c.append(head);
   c.append(el('p', 'mq-p', a.says.text));
   if (a.derived_value) {

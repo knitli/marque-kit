@@ -301,4 +301,16 @@ assert.equal(view(derivedCab, record(empty(), 'a-cab', 'answered', { fields: { d
   assert.notEqual(s.log[0].value.reading.reading, 'edited in place');
 }
 
+// "Fix it after all" on a written override stays pending: the host has the fix to apply.
+{
+  let s = record(empty(), P2, 'kept_as_written', null, undefined, snapshot(f(P2)));
+  s = linted(s);
+  const kept = view(f(P2), s);
+  assert.equal(kept.overridden, true);
+  s = record(s, P2, 'changed', null, undefined, snapshot(kept));
+  const d = docView(doc, s);
+  assert.deepEqual(d.document.pending, [P2]);
+  assert.equal(d.findings.find((x) => x.id === P2).stale, undefined);
+}
+
 console.log('state: ok');

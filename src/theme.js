@@ -21,6 +21,16 @@ export const PAIRS = [
 ];
 export const SIZES = [['size-xs', 12], ['size-sm', 13]];
 
+/** Any CSS colour → sRGB [r, g, b, a], by painting it: oklch(), lab() and color() aren't rgb numbers. */
+function srgb(css) {
+  if (/^rgba?\(/.test(css)) return rgba(css);
+  const c = document.createElement('canvas'); c.width = c.height = 1;
+  const ctx = c.getContext('2d', { colorSpace: 'srgb' });
+  if (!ctx) return rgba(css);
+  ctx.fillStyle = css; ctx.fillRect(0, 0, 1, 1);
+  const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+  return [r, g, b, a / 255];
+}
 /** "rgb(r, g, b)" / "rgba(r, g, b, a)" → [r, g, b, a]. */
 export const rgba = (s) => { const [r, g, b, a = 1] = (s.match(/[\d.]+/g) || []).map(Number); return [r, g, b, a]; };
 /** `top` laid over an opaque `under`. */
@@ -67,7 +77,7 @@ export function check(root) {
   const probe = document.createElement('span');
   probe.hidden = true;
   root.append(probe);
-  const read = (t) => { probe.style.color = `var(--mq-${t})`; return rgba(getComputedStyle(probe).color); };
+  const read = (t) => { probe.style.color = `var(--mq-${t})`; return srgb(getComputedStyle(probe).color); };
   const px = (t) => { probe.style.fontSize = `var(--mq-${t})`; return parseFloat(getComputedStyle(probe).fontSize); };
   const ship = shipped(root), cs = getComputedStyle(root);
   const host = (t) => ship[`--mq-${t}`] && !same(cs.getPropertyValue(`--mq-${t}`), ship[`--mq-${t}`]);
@@ -104,9 +114,15 @@ export function check(root) {
 
 /** Re-check whenever the theme can change: data-mq-theme anywhere above, or the scheme `auto` follows. */
 export function watch(root, onTheme) {
+  // A root mounted detached is checked once it's in the document.
+  let done = root.isConnected;
   const run = () => onTheme(check(root));
-  const mo = new MutationObserver(run), mq = matchMedia('(prefers-color-scheme: dark)');
-  mo.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-mq-theme'] });
+  const mo = new MutationObserver((ms) => {
+    if (ms.some((m) => m.type === 'attributes')) run();
+    else if (!done && root.isConnected) { done = true; run(); }
+  });
+  const mq = matchMedia('(prefers-color-scheme: dark)');
+  mo.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-mq-theme'], childList: true });
   mq.addEventListener('change', run);
   return () => { mo.disconnect(); mq.removeEventListener('change', run); };
 }

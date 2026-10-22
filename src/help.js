@@ -243,6 +243,7 @@ export function passage(c, manual, host = {}, { plain } = {}) {
 
 /* ── C13 · vocabulary lookup ─────────────────────────────────────────── */
 function distance(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 3; // only 2 or less is used: a long paste never builds the matrix
   const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
   for (let j = 1; j <= b.length; j++) d[0][j] = j;
   for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
