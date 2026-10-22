@@ -99,8 +99,9 @@ const holds = (e, f) => {
   const r = e?.value?.reading?.result?.text ?? (e?.about?.asks?.field?.type === 'marking' ? e.value.free : null);
   const norm = (t) => (t ?? '').replace(/\s+/g, ' ').trim();
   const now = norm(f.outcome?.result?.text), was = norm(f.marking?.as_written?.text);
-  // Asked of this marking: the one it was asked about, or the one the answer wrote.
-  const same = !e?.about || was === norm(e.about.as_written) || was === now;
+  // Asked of this marking: the one it was asked about, or the one a marking answer wrote.
+  // A prose answer's written marking can't be told from a new one, so it holds only on its own.
+  const same = !e?.about || was === norm(e.about.as_written) || (r != null && was === now);
   return same && (r == null || norm(r) === now) ? e : null;
 };
 const decided = (f) => edit(f.person) || (!f.stale && f.needs_person === 'none' && !f.asks ? holds(edit(f.history?.findLast((e) => edit(e))), f) : null);
@@ -717,7 +718,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     theme = r; host.onTheme?.(r);
     if (!!r?.narrow !== was) draw();
   }) : () => {};
-  if (host.vocab) tips(body, host.vocab, host);
+  const untips = host.vocab ? tips(body, host.vocab, host) : () => {};
 
   const h = {
     ...host,
@@ -766,12 +767,14 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   function draw(focusId = focusedId()) {
     const v = cur.doc && docView(cur.doc, cur.state);
     let say = '';
-    if (v && cur.engine === 'ok') {
+    const ok = cur.engine === 'ok';
+    if (v && (ok || cur.engine === 'checking')) {
       const now = sections(v, cur.moment).must;
       // Keyed by the question too: one asked again under the same id is news.
       const key = (f) => `${f.id} ${JSON.stringify(f.asks ?? null)}`;
-      if (said) say = now.filter((f) => !said.has(key(f))).map((f) => `${spokenWhere(f)} needs you.`).join(' ');
-      said = new Set(now.map(key));
+      if (said && ok) say = now.filter((f) => !said.has(key(f))).map((f) => `${spokenWhere(f)} needs you.`).join(' ');
+      // While checking, only the first results set the baseline; what arrives after is told once it's done.
+      if (ok || !said) said = new Set(now.map(key));
     }
     // Never leave an old announcement behind for someone to find later.
     live.textContent = say;
@@ -783,7 +786,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   return {
     get theme() { return theme; }, // the gate's report: { checked, rejected: [{ token, measured, floor, fallback }] }
     /** Take the pane down: its theme watchers go, and so does what it drew. */
-    destroy() { unwatch(); release(root); root.replaceChildren(); if (added) root.classList.remove('mq'); },
+    destroy() { unwatch(); untips(); release(root); root.replaceChildren(); if (added) root.classList.remove('mq'); },
     update({ linted: upTo, seq, ...next }) {
       // A lint that began before the one already shown is stale: keep the newer document.
       // `seq` orders lints that began at the same point in the log. A stale lint's

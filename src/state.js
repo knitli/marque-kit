@@ -40,7 +40,7 @@ export const empty = () => ({ log: [], seen: [] });
 export function record(state, id, act, value = null, at = new Date().toISOString(), about = undefined) {
   if (!ACTS.includes(act)) throw new Error(`Unknown act "${act}"; expected one of ${ACTS.join(', ')}`);
   // The log owns its values: a host editing its document in place can't rewrite an act.
-  return { ...state, log: [...state.log, { id, act, value: value == null ? value : structuredClone(value), at, ...(about && { about }) }] };
+  return { ...state, log: [...state.log, { id, act, value: value == null ? value : structuredClone(value), at, ...(about && { about: structuredClone(about) }) }] };
 }
 
 /** What an act is about, kept with it: markings, rule and place, never body text. */

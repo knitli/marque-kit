@@ -50,25 +50,30 @@ export const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => 
 // theme.css's token blocks; a host's own `.mq { … }` is not one of them.
 const norm = (sel) => sel.replace(/[\s"']/g, '');
 const THEMES = new Set(['.mq,[data-mq-theme=light]', '[data-mq-theme=dark]', '[data-mq-theme=auto]'].map(norm));
-const applies = (root, sel) => { try { return !!root.closest(sel); } catch { return false; } }; // ::before and the like
+const applies = (n, sel) => { try { return n.matches(sel); } catch { return false; } }; // ::before and the like
 const same = (a, b) => a.replace(/\s+/g, '') === b.replace(/\s+/g, '');
 
 /** The --mq-* values theme.css gives `root`, ignoring anything a host set. */
 function shipped(root) {
-  const out = {};
+  const blocks = [];
   const walk = (rules) => {
     for (const r of rules) {
       // A style rule has cssRules too (nesting), so it is matched first.
-      if (r.style && r.selectorText) {
-        if (THEMES.has(norm(r.selectorText)) && applies(root, r.selectorText)) for (const p of r.style) if (p.startsWith('--mq-')) out[p] = r.style.getPropertyValue(p).trim();
-      } else if (r.cssRules && (!r.media || matchMedia(r.media.mediaText).matches)) walk(r.cssRules);
+      if (r.style && r.selectorText) { if (THEMES.has(norm(r.selectorText))) blocks.push(r); }
+      else if (r.cssRules && (!r.media || matchMedia(r.media.mediaText).matches)) walk(r.cssRules);
     }
   };
   // Found by the kit's own theme selectors, so a bundled, inlined or renamed theme.css still counts.
   for (const sheet of document.styleSheets) {
     try { walk(sheet.cssRules); } catch { /* another origin without CORS: unreadable */ }
   }
-  return out;
+  // Tokens inherit, and the nearest declaration wins: root takes the blocks on the nearest element
+  // they style (its own `.mq` before an ancestor's theme), later ones over earlier, as the cascade does.
+  for (let n = root; n; n = n.parentElement) {
+    const own = blocks.filter((r) => applies(n, r.selectorText));
+    if (own.length) return Object.fromEntries(own.flatMap((r) => [...r.style].filter((p) => p.startsWith('--mq-')).map((p) => [p, r.style.getPropertyValue(p).trim()])));
+  }
+  return {};
 }
 
 /** What `root` paints on: its own background and its ancestors', laid down from the page's white.
@@ -170,6 +175,9 @@ export function watch(root, onTheme) {
   const mqs = ['(prefers-color-scheme: dark)', '(forced-colors: active)'].map((q) => matchMedia(q));
   mo.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-mq-theme'], childList: true });
   mqs.forEach((q) => q.addEventListener('change', run));
+  // Print has its own black-on-white palette: the screen fallbacks step aside for it, then come back.
+  const printing = () => release(root);
+  addEventListener('beforeprint', printing); addEventListener('afterprint', run);
   // Re-checked when the pane crosses the width floor, not on every resize.
   const under = () => (root.parentElement || root).clientWidth < FLOOR;
   let narrow = under();
@@ -178,5 +186,8 @@ export function watch(root, onTheme) {
     narrow = under(); run();
   });
   if (ro) ro.observe(root.parentElement || root);
-  return () => { mo.disconnect(); mqs.forEach((q) => q.removeEventListener('change', run)); if (ro) ro.disconnect(); };
+  return () => {
+    mo.disconnect(); mqs.forEach((q) => q.removeEventListener('change', run)); if (ro) ro.disconnect();
+    removeEventListener('beforeprint', printing); removeEventListener('afterprint', run);
+  };
 }
