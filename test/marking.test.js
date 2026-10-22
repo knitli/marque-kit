@@ -34,4 +34,8 @@ assert.equal(spoken('(S//REL TO USA, GBR)'), 'S, REL TO, U-S-A, G-B-R');
 const hidden = { text: '(S//FGI AUS//NF)', layers: [{ tokens: [{ t: '(S' }] }, { tokens: [{ t: '//FGI ' }, { t: 'AUS' }] }, { tokens: [{ t: '//NF)' }] }], masks: [{ kind: 'concealed', span: [8, 11] }] };
 assert.equal(spoken(hidden).includes('A-U-S'), false, 'concealed code not spoken');
 assert.equal(spoken(hidden), 'S, F-G-I, NF, source concealed');
+// Spans are UTF-8 bytes: text before the mask that isn't ASCII doesn't shift it onto another token.
+const wide = { text: '(S//éééé AUS//NF)', layers: [{ tokens: [{ t: '(S' }] }, { tokens: [{ t: '//éééé ' }, { t: 'AUS' }] }, { tokens: [{ t: '//NF)' }] }], masks: [{ kind: 'concealed', span: [13, 16] }] };
+assert.equal(spoken(wide).includes('A-U-S'), false, 'byte span conceals AUS');
+assert.equal(spoken(wide).includes('NF'), true, 'and only AUS');
 console.log(`ok · ${cases.length + 1} markings`);

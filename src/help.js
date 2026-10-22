@@ -380,8 +380,9 @@ function place(n, x, y) {
 }
 
 /** Close every overlay inside `node`, through its own close path: a mount being destroyed takes its overlays with it. */
-export function closeWithin(node) {
-  for (const e of [...stack].reverse()) if (node.contains(e.content)) e.close();
+export function closeWithin(node, { windows = true } = {}) {
+  // A window (the manual, a lookup) isn't tied to a finding: a redraw leaves it open with `windows: false`.
+  for (const e of [...stack].reverse()) if (node.contains(e.content) && (windows || e.kind !== 'window')) e.close();
 }
 
 export function float(content, anchor, { kind = 'pop', onClose } = {}) {
@@ -404,7 +405,7 @@ export function float(content, anchor, { kind = 'pop', onClose } = {}) {
   }
   const back = document.activeElement;
   const outside = (e) => { if (!content.contains(e.target) && e.target !== anchor) close(); };
-  const entry = { close, content };
+  const entry = { close, content, kind };
   content.addEventListener('mq-close', close); // content asks to close itself after an act
   function close() {
     const i = stack.indexOf(entry); if (i < 0) return;

@@ -716,8 +716,11 @@ export function receipt(doc, session = {}) {
   const about = (e, x) => {
     const rule = x.rule ? `${x.rule.scheme}:${x.rule.predicate}` : x.kind;
     if (!e.about) return '';
-    if (e.about.rule && e.about.rule !== rule) return `on ${e.about.rule}${e.about.as_written ? ` ${e.about.as_written}` : ''}`;
-    return e.about.as_written !== (x.marking?.as_written?.text ?? null) && e.about.as_written ? `asked of ${e.about.as_written}` : '';
+    // Taken at another paragraph or page under this id: the receipt says where it was.
+    const was = 'anchor' in e.about ? where({ ...x, anchor: e.about.anchor }) : null;
+    const at = was && was !== where(x) ? `at ${was}` : '';
+    if (e.about.rule && e.about.rule !== rule) return [`on ${e.about.rule}${e.about.as_written ? ` ${e.about.as_written}` : ''}`, at].filter(Boolean).join(' ');
+    return [e.about.as_written !== (x.marking?.as_written?.text ?? null) && e.about.as_written ? `asked of ${e.about.as_written}` : '', at].filter(Boolean).join(' ');
   };
   const acts = (x) => (x.history || []).map((e) => [e.act.replace(/_/g, ' '), op(e), about(e, x), e.at].filter(Boolean).join(' ')).join(' → ');
   for (const f of doc.findings) {
@@ -909,7 +912,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     // Never leave an old announcement behind for someone to find later.
     live.textContent = say;
     // A popover opened on the last draw acts on the findings it was drawn from: it goes with them.
-    closeWithin(root);
+    closeWithin(root, { windows: false });
     body.replaceChildren(pane(v, h));
     if (host.vocab) relabel(body, host.vocab); // this pane's own vocabulary
     refocus(focusId);

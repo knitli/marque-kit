@@ -127,7 +127,7 @@ const pinned = new WeakMap();
 export function release(root) {
   for (const { t, ship, value, priority } of pinned.get(root) || []) {
     const now = root.style.getPropertyValue(t);
-    if (now && !same(now, ship)) continue; // the host has set it again since
+    if (!same(now, ship)) continue; // the host has set it again, or taken it away, since
     if (value) root.style.setProperty(t, value, priority); else root.style.removeProperty(t);
   }
   pinned.delete(root);
@@ -208,6 +208,7 @@ export function watch(root, onTheme) {
   // A root moved under another ancestor (removed and put back) may be under another theme.
   let parent = root.parentElement;
   // shortcut: rules changed through the CSSOM (insertRule, adoptedStyleSheets) aren't seen; a host that does so re-mounts.
+  const LINKED = ['href', 'media', 'rel', 'disabled'];
   const links = new Set(); // linked sheets still loading, so unwatch can let them go
   const sheet = (n) => n.nodeName === 'STYLE' || (n.nodeName === 'LINK' && /\bstylesheet\b/i.test(n.rel));
   const mo = new MutationObserver((ms) => {
@@ -218,14 +219,17 @@ export function watch(root, onTheme) {
     const themed = ms.some((m) => m.type === 'attributes' && m.attributeName === 'data-mq-theme');
     // A stylesheet put in, taken out or rewritten can set tokens; a linked one is checked once it loads.
     for (const m of ms) for (const n of m.addedNodes) if (n.nodeName === 'LINK') { links.add(n); n.addEventListener('load', loaded, { once: true }); }
-    const styled = ms.some((m) => (m.type === 'childList' && ([...m.addedNodes, ...m.removedNodes].some(sheet) || m.target.nodeName === 'STYLE'))
+    // A link switched in place (href, media, rel, disabled) applies at once or once its new sheet loads.
+    for (const m of ms) if (m.type === 'attributes' && m.target.nodeName === 'LINK' && LINKED.includes(m.attributeName)) { links.add(m.target); m.target.addEventListener('load', loaded, { once: true }); }
+    const styled = ms.some((m) => (m.type === 'attributes' && m.target.nodeName === 'LINK' && LINKED.includes(m.attributeName))
+      || (m.type === 'childList' && ([...m.addedNodes, ...m.removedNodes].some(sheet) || m.target.nodeName === 'STYLE'))
       || (m.type === 'characterData' && m.target.parentNode?.nodeName === 'STYLE'));
     if (themed || styled || moved || !done || sig() !== last) { done = true; run(); }
   });
   const mqs = ['(prefers-color-scheme: dark)', '(forced-colors: active)'].map((q) => matchMedia(q));
   // One registration (a second on the same node would replace the first); the signature sorts out
   // which class or style changes are on the root's own line.
-  mo.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-mq-theme', 'class', 'style'], childList: true, characterData: true });
+  mo.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-mq-theme', 'class', 'style', ...LINKED], childList: true, characterData: true });
   mqs.forEach((q) => q.addEventListener('change', run));
   // Print has its own black-on-white palette: the screen fallbacks step aside for it, then come back.
   // A rejected value stays out of print, the root's own or one inherited from above: each pinned token

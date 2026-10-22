@@ -77,8 +77,9 @@ export function normalise(marking) {
   throw new TypeError('marking must be a string or {text, layers}');
 }
 
-/** A mask given as a span ([start, end) in `text`) covers bytes the tokens may still carry: those
- *  tokens go, in what is drawn, said and copied, and the mask is drawn in their layer instead. */
+/** A mask given as a span ([start, end) in UTF-8 bytes of `text`, as every span is) covers bytes the tokens
+ *  may still carry: those tokens go, in what is drawn, said and copied, and the mask is drawn in their layer instead. */
+const utf8 = new TextEncoder();
 function conceal(m) {
   const spans = (m.masks || []).filter((k) => Array.isArray(k.span));
   if (!spans.length) return m;
@@ -86,11 +87,12 @@ function conceal(m) {
   const masks = m.masks.map((k) => ({ ...k, ...(Array.isArray(k.span) && { len: k.len ?? k.span[1] - k.span[0] }) }));
   let at = 0;
   const layers = m.layers.map((l, li) => ({ ...l, tokens: l.tokens.filter(({ t }) => {
-    const over = hit(at, (at += t.length));
+    const over = hit(at, (at += utf8.encode(t).length));
     for (const k of over) { const i = m.masks.indexOf(k); masks[i].layer ??= li; }
     return !over.length;
   }) }));
-  const text = [...spans].sort((a, b) => b.span[0] - a.span[0]).reduce((t, k) => t.slice(0, k.span[0]) + t.slice(k.span[1]), m.text);
+  const b = [...spans].sort((x, y) => y.span[0] - x.span[0]).reduce((t, k) => [...t.slice(0, k.span[0]), ...t.slice(k.span[1])], [...utf8.encode(m.text)]);
+  const text = new TextDecoder().decode(new Uint8Array(b));
   return { ...m, text, layers, masks };
 }
 
