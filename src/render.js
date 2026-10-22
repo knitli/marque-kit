@@ -761,6 +761,16 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   // The kit root carries the tokens; one above it (with its theme) wins, so only add it when there is none.
   const added = !root.closest('.mq');
   if (added) root.classList.add('mq');
+  // A theme set above on something that isn't a kit root: the root this mount made follows it, since
+  // its own .mq light defaults would otherwise win over what it inherits. Kept in step as it changes.
+  const mirrors = added && !root.hasAttribute('data-mq-theme');
+  const follow = () => {
+    if (!mirrors) return;
+    const t = root.parentElement?.closest('[data-mq-theme]')?.getAttribute('data-mq-theme');
+    if (t && root.getAttribute('data-mq-theme') !== t) root.setAttribute('data-mq-theme', t);
+    else if (!t && root.hasAttribute('data-mq-theme')) root.removeAttribute('data-mq-theme');
+  };
+  follow();
   // Every mount is its own query container, so the card's narrow rules follow this pane, not a wider ancestor.
   root.classList.add('mq-mount');
   root.replaceChildren(body, live);
@@ -778,6 +788,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   });
   if (sized) sized.observe(root);
   const unwatch = typeof MutationObserver !== 'undefined' ? watch(root, (r) => {
+    follow(); // a change above: if it moved the root's theme, that change checks again
     const was = !!theme?.narrow;
     theme = r; narrowed(); host.onTheme?.(r);
     if (!!r?.narrow !== was) draw();
@@ -881,7 +892,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   return {
     get theme() { return theme; }, // the gate's report: { checked, rejected: [{ token, measured, floor, fallback }] }
     /** Take the pane down: its theme watchers go, and so does what it drew. */
-    destroy() { dead = true; unwatch(); if (sized) sized.disconnect(); untips(); release(root); root.replaceChildren(); root.classList.remove('mq-narrow', 'mq-mount'); if (added) root.classList.remove('mq'); },
+    destroy() { dead = true; unwatch(); if (sized) sized.disconnect(); untips(); release(root); root.replaceChildren(); root.classList.remove('mq-narrow', 'mq-mount'); if (added) root.classList.remove('mq'); if (mirrors) root.removeAttribute('data-mq-theme'); },
     update({ linted: upTo, seq, ...next }) {
       // A lint that began before the one already shown is stale: keep the newer document.
       // `seq` orders lints that began at the same point in the log. A stale lint's

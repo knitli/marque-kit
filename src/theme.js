@@ -104,6 +104,19 @@ function backdrop(root) {
   return layers.reduceRight((under, c) => over(c, under), [255, 255, 255, 1]);
 }
 
+/** The print palette theme.css sets (its @media print token block), by token. */
+function printPalette() {
+  const out = {};
+  const walk = (rules, inPrint) => {
+    for (const r of rules) {
+      if (r.style && r.selectorText) { if (inPrint) for (const p of r.style) if (p.startsWith('--mq-')) out[p] = r.style.getPropertyValue(p).trim(); }
+      else if (r.cssRules) walk(r.cssRules, inPrint || /\bprint\b/.test(r.media?.mediaText ?? ''));
+    }
+  };
+  for (const sheet of document.styleSheets) { try { walk(sheet.cssRules, false); } catch { /* unreadable */ } }
+  return out;
+}
+
 // root → the fallbacks check() set inline, with what the host had there, so a re-check can put it back
 const pinned = new WeakMap();
 
@@ -205,9 +218,15 @@ export function watch(root, onTheme) {
   mo.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-mq-theme', 'class', 'style'], childList: true });
   mqs.forEach((q) => q.addEventListener('change', run));
   // Print has its own black-on-white palette: the screen fallbacks step aside for it, then come back.
-  // The host's rejected value stays out of print too: both step aside, and come back after.
-  const printing = () => { for (const { t } of pinned.get(root) || []) root.style.removeProperty(t); last = sig(); };
-  addEventListener('beforeprint', printing); addEventListener('afterprint', run);
+  // A rejected value stays out of print, the root's own or one inherited from above: each pinned token
+  // takes the print palette's value (the screen fallback where print sets none), and the screen pins come back after.
+  const printing = () => {
+    const pal = printPalette();
+    for (const { t, ship } of pinned.get(root) || []) root.style.setProperty(t, pal[t] ?? ship, 'important');
+    last = sig();
+  };
+  const printed = () => { for (const { t, ship } of pinned.get(root) || []) root.style.setProperty(t, ship, 'important'); run(); };
+  addEventListener('beforeprint', printing); addEventListener('afterprint', printed);
   // Re-checked when the pane crosses the width floor, not on every resize.
   const under = () => room(root) < FLOOR;
   let narrow = under();
@@ -218,6 +237,6 @@ export function watch(root, onTheme) {
   if (ro) { ro.observe(root); if (root.parentElement) ro.observe(root.parentElement); }
   return () => {
     mo.disconnect(); mqs.forEach((q) => q.removeEventListener('change', run)); if (ro) ro.disconnect();
-    removeEventListener('beforeprint', printing); removeEventListener('afterprint', run);
+    removeEventListener('beforeprint', printing); removeEventListener('afterprint', printed);
   };
 }

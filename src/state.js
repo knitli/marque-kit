@@ -144,6 +144,8 @@ const holds = (e, f) => {
   const now = norm(f.outcome?.result?.text), was = norm(f.marking?.as_written?.text);
   // Asked of this marking: the one it was asked about, or the one a marking answer wrote.
   // A prose answer's written marking can't be told from a new one, so it holds only on its own.
+  // Another rule under the same id is another finding, whatever its marking.
+  if (e?.about && (e.about.rule ?? null) !== ruleOf(f)) return null;
   const same = !e?.about || was === norm(e.about.as_written) || (r != null && was === now);
   return same && (r == null || norm(r) === now) ? e : null;
 };

@@ -190,7 +190,7 @@
 .mq-float { position: fixed; }
 .mq-float.pop { box-shadow: var(--mq-shadow-overlay); max-height: calc(100vh - 48px); overflow: auto; }
 .mq-float.window { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); box-shadow: var(--mq-shadow-overlay); }
-.mq-tip.mq-float { display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
+.mq-tip.mq-float { display: flex; flex-direction: column; gap: 4px; }
 .mq-tip .mq-src { color: inherit; }
 .mq-close { font-family: var(--mq-font-body); font-size: var(--mq-size-sm); font-weight: 600; color: var(--mq-act-ink); background: transparent; border: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 

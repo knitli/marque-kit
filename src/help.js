@@ -380,7 +380,8 @@ function place(n, x, y) {
 }
 
 export function float(content, anchor, { kind = 'pop', onClose } = {}) {
-  const root = anchor?.closest?.('.mq') || document.querySelector('.mq') || document.body;
+  // The pane's own mount first, so its overlays go when it does; then the kit root.
+  const root = anchor?.closest?.('.mq-mount, .mq') || document.querySelector('.mq') || document.body;
   content.classList.add('mq-float', kind);
   if (!content.hasAttribute('role')) content.setAttribute('role', 'dialog'); // non-modal: no aria-modal
   root.append(content);
@@ -429,7 +430,11 @@ export function float(content, anchor, { kind = 'pop', onClose } = {}) {
 export function tips(root, vocab, host = {}) {
   let timer = null, shown = null;
   const id = `mq-tip-${Math.random().toString(36).slice(2, 8)}`;
-  const hide = () => { clearTimeout(timer); if (shown) { shown.tok.removeAttribute('aria-describedby'); shown.t.remove(); shown = null; } };
+  // Hoverable (WCAG 1.4.13): leaving the token gives the pointer a moment to reach the tip, and the tip keeps itself open.
+  let leaving = null;
+  const stay = () => clearTimeout(leaving);
+  const leave = () => { clearTimeout(leaving); leaving = setTimeout(hide, 300); };
+  const hide = () => { clearTimeout(timer); clearTimeout(leaving); if (shown) { shown.tok.removeAttribute('aria-describedby'); shown.t.remove(); shown = null; } };
   const show = (tok) => {
     hide();
     if (!root.contains(tok)) return; // redrawn while the tip waited: nothing to point at
@@ -442,14 +447,16 @@ export function tips(root, vocab, host = {}) {
     // Below the marking, or above it when there's no room below.
     const vh = document.documentElement.clientHeight;
     place(t, Math.max(8, Math.min(tok.getBoundingClientRect().left, vw - t.offsetWidth - 8)), r.bottom + 6 + t.offsetHeight > vh - 8 ? Math.max(8, r.top - 6 - t.offsetHeight) : r.bottom + 6);
+    t.addEventListener('pointerenter', stay); t.addEventListener('pointerleave', leave);
     tok.setAttribute('aria-describedby', id);
     shown = { tok, t };
   };
   // Only a marking's code opens a dialog; a country or group keeps to its tooltip. Said before it's reached.
   const popup = (t) => { if (t && entry(vocab, t.dataset.help)?.kind === 'marking') t.setAttribute('aria-haspopup', 'dialog'); return t; };
   const tokOf = (e) => popup(e.target.closest?.('.mq-tok'));
-  const over = (e) => { const t = tokOf(e); if (t) { clearTimeout(timer); timer = setTimeout(() => show(t), 300); } };
-  const out = (e) => { if (tokOf(e)) hide(); };
+  const over = (e) => { const t = tokOf(e); if (!t) return; if (shown?.tok === t) return stay(); clearTimeout(timer); timer = setTimeout(() => show(t), 300); };
+  const out = (e) => { if (!tokOf(e)) return; clearTimeout(timer); if (shown) leave(); };
+  const blur = (e) => { if (tokOf(e)) hide(); };
   const focus = (e) => { const t = tokOf(e); if (t) show(t); };
   const key = (e) => {
     const t = tokOf(e); if (!t) return;
@@ -463,7 +470,7 @@ export function tips(root, vocab, host = {}) {
   };
   // A token inside a reading's label opens help, never picks the reading.
   const click = (e) => { const t = tokOf(e); if (t) { e.preventDefault(); e.stopPropagation(); deeper(t); } };
-  const on = [['pointerover', over], ['pointerout', out], ['focusin', focus], ['focusout', out], ['keydown', key], ['click', click]];
+  const on = [['pointerover', over], ['pointerout', out], ['focusin', focus], ['focusout', blur], ['keydown', key], ['click', click]];
   on.forEach(([k, fn]) => root.addEventListener(k, fn));
   return () => { hide(); on.forEach(([k, fn]) => root.removeEventListener(k, fn)); };
 }
