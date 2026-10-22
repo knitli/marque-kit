@@ -103,7 +103,7 @@ export function render(marking, o = {}) {
   const root = el('span', 'mq-mark');
   if (o.state) root.classList.add(o.state);
   if (o.size && o.size !== 'sm') root.classList.add(o.size);
-  if (o.stacked) root.classList.add('stacked');
+  if (o.stacked) { root.classList.add('stacked'); root.dataset.stack = 'fixed'; }
   root.setAttribute('dir', 'ltr');
   root.dataset.text = m.text;
   if (o.form === 'summary') return summary(m, root);
@@ -124,8 +124,9 @@ export function render(marking, o = {}) {
       const text = (hidden.length && i === shown.length - 1) ? t.t.replace(/[, ]+$/, '') : t.t;
       const span = el('span', 'mq-i', text);
       const help = t.help || (o.help?.includes(bare(t.t)) ? bare(t.t) : null);
-      // Enter opens its help: a button that opens a dialog, to a screen reader too.
-      if (help) { span.classList.add('mq-tok'); span.tabIndex = 0; span.dataset.help = help; span.setAttribute('role', 'button'); span.setAttribute('aria-haspopup', 'dialog'); }
+      // Enter opens its help: a button, to a screen reader too. Whether it opens a dialog
+      // depends on the vocabulary, so tips() says that.
+      if (help) { span.classList.add('mq-tok'); span.tabIndex = 0; span.dataset.help = help; span.setAttribute('role', 'button'); }
       L.appendChild(span);
     });
     if (hidden.length) {
@@ -178,6 +179,12 @@ function summary(m, root) {
  * it always wraps the same way (CSS alone wraps greedily and orphans `GBR)`).
  * Call once per render, and again on container resize if the host allows.
  */
+/** Measure again after the room changed: a marking stacked at one width may fit at another. */
+export function resettle(root) {
+  if (root.dataset.stack !== 'fixed') root.classList.remove('stacked');
+  return settle(root);
+}
+
 export function settle(root) {
   if (root.classList.contains('stacked') || root.classList.contains('summary')) return root;
   const one = root.getBoundingClientRect().height;

@@ -32,7 +32,7 @@
  * engine's document as-is.
  */
 
-import { render as mark, settle } from './marking.js';
+import { render as mark, settle, resettle } from './marking.js';
 import { empty, record, see, linted, snapshot, docView, decision } from './state.js';
 import { cite, hasTip, tips } from './help.js';
 import { check, watch, release } from './theme.js';
@@ -633,7 +633,14 @@ export function receipt(doc, session = {}) {
   const op = (e) => (e.act === 'changed' && e.value == null ? 'back to Marque\u2019s result'
     : e.act === 'kept_as_written' ? (e.about?.result ? `instead of ${e.about.result}` : '')
     : e.value?.apply ? `apply${e.about?.result ? ` ${e.about.result}` : ''}` : e.value?.remove ? 'remove' : said(e.value));
-  const acts = (x) => (x.history || []).map((e) => [e.act.replace(/_/g, ' '), op(e), e.at].filter(Boolean).join(' ')).join(' → ');
+  // An act taken on another rule or marking under this id says which, from its own snapshot.
+  const about = (e, x) => {
+    const rule = x.rule ? `${x.rule.scheme}:${x.rule.predicate}` : x.kind;
+    if (!e.about) return '';
+    if (e.about.rule && e.about.rule !== rule) return `on ${e.about.rule}${e.about.as_written ? ` ${e.about.as_written}` : ''}`;
+    return e.about.as_written !== (x.marking?.as_written?.text ?? null) && e.about.as_written ? `asked of ${e.about.as_written}` : '';
+  };
+  const acts = (x) => (x.history || []).map((e) => [e.act.replace(/_/g, ' '), op(e), about(e, x), e.at].filter(Boolean).join(' ')).join(' → ');
   for (const f of doc.findings) {
     const ln = el('div', 'ln');
     ln.append(el('span', 't', where(f)));
@@ -703,6 +710,14 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   root.replaceChildren(body, live);
   let theme = check(root); // before the first draw, so a failing host token never shows
   host.onTheme?.(theme);
+  // A marking stacked or not at one width is measured again at another.
+  let width = 0;
+  const sized = typeof ResizeObserver !== 'undefined' && new ResizeObserver(() => {
+    if (root.clientWidth === width) return;
+    width = root.clientWidth;
+    root.querySelectorAll('.mq-mark').forEach(resettle);
+  });
+  if (sized) sized.observe(root);
   const unwatch = typeof MutationObserver !== 'undefined' ? watch(root, (r) => {
     const was = !!theme?.narrow;
     theme = r; host.onTheme?.(r);
@@ -777,7 +792,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   return {
     get theme() { return theme; }, // the gate's report: { checked, rejected: [{ token, measured, floor, fallback }] }
     /** Take the pane down: its theme watchers go, and so does what it drew. */
-    destroy() { unwatch(); untips(); release(root); root.replaceChildren(); if (added) root.classList.remove('mq'); },
+    destroy() { unwatch(); if (sized) sized.disconnect(); untips(); release(root); root.replaceChildren(); if (added) root.classList.remove('mq'); },
     update({ linted: upTo, seq, ...next }) {
       // A lint that began before the one already shown is stale: keep the newer document.
       // `seq` orders lints that began at the same point in the log. A stale lint's

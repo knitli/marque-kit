@@ -15,7 +15,7 @@
 // [foreground, background, floor]; a tint is laid over the surface first.
 export const PAIRS = [
   ['text', 'surface', 4.5], ['text-muted', 'surface', 4.5],
-  ['act-ink', 'surface', 4.5], ['act-on', 'act', 4.5], ['act-on', 'act-hover', 4.5], ['act-ink', 'act-tint', 4.5], ['text', 'act-tint', 4.5], // option text, hovered or chosen
+  ['act-ink', 'surface', 4.5], ['act-on', 'act', 4.5], ['act-on', 'act-hover', 4.5], ['act-ink', 'act-tint', 4.5], ['text', 'act-tint', 4.5], ['text-muted', 'act-tint', 4.5], // options and rows, hovered or chosen
   ['attn-on', 'attn', 4.5], ['attn-ink', 'surface', 4.5], ['attn-ink', 'attn-tint', 4.5],
   ['error-ink', 'surface', 4.5], ['focus', 'surface', 3.0], ['focus', 'ground', 3.0],
   ['attn-ink', 'ground', 4.5], // the brand's gold and the Needs-you section mark
@@ -177,7 +177,11 @@ export function check(root) {
 export function watch(root, onTheme) {
   // A root mounted detached is checked once it's in the document.
   let done = root.isConnected;
-  const run = () => onTheme(check(root));
+  // A host can retheme the root itself: its class, or tokens in its style. The gate's own pins
+  // are in the signature it leaves behind, so they don't set it off again.
+  const sig = () => `${root.className}|${[...root.style].filter((p) => p.startsWith('--mq-')).map((p) => `${p}:${root.style.getPropertyValue(p)}`).join(';')}`;
+  let last = sig();
+  const run = () => { onTheme(check(root)); last = sig(); };
   // A root moved under another ancestor (removed and put back) may be under another theme.
   let parent = root.parentElement;
   const mo = new MutationObserver((ms) => {
@@ -185,13 +189,15 @@ export function watch(root, onTheme) {
     const moved = root.parentElement !== parent || ms.some((m) => [...m.addedNodes].some((n) => n === root || n.contains?.(root)));
     if (moved) { narrow = under(); if (ro) { ro.disconnect(); ro.observe(root); if (root.parentElement) ro.observe(root.parentElement); } }
     parent = root.parentElement;
-    if (ms.some((m) => m.type === 'attributes') || moved || !done) { done = true; run(); }
+    const themed = ms.some((m) => m.type === 'attributes' && m.attributeName === 'data-mq-theme');
+    if (themed || moved || !done || sig() !== last) { done = true; run(); }
   });
   const mqs = ['(prefers-color-scheme: dark)', '(forced-colors: active)'].map((q) => matchMedia(q));
   mo.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-mq-theme'], childList: true });
+  mo.observe(root, { attributes: true, attributeFilter: ['class', 'style'] });
   mqs.forEach((q) => q.addEventListener('change', run));
   // Print has its own black-on-white palette: the screen fallbacks step aside for it, then come back.
-  const printing = () => release(root);
+  const printing = () => { release(root); last = sig(); };
   addEventListener('beforeprint', printing); addEventListener('afterprint', run);
   // Re-checked when the pane crosses the width floor, not on every resize.
   const under = () => room(root) < FLOOR;

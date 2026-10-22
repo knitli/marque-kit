@@ -445,7 +445,9 @@ export function tips(root, vocab, host = {}) {
     tok.setAttribute('aria-describedby', id);
     shown = { tok, t };
   };
-  const tokOf = (e) => e.target.closest?.('.mq-tok');
+  // Only a marking's code opens a dialog; a country or group keeps to its tooltip. Said before it's reached.
+  const popup = (t) => { if (t && entry(vocab, t.dataset.help)?.kind === 'marking') t.setAttribute('aria-haspopup', 'dialog'); return t; };
+  const tokOf = (e) => popup(e.target.closest?.('.mq-tok'));
   const over = (e) => { const t = tokOf(e); if (t) { clearTimeout(timer); timer = setTimeout(() => show(t), 300); } };
   const out = (e) => { if (tokOf(e)) hide(); };
   const focus = (e) => { const t = tokOf(e); if (t) show(t); };

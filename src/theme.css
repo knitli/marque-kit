@@ -94,7 +94,7 @@
   --mq-surface-sunken: #232a25;
 
   --mq-text: #dde4d8;
-  --mq-text-muted: #98a39a;
+  --mq-text-muted: #a3ada4;       /* 4.7:1 on a hovered row (act-tint over surface) */
 
   --mq-rule: #414a44;
   --mq-rule-strong: #76827a;       /* Knitli: #5a655d (2.05:1 on the card).
@@ -142,7 +142,7 @@
 @media (prefers-color-scheme: dark) {
   [data-mq-theme="auto"] {
     --mq-ground: #262d28; --mq-surface: #2e3630; --mq-surface-sunken: #232a25;
-    --mq-text: #dde4d8; --mq-text-muted: #98a39a;
+    --mq-text: #dde4d8; --mq-text-muted: #a3ada4;
     --mq-rule: #414a44; --mq-rule-strong: #76827a;
     --mq-act: #4464ad; --mq-act-ink: #9db2e0; --mq-act-on: #ffffff;
     --mq-act-tint: rgba(68,100,173,.18); --mq-act-hover: #5273bd;

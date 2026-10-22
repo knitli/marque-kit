@@ -97,16 +97,18 @@ function reversed(state, id, e = last(state, id)) {
 /** The host re-linted: the first `n` acts are in the new findings. Never moves back. */
 export const linted = (state, n = state.log.length) => ({ ...state, linted: Math.max(state.linted ?? 0, Math.min(n, state.log.length)) });
 
+/** JSON with object keys sorted, arrays in order: the same question reserialised is the same question. */
+const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((n) => [n, x[n]])) : x));
 /** The finding isn't the one the act was taken on: another marking or question under the same id. */
 const moved = (e, f) => !!e.about
   // The whole question, not only its words: a new field type or format changes what an answer means.
-  && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || JSON.stringify(e.about.asks ?? null) !== JSON.stringify(f.asks ?? null)
+  && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || canon(e.about.asks ?? null) !== canon(f.asks ?? null)
     || e.about.result !== (f.outcome?.result?.text ?? null));
 const stale = (e, f) => moved(e, f)
   // A reading picked is stale once the finding no longer offers it, from the readings or the question's own options.
   // The whole reading, not only its marking: what it asserts is what gets applied and audited.
   || (!!e.value?.reading && ![...(f.outcome?.readings || []), ...(Array.isArray(f.asks?.options) ? f.asks.options : [])]
-    .some((r) => JSON.stringify(r) === JSON.stringify(e.value.reading)));
+    .some((r) => canon(r) === canon(e.value.reading)));
 /** The finding as it was before a written act, from that act's snapshot. */
 const restore = (f, was) => ({ ...f, asks: was.asks ?? null, outcome: { ...f.outcome, ...was.outcome }, needs_person: was.needs_person, blocks: was.blocks });
 /** The finding the person answered: after a pending take-back of a written answer, the question it reopened. */
@@ -121,7 +123,7 @@ function answeredOn(state, f, e) {
 const staleOp = (e, a) => !!e.about && (e.about.state !== a.state || e.about.result !== (a.derived_value?.text ?? null)
   // A typed field is stale once the field is gone or asks for something else; its state and value are the overlay's.
   || Object.keys(e.value?.fields || {}).some((k) => !a.fields?.[k] || (e.about.fields?.[k] && schema(e.about.fields[k]) !== schema(a.fields[k]))));
-const schema = ({ state, value, source, ...fl }) => JSON.stringify(fl);
+const schema = ({ state, value, source, ...fl }) => canon(fl);
 
 const edited = (e) => (e?.act === 'answered' || e?.act === 'changed') ? e : null;
 /** On a view (render and help share it): the person's decision on this finding: the act in force, or, once a lint has
