@@ -91,8 +91,9 @@ function visiblyChanged(f) {
 
 const edit = (e) => (e?.act === 'answered' || e?.act === 'changed') ? e : null;
 /** The person's decision on this finding: the act in force, or, once a lint has
- *  written it and nothing is asked again, the last one in the history. */
-const decided = (f) => edit(f.person) || (f.needs_person === 'none' && !f.asks ? edit(f.history?.findLast((e) => edit(e))) : null);
+ *  written it and nothing is asked again, the last one in the history. A stale
+ *  view has no decision: the lint dropped the person's last one. */
+const decided = (f) => edit(f.person) || (!f.stale && f.needs_person === 'none' && !f.asks ? edit(f.history?.findLast((e) => edit(e))) : null);
 const settled = (f) => decided(f)?.value != null;
 const wasAsked = (f) => !!f.asked || !!f.history?.some((e) => e.act === 'answered');
 const SHAPE = { quiet: '', noticeable: '', advisory: 'can-act', action: 'must-act', blocking: 'must-act' };
@@ -284,7 +285,7 @@ export function row(f, host = {}) {
   const isArtifact = !!f.kind;
   const r = isArtifact ? artRung(f, host.moment) : rung(f, host.moment);
   const li = el('div', 'mq-row-item'); li.dataset.finding = f.id; li.tabIndex = 0; li.setAttribute('role', 'button');
-  li.setAttribute('aria-expanded', 'false');
+  if (!host.narrow) li.setAttribute('aria-expanded', 'false');
   li.append(el('span', 'where', where(f)));
   const what = el('div', 'what', f.asks ? f.asks.text : f.says.text);
   const m = f.outcome?.result || f.marking?.as_written;
@@ -305,13 +306,15 @@ export function row(f, host = {}) {
     li.after(d);
   };
   const click = () => {
+    // Under the width floor there is no room for a card: the host is told, and shows it its own way.
+    if (host.narrow) { host.onOpen?.(f); host.onJump?.(f); return; }
     const open = !li.classList.contains('open');
     toggle(open); host.onOpen?.(open ? f : null);
     if (open) host.onJump?.(f);
   };
   li.addEventListener('click', click);
   li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); click(); } });
-  if (host.open === f.id) queueMicrotask(() => toggle(true));
+  if (host.open === f.id && !host.narrow) queueMicrotask(() => toggle(true));
   return li;
 }
 
@@ -677,11 +680,16 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   const live = el('div', 'mq-sr'); live.setAttribute('aria-live', 'polite');
   const body = el('div');
   // The kit root carries the tokens; one above it (with its theme) wins, so only add it when there is none.
-  if (!root.closest('.mq')) root.classList.add('mq');
+  const added = !root.closest('.mq');
+  if (added) root.classList.add('mq');
   root.replaceChildren(body, live);
   let theme = check(root); // before the first draw, so a failing host token never shows
   host.onTheme?.(theme);
-  const unwatch = typeof MutationObserver !== 'undefined' ? watch(root, (r) => { theme = r; host.onTheme?.(r); }) : () => {};
+  const unwatch = typeof MutationObserver !== 'undefined' ? watch(root, (r) => {
+    const was = !!theme?.narrow;
+    theme = r; host.onTheme?.(r);
+    if (!!r?.narrow !== was) draw();
+  }) : () => {};
   if (host.vocab) tips(body, host.vocab, host);
 
   const h = {
@@ -690,6 +698,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     get engine() { return cur.engine; },
     get readOnly() { return cur.readOnly; },
     get open() { return cur.open; },
+    get narrow() { return !!theme?.narrow; },
     onOpen(f) {
       cur.open = f?.id ?? null;
       // Opening it is seeing it. Recorded now and drawn when the row closes, so rows never move under the pointer.
@@ -732,8 +741,10 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     let say = '';
     if (v && cur.engine === 'ok') {
       const now = sections(v, cur.moment).must;
-      if (said) say = now.filter((f) => !said.has(f.id)).map((f) => `${spokenWhere(f)} needs you.`).join(' ');
-      said = new Set(now.map((f) => f.id));
+      // Keyed by the question too: one asked again under the same id is news.
+      const key = (f) => `${f.id} ${JSON.stringify(f.asks ?? null)}`;
+      if (said) say = now.filter((f) => !said.has(key(f))).map((f) => `${spokenWhere(f)} needs you.`).join(' ');
+      said = new Set(now.map(key));
     }
     // Never leave an old announcement behind for someone to find later.
     live.textContent = say;
@@ -745,7 +756,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   return {
     get theme() { return theme; }, // the gate's report: { checked, rejected: [{ token, measured, floor, fallback }] }
     /** Take the pane down: its theme watchers go, and so does what it drew. */
-    destroy() { unwatch(); root.replaceChildren(); },
+    destroy() { unwatch(); root.replaceChildren(); if (added) root.classList.remove('mq'); },
     update({ linted: upTo, seq, ...next }) {
       // A lint that began before the one already shown is stale: keep the newer document.
       // `seq` orders lints that began at the same point in the log.

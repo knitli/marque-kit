@@ -368,9 +368,9 @@ export function float(content, anchor, { kind = 'pop', onClose } = {}) {
   } else {
     // Beside the pane where there's room; over the page where there isn't. Never over the pane.
     const pane = (anchor?.closest?.('.mq-pane') || root.querySelector('.mq-pane'))?.getBoundingClientRect();
-    const room = pane ? pane.left - 32 : 0;
     content.style.top = '24px';
-    if (room >= 520) content.style.right = `${vw - pane.left + 16}px`;
+    if (pane && pane.left - 32 >= 520) content.style.right = `${vw - pane.left + 16}px`;
+    else if (pane && vw - pane.right - 32 >= 520) content.style.left = `${pane.right + 16}px`;
     else content.style.left = '16px';
   }
   const back = document.activeElement;

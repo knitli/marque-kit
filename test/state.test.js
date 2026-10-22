@@ -276,6 +276,18 @@ assert.equal(view(derivedCab, record(empty(), 'a-cab', 'answered', { fields: { d
   assert.equal(view({ ...cab, fields: rest }, s).stale, true);
   assert.equal(view({ ...cab, fields: { ...cab.fields, derived_from: { ...derived_from, hint: 'a source list' } } }, s).stale, true);
 }
+// A stale later field leaves an earlier one that still holds: shown, and still waiting to be written.
+{
+  let s = record(empty(), 'a-cab', 'answered', { fields: { derived_from: 'Multiple Sources' } }, undefined, snapshot(cab));
+  s = record(s, 'a-cab', 'answered', { fields: { declassify_on: '20490115' } }, undefined, snapshot(cab));
+  const now = { ...cab, fields: { ...cab.fields, declassify_on: { ...cab.fields.declassify_on, hint: 'eight digits' } } };
+  const v = view(now, s);
+  assert.notEqual(v.stale, true);
+  assert.equal(v.fields.derived_from.value, 'Multiple Sources');
+  assert.notEqual(v.fields.declassify_on.source, 'person');
+  const d = { ...doc, document: { ...doc.document, artifacts: doc.document.artifacts.map((a) => (a.id === 'a-cab' ? now : a)) } };
+  assert.ok(docView(d, s).document.pending.includes('a-cab'));
+}
 
 // A reading whose label or assertions changed under the same marking is a different reading.
 {

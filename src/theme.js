@@ -20,6 +20,8 @@ export const PAIRS = [
   ['error-ink', 'surface', 4.5], ['focus', 'surface', 3.0],
 ];
 export const SIZES = [['size-xs', 12], ['size-sm', 13]];
+/** The narrowest pane a card fits (docs/THEME.md); under it the kit shows rows only. */
+export const FLOOR = 240;
 
 /** Any CSS colour → sRGB [r, g, b, a], by painting it: oklch(), lab() and color() aren't rgb numbers. */
 function srgb(css) {
@@ -66,13 +68,25 @@ function shipped(root) {
   return out;
 }
 
-const pinned = new WeakMap(); // root → the fallbacks check() set inline, so a re-check can lift them
+/** What `root` paints on: its own background and its ancestors', laid down from the page's white.
+ *  shortcut: background images and gradients are not seen; measure them if a host needs it. */
+function backdrop(root) {
+  const layers = [];
+  for (let n = root; n; n = n.parentElement) layers.push(srgb(getComputedStyle(n).backgroundColor));
+  return layers.reduceRight((under, c) => over(c, under), [255, 255, 255, 1]);
+}
+
+// root → the fallbacks check() set inline, with what the host had there, so a re-check can put it back
+const pinned = new WeakMap();
 
 /** Measure `root`'s tokens; fall back the host's where a pair fails.
  *  Run again when the theme changes: it lifts its own earlier fallbacks first. */
 export function check(root) {
   if (!root?.isConnected) return null;
-  for (const t of pinned.get(root) || []) root.style.removeProperty(t);
+  for (const { t, ship, value, priority } of pinned.get(root) || []) {
+    if (!same(root.style.getPropertyValue(t), ship)) continue; // the host has set it again since
+    if (value) root.style.setProperty(t, value, priority); else root.style.removeProperty(t);
+  }
   pinned.set(root, []);
   const probe = document.createElement('span');
   probe.hidden = true;
@@ -83,20 +97,31 @@ export function check(root) {
   const host = (t) => ship[`--mq-${t}`] && !same(cs.getPropertyValue(`--mq-${t}`), ship[`--mq-${t}`]);
   const rejected = [];
   const fall = (t, measured, floor) => {
+    const token = `--mq-${t}`;
     // fallback: false when theme.css couldn't be read (another origin without CORS): reported, not fixed.
     const fallback = host(t);
-    rejected.push({ token: `--mq-${t}`, measured: Math.round(measured * 100) / 100, floor, fallback });
-    if (fallback) { root.style.setProperty(`--mq-${t}`, ship[`--mq-${t}`]); pinned.get(root).push(`--mq-${t}`); }
+    if (!rejected.some((r) => r.token === token)) rejected.push({ token, measured: Math.round(measured * 100) / 100, floor, fallback });
+    if (fallback) {
+      pinned.get(root).push({ t: token, ship: ship[token], value: root.style.getPropertyValue(token), priority: root.style.getPropertyPriority(token) });
+      root.style.setProperty(token, ship[token]);
+    }
+    return fallback;
   };
-  for (const [fg, bg, floor] of PAIRS) {
-    // A translucent surface sits on the ground, and the ground on the page.
-    const surface = over(read('surface'), over(read('ground'), [255, 255, 255]));
-    const back = bg === 'surface' ? surface : over(read(bg), surface); // the surface is composited once
-    const m = ratio(over(read(fg), back), back);
-    if (m >= floor) continue;
-    // The host's token gives way; if both are the host's, both do.
-    const own = [fg, bg].filter(host);
-    for (const t of own.length ? own : [fg]) fall(t, m, floor);
+  // Forced colours: the user's system palette is in force, and it isn't the host's to fail or ours to replace.
+  const forced = matchMedia('(forced-colors: active)').matches;
+  // A fallback can break a pair that passed before it, so the pairs run again until nothing moves.
+  for (let pass = 0, moved = !forced; moved && pass < PAIRS.length; pass++) {
+    moved = false;
+    const page = backdrop(root); // the ground is root's own background
+    for (const [fg, bg, floor] of PAIRS) {
+      const surface = over(read('surface'), page);
+      const back = bg === 'surface' ? surface : over(read(bg), surface); // the surface is composited once
+      const m = ratio(over(read(fg), back), back);
+      if (m >= floor) continue;
+      // The host's token gives way; if both are the host's, both do.
+      const own = [fg, bg].filter(host);
+      for (const t of own.length ? own : [fg]) if (fall(t, m, floor)) moved = true;
+    }
   }
   for (const [t, floor] of SIZES) { const m = px(t); if (m < floor) fall(t, m, floor); }
   // The mark font must be monospace: narrow and wide letters measure the same (1.0).
@@ -109,10 +134,15 @@ export function check(root) {
   }
   probe.remove();
   for (const r of rejected) console.warn(`Marque theme: ${r.token} measured ${r.measured}, floor ${r.floor}; ${r.fallback ? 'shipped value used' : 'no shipped value could be read to fall back to'}`);
-  return { checked: PAIRS.length + SIZES.length + 1, rejected };
+  // The room the host gives the pane; `.mq`'s own min-width would only overflow it.
+  const width = (root.parentElement || root).clientWidth;
+  const narrow = width < FLOOR;
+  if (narrow) console.warn(`Marque theme: the pane is ${width}px wide, under ${FLOOR}px; cards can't be laid out, so only rows are shown`);
+  return { checked: (forced ? 0 : PAIRS.length) + SIZES.length + 2, rejected, width, narrow };
 }
 
-/** Re-check whenever the theme can change: data-mq-theme anywhere above, or the scheme `auto` follows. */
+/** Re-check whenever the theme can change: data-mq-theme anywhere above, the scheme `auto` follows,
+ *  forced colours, or the pane crossing the width floor. */
 export function watch(root, onTheme) {
   // A root mounted detached is checked once it's in the document.
   let done = root.isConnected;
@@ -121,8 +151,16 @@ export function watch(root, onTheme) {
     if (ms.some((m) => m.type === 'attributes')) run();
     else if (!done && root.isConnected) { done = true; run(); }
   });
-  const mq = matchMedia('(prefers-color-scheme: dark)');
+  const mqs = ['(prefers-color-scheme: dark)', '(forced-colors: active)'].map((q) => matchMedia(q));
   mo.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-mq-theme'], childList: true });
-  mq.addEventListener('change', run);
-  return () => { mo.disconnect(); mq.removeEventListener('change', run); };
+  mqs.forEach((q) => q.addEventListener('change', run));
+  // Re-checked when the pane crosses the width floor, not on every resize.
+  const under = () => (root.parentElement || root).clientWidth < FLOOR;
+  let narrow = under();
+  const ro = typeof ResizeObserver !== 'undefined' && new ResizeObserver(() => {
+    if (!root.isConnected || under() === narrow) return;
+    narrow = under(); run();
+  });
+  if (ro) ro.observe(root.parentElement || root);
+  return () => { mo.disconnect(); mqs.forEach((q) => q.removeEventListener('change', run)); if (ro) ro.disconnect(); };
 }

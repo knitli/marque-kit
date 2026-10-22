@@ -182,9 +182,11 @@ function artifactView(a, state, took) {
   }
   const ops = since(state).filter((e) => e.id === a.id);
   // An apply, a removal or a typed field taken on another value or state of this artifact doesn't carry over.
-  if (ops.length && staleOp(ops[ops.length - 1], out)) return { ...out, person: null, stale: true };
+  // Each op is checked on its own: a stale later field leaves an earlier one that still holds.
+  const valid = ops.filter((e) => !staleOp(e, out));
+  if (ops.length && !valid.length) return { ...out, person: null, stale: true };
   if (a.fields) {
-    const typed = Object.assign({}, ...ops.filter((e) => e.value?.fields && !staleOp(e, out)).map((e) => e.value.fields));
+    const typed = Object.assign({}, ...valid.filter((e) => e.value?.fields).map((e) => e.value.fields));
     const fields = Object.fromEntries(Object.entries(a.fields).map(([k, fl]) =>
       [k, typed[k] ? { ...fl, state: 'known', value: typed[k], source: 'person' } : fl]));
     const has = (fl) => fl?.state === 'known' || fl?.state === 'derived';
@@ -195,7 +197,7 @@ function artifactView(a, state, took) {
     const open = Object.values(fields).some((fl) => !has(fl));
     out = { ...out, fields, needs_person: open ? a.needs_person : 'none' };
   }
-  const asked = live(state, a.id)?.value;
+  const asked = (ops.length ? valid[valid.length - 1] : live(state, a.id))?.value;
   if (asked?.apply || asked?.remove) out = { ...out, applying: true };
   return out;
 }

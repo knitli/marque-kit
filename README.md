@@ -52,7 +52,7 @@ p.update({ moment: 'finalize' }); // the host's moment; the kit never guesses it
 p.destroy();                    // when the pane goes away
 ```
 
-`act` is null when only the seen list changed. An answer shows on its card at once but stays in `document.pending`, and the document is not ready, until the host applies it, re-lints and calls `p.update({ doc })`. `@marque/kit/help` has what a host needs to answer `onHelp` and `onLookup`. At mount the kit measures the host's `--mq-*` tokens against the contrast and size floors (`@marque/kit/theme`); a failing token falls back to the shipped value, and the report is `p.theme` and `onTheme(report)`.
+`act` is null when only the seen list changed. An answer shows on its card at once but stays in `document.pending`, and the document is not ready, until the host applies it, re-lints and calls `p.update({ doc })`. `@marque/kit/help` has what a host needs to answer `onHelp` and `onLookup`. At mount the kit measures the host's `--mq-*` tokens against the contrast and size floors (`@marque/kit/theme`); a failing token falls back to the shipped value, and the report is `p.theme` and `onTheme(report)`. Under forced colours the system palette stands and only sizes and the mark font are measured. When the room the host gives the pane is under 240px, the report says `narrow: true` and the kit shows rows only: opening one calls `onOpen(f)` for the host to show it its own way.
 
 The demo is static files over any HTTP server; it needs one only because ES modules won't load from `file://`.
 
