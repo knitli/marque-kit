@@ -300,6 +300,12 @@ export function row(f, host = {}) {
     // One card open at a time.
     li.closest('.mq-pane')?.querySelectorAll('.mq-row-item.open').forEach((o) => { if (o !== li) { o.nextElementSibling?.remove(); o.classList.remove('open'); o.setAttribute('aria-expanded', 'false'); } });
     const d = el('div', 'mq-row-detail'); d.append(isArtifact ? artifact(f, host) : card(f, host));
+    // Escape from inside the card closes it and goes back to its row.
+    // A token's open tooltip takes the first Escape.
+    d.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || e.target.getAttribute?.('aria-describedby')?.startsWith('mq-tip')) return;
+      e.preventDefault(); toggle(false); host.onOpen?.(null); li.focus();
+    });
     li.after(d);
   };
   const click = () => {
@@ -326,7 +332,8 @@ export function sections(doc, moment = 'editing') {
     if (r === 'blocking') g.must.push(f);
     // "Not my call" routes the question; it stays Action required for whoever gets it.
     // Deferred, Advisory or Action required, it waits for finalize, where it blocks.
-    else if (waits(f, moment) || ((r === 'action' || r === 'advisory') && f.deferred === 'deferred')) g.later.push(f);
+    // At the gate the moment it waited for has come, so one that never blocks is back in its section.
+    else if (waits(f, moment) || ((r === 'action' || r === 'advisory') && f.deferred === 'deferred' && !GATE.has(moment))) g.later.push(f);
     else if (r === 'action') g.must.push(f);
     else if (r === 'advisory') g.can.push(f);
     else g.done.push(f);
@@ -580,7 +587,8 @@ export function gate(doc, host = {}) {
     // What still has to be written: pending acts, and a derived artifact nobody has written. Done acts are not future writes.
     const pend = new Set(doc.document.pending || []);
     const will = doc.document.artifacts.filter((a) => pend.has(a.id) || due(a));
-    const answered = doc.findings.filter((f) => pend.has(f.id) || f.history?.some((e) => e.value != null));
+    // What the person decided and still stands; one they took back is the receipt's to show.
+    const answered = doc.findings.filter((f) => pend.has(f.id) || decision(f)?.value != null);
     const stuck = unwritable(doc, host);
     g.append(el('h3', 'mq-q', n ? `Waiting for ${plural(n, 'answer', 'answers')} to be written into the document.`
       : stuck ? `Not ready. The document is read-only, so ${plural(stuck, 'thing', 'things')} can't be written into it.`
@@ -668,7 +676,8 @@ export function receipt(doc, session = {}) {
     ln.append(el('span', 't', a.anchor || a.kind ? where(a) : '—'));
     const b = el('div', 'b');
     b.append(el('span', null, `${a.rule ? `${a.rule} · ` : ''}no longer reported · ${acts(x)}`));
-    if (a.as_written) b.append(placed(mark({ text: a.as_written }, { size: 'xs' })));
+    // From the act's own marking where it has one: its masks stay masks.
+    if (a.marking || a.as_written) b.append(placed(mark(a.marking || { text: a.as_written }, { size: 'xs' })));
     ln.append(b);
     r.append(ln);
   }

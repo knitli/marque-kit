@@ -454,7 +454,7 @@ export function tips(root, vocab, host = {}) {
   const key = (e) => {
     const t = tokOf(e); if (!t) return;
     if (e.key === 'Escape' && shown) { e.stopPropagation(); hide(); }
-    if (e.key === 'Enter') { e.preventDefault(); deeper(t); }
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); deeper(t); } // a button takes both
   };
   // Countries and groups are tier 1 only: activating one keeps its tooltip rather than asking for nothing.
   const deeper = (t) => {

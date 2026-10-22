@@ -14,7 +14,7 @@
 
 // [foreground, background, floor]; a tint is laid over the surface first.
 export const PAIRS = [
-  ['text', 'surface', 4.5], ['text-muted', 'surface', 4.5],
+  ['text', 'surface', 4.5], ['text-muted', 'surface', 4.5], ['surface', 'text', 4.5], // the tooltip turns them round
   ['act-ink', 'surface', 4.5], ['act-on', 'act', 4.5], ['act-on', 'act-hover', 4.5], ['act-ink', 'act-tint', 4.5], ['text', 'act-tint', 4.5], ['text-muted', 'act-tint', 4.5], // options and rows, hovered or chosen
   ['attn-on', 'attn', 4.5], ['attn-ink', 'surface', 4.5], ['attn-ink', 'attn-tint', 4.5], ['text', 'attn-tint', 4.5], // a cited sentence, highlighted
   ['error-ink', 'surface', 4.5], ['focus', 'surface', 3.0], ['focus', 'ground', 3.0],
