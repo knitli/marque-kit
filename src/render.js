@@ -35,7 +35,7 @@
 import { render as mark, settle } from './marking.js';
 import { empty, record, see, linted, snapshot, docView } from './state.js';
 import { cite, hasTip, tips } from './help.js';
-import { check } from './theme.js';
+import { check, watch } from './theme.js';
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 const el = (tag, cls, text) => {
@@ -162,7 +162,8 @@ function asks(f, host, r, help) {
   free.placeholder = a.field?.hint || 'Type an answer';
   free.addEventListener('input', () => {
     const t = free.value.trim();
-    chosen = t ? { free: t } : null;
+    // Blank text doesn't take the answer from a reading still picked.
+    chosen = t ? { free: t } : (chosen?.reading ? chosen : null);
     if (t) { form.querySelectorAll('input[type=radio]').forEach((x) => { x.checked = false; }); clear(); }
   });
   free.setAttribute('aria-describedby', err.id);
@@ -663,12 +664,14 @@ export function receipt(doc, session = {}) {
  */
 export function mount(root, { doc = null, state = empty(), moment = 'editing', engine = 'ok', readOnly = false, ...host } = {}) {
   const cur = { doc, state, moment, engine, readOnly, open: null, seq: null };
-  let said = null, unseen = false;
+  // Findings already there at mount aren't news; the first ones to arrive later are.
+  let said = doc ? null : new Set(), unseen = false;
   const live = el('div', 'mq-sr'); live.setAttribute('aria-live', 'polite');
   const body = el('div');
   root.replaceChildren(body, live);
-  const theme = check(root); // before the first draw, so a failing host token never shows
+  let theme = check(root); // before the first draw, so a failing host token never shows
   host.onTheme?.(theme);
+  if (typeof MutationObserver !== 'undefined') watch(root, (r) => { theme = r; host.onTheme?.(r); });
   if (host.vocab) tips(body, host.vocab, host);
 
   const h = {
@@ -730,7 +733,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   draw();
 
   return {
-    theme, // the gate's report: { checked, rejected: [{ token, measured, floor }] }
+    get theme() { return theme; }, // the gate's report: { checked, rejected: [{ token, measured, floor }] }
     update({ linted: upTo, seq, ...next }) {
       // A lint that began before the one already shown is stale: keep the newer document.
       // `seq` orders lints that began at the same point in the log.

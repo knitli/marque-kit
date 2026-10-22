@@ -232,4 +232,34 @@ assert.equal(view(derivedCab, record(empty(), 'a-cab', 'answered', { fields: { d
   assert.equal(rung(view(f(P5), s)), 'noticeable');
 }
 
+// An override a lint invalidated isn't pending: there is nothing to write.
+{
+  const p2 = f(P2);
+  const s = record(empty(), P2, 'kept_as_written', null, undefined, snapshot(p2));
+  const moved = { ...p2, marking: { ...p2.marking, as_written: { text: '(S//REL TO USA, FVEY)' } } };
+  const d = docView({ ...doc, findings: doc.findings.map((x) => (x.id === P2 ? moved : x)) }, s);
+  assert.deepEqual(d.document.pending, []);
+  assert.equal(d.findings.find((x) => x.id === P2).overridden, undefined);
+}
+// A take-back of a written answer on a finding that has since changed restores nothing and isn't pending.
+{
+  let s = record(empty(), P3, 'answered', { reading: f(P3).outcome.readings[0], index: 0 }, undefined, snapshot(f(P3)));
+  s = linted(s);
+  const written = { ...f(P3), asks: null, needs_person: 'none', blocks: 'never', marking: { ...f(P3).marking, as_written: f(P3).outcome.readings[0].result } };
+  s = record(s, P3, 'changed', null, undefined, snapshot(written));
+  const later = { ...written, marking: { ...written.marking, as_written: { text: '(S//NF)' } } };
+  const d = docView({ ...doc, findings: doc.findings.map((x) => (x.id === P3 ? later : x)) }, s);
+  assert.deepEqual(d.document.pending, []);
+  assert.equal(d.findings.find((x) => x.id === P3).asks, null, 'the old question is not restored');
+}
+// An apply taken on one banner value doesn't carry over to a new one.
+{
+  const ban = doc.document.artifacts.find((a) => a.id === 'a-banner');
+  const s = record(empty(), 'a-banner', 'answered', { apply: true }, undefined, snapshot(ban));
+  assert.equal(view(ban, s).applying, true);
+  const next = { ...ban, derived_value: { text: 'SECRET//NOFORN' } };
+  assert.equal(view(next, s).applying, undefined);
+  assert.deepEqual(docView({ ...doc, document: { ...doc.document, artifacts: doc.document.artifacts.map((a) => (a.id === 'a-banner' ? next : a)) } }, s).document.pending, []);
+}
+
 console.log('state: ok');

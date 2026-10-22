@@ -49,6 +49,7 @@ export const snapshot = (f) => structuredClone({ // a record, not a view of a do
   // What taking the act back restores: Marque's own words, never body text.
   ...(f.outcome && { outcome: { kind: f.outcome.kind, result: f.outcome.result, readings: f.outcome.readings } }),
   ...(f.asks && { asks: f.asks }), needs_person: f.needs_person, blocks: f.blocks,
+  ...(f.state && { state: f.state }),
 });
 
 /** Seen only quiets (docs/DERIVATION.md): a Noticeable becomes Quiet; nothing else moves. */
@@ -92,10 +93,14 @@ function reversed(state, id) {
 /** The host re-linted: the first `n` acts are in the new findings. Never moves back. */
 export const linted = (state, n = state.log.length) => ({ ...state, linted: Math.max(state.linted ?? 0, Math.min(n, state.log.length)) });
 
-const stale = (e, f) => (!!e.about
-  && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || (e.about.asks?.text ?? null) !== (f.asks?.text ?? null)))
+/** The finding isn't the one the act was taken on: another marking or question under the same id. */
+const moved = (e, f) => !!e.about
+  && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || (e.about.asks?.text ?? null) !== (f.asks?.text ?? null));
+const stale = (e, f) => moved(e, f)
   // A reading picked is stale once the finding no longer offers it.
   || (!!e.value?.reading && !(f.outcome?.readings || []).some((r) => r.result?.text === e.value.reading.result?.text));
+/** An artifact op is stale once the artifact isn't the one it was taken on. */
+const staleOp = (e, a) => !!e.about && (e.about.state !== a.state || e.about.result !== (a.derived_value?.text ?? null));
 
 /** One finding or artifact as it stands with the person's acts on it. */
 export function view(f, state) {
@@ -118,7 +123,10 @@ function overlay(f, state) {
       if (e.value == null) {
         // Back to Marque's own result. Taking back one a lint already wrote reopens
         // the finding as it was before that act, question and readings included.
-        const was = reversed(state, f.id)?.about;
+        const back = reversed(state, f.id);
+        // A take-back on a written finding that has since changed takes back nothing.
+        if (back && moved(e, f)) return { ...v, person: null, stale: true };
+        const was = back?.about;
         if (!was?.outcome) return v;
         return { ...v, asks: was.asks ?? null, outcome: { ...f.outcome, ...was.outcome }, needs_person: was.needs_person, blocks: was.blocks };
       }
@@ -129,7 +137,7 @@ function overlay(f, state) {
     }
     case 'kept_as_written':
       // The person kept one marking against one fix; a different one under the same id is open again.
-      if (e.about && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || e.about.result !== (f.outcome?.result?.text ?? null))) return v;
+      if (e.about && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || e.about.result !== (f.outcome?.result?.text ?? null))) return { ...v, person: null, stale: true };
       return { ...v, overridden: true, outcome: { ...f.outcome, kind: 'kept_as_written', result: f.marking?.as_written, readings: [] }, needs_person: 'none', blocks: 'never' };
     default: // deferred, declined: still open
       return { ...v, deferred: e.act };
@@ -138,8 +146,19 @@ function overlay(f, state) {
 
 function artifactView(a, state) {
   let out = a;
+  // A banner moves with the alternatives taken, so the ops below are checked against the value shown.
+  if (a.if_taken) {
+    const taken = Object.keys(a.if_taken).filter((fid) => settled(live(state, fid)));
+    if (taken.length) {
+      const rest = Object.fromEntries(Object.entries(a.if_taken).filter(([fid]) => !taken.includes(fid)));
+      out = { ...out, derived_value: a.if_taken[taken[taken.length - 1]], if_taken: Object.keys(rest).length ? rest : null };
+    }
+  }
+  const ops = since(state).filter((e) => e.id === a.id);
+  // An apply, a removal or a typed field taken on another value or state of this artifact doesn't carry over.
+  if (ops.length && staleOp(ops[ops.length - 1], out)) return { ...out, person: null, stale: true };
   if (a.fields) {
-    const typed = Object.assign({}, ...since(state).filter((e) => e.id === a.id && e.value?.fields).map((e) => e.value.fields));
+    const typed = Object.assign({}, ...ops.filter((e) => e.value?.fields && !staleOp(e, out)).map((e) => e.value.fields));
     const fields = Object.fromEntries(Object.entries(a.fields).map(([k, fl]) =>
       [k, typed[k] ? { ...fl, state: 'known', value: typed[k], source: 'person' } : fl]));
     const has = (fl) => fl?.state === 'known' || fl?.state === 'derived';
@@ -152,13 +171,6 @@ function artifactView(a, state) {
   }
   const asked = live(state, a.id)?.value;
   if (asked?.apply || asked?.remove) out = { ...out, applying: true };
-  if (a.if_taken) {
-    const taken = Object.keys(a.if_taken).filter((fid) => settled(live(state, fid)));
-    if (taken.length) {
-      const rest = Object.fromEntries(Object.entries(a.if_taken).filter(([fid]) => !taken.includes(fid)));
-      out = { ...out, derived_value: a.if_taken[taken[taken.length - 1]], if_taken: Object.keys(rest).length ? rest : null };
-    }
-  }
   return out;
 }
 

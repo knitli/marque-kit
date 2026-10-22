@@ -53,9 +53,14 @@ function shipped(root) {
   return out;
 }
 
-/** Measure `root`'s tokens; fall back the host's where a pair fails. */
+const pinned = new WeakMap(); // root → the fallbacks check() set inline, so a re-check can lift them
+
+/** Measure `root`'s tokens; fall back the host's where a pair fails.
+ *  Run again when the theme changes: it lifts its own earlier fallbacks first. */
 export function check(root) {
   if (!root?.isConnected) return null;
+  for (const t of pinned.get(root) || []) root.style.removeProperty(t);
+  pinned.set(root, []);
   const probe = document.createElement('span');
   probe.hidden = true;
   root.append(probe);
@@ -66,7 +71,7 @@ export function check(root) {
   const rejected = [];
   const fall = (t, measured, floor) => {
     rejected.push({ token: `--mq-${t}`, measured: Math.round(measured * 100) / 100, floor });
-    if (host(t)) root.style.setProperty(`--mq-${t}`, ship[`--mq-${t}`]);
+    if (host(t)) { root.style.setProperty(`--mq-${t}`, ship[`--mq-${t}`]); pinned.get(root).push(`--mq-${t}`); }
   };
   for (const [fg, bg, floor] of PAIRS) {
     const surface = over(read('surface'), [255, 255, 255]);
@@ -81,4 +86,11 @@ export function check(root) {
   probe.remove();
   for (const r of rejected) console.warn(`Marque theme: ${r.token} measured ${r.measured}, floor ${r.floor}; shipped value used`);
   return { checked: PAIRS.length + SIZES.length, rejected };
+}
+
+/** Re-check whenever the theme can change: data-mq-theme anywhere above, or the scheme `auto` follows. */
+export function watch(root, onTheme) {
+  const run = () => onTheme(check(root));
+  new MutationObserver(run).observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-mq-theme'] });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', run);
 }

@@ -145,8 +145,9 @@ export function why(f, host = {}, rung = null) {
   } else if ((rung === 'noticeable' || rung === 'quiet') && f.marking?.as_written && !answered(f) && !f.overridden) {
     // Only Marque's own fix can be overridden: never a person's answer, and never a mark nobody wrote.
     const k = el('div', 'mq-keep');
-    // Recorded once: the popover closes, so the button can't record it again.
-    k.append(button('ghost', 'Keep it as written', () => { host.onAct?.(f, 'kept_as_written'); p.dispatchEvent(new Event('mq-close', { bubbles: true })); }), ' Marque still reports it in the audit.');
+    // Recorded once: the popover closes first, so the button can't record it again
+    // and focus is back in the pane before it redraws.
+    k.append(button('ghost', 'Keep it as written', () => { p.dispatchEvent(new Event('mq-close', { bubbles: true })); host.onAct?.(f, 'kept_as_written'); }), ' Marque still reports it in the audit.');
     p.append(k);
   }
   return p;
