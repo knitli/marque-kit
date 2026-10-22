@@ -53,8 +53,11 @@ let uid = 0;
 const placed = (m) => { queueMicrotask(() => settle(m)); return m; };
 const SHORT = { front_marking: 'BANNER', authority_block: 'CAB' };
 const NAME = { front_marking: 'Banner', authority_block: 'Authority block' };
-const where = (f) => f.anchor?.portion ? `¶${f.anchor.portion}` : SHORT[f.kind] || (f.scope === 'document' || f.anchor?.kind === 'document' ? 'DOC' : '—');
-const spokenWhere = (f) => f.anchor?.portion ? `Paragraph ${f.anchor.portion}` : NAME[f.kind] || 'The document';
+const page = (f) => (f.anchor?.kind === 'page' ? f.anchor.page : null);
+const where = (f) => f.anchor?.portion ? `¶${f.anchor.portion}` : page(f) != null ? `p${page(f)}` : SHORT[f.kind] || (f.scope === 'document' || f.anchor?.kind === 'document' ? 'DOC' : '—');
+const spokenWhere = (f) => f.anchor?.portion ? `Paragraph ${f.anchor.portion}` : page(f) != null ? `Page ${page(f)}` : NAME[f.kind] || 'The document';
+/** A marking-valued artifact; a notice may carry typed content instead, which isn't one. */
+const isMarking = (v) => typeof v === 'string' || typeof v?.text === 'string';
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 /* ── 1b · rung ───────────────────────────────────────────────────────── */
@@ -129,7 +132,17 @@ function asks(f, host, r, help) {
   let chosen = null;
   // Answer is never disabled: pressed with nothing chosen, it says what's missing (docs/COMPONENTS.md, C4).
   const err = el('div', 'err'); err.id = `${name}-err`; err.setAttribute('role', 'alert');
+  // A typed marking has to look like one before it's written: capitals and marking punctuation,
+  // a portion in parentheses, a banner without.
+  const shape = { portion: /^\([A-Z0-9/ ,_-]+\)$/, banner: /^[A-Z0-9/ ,_-]+$/ }[a.field?.format] || /^\(?[A-Z0-9/ ,_-]+\)?$/;
   const commit = () => {
+    if (chosen?.free && a.field?.type === 'marking' && !shape.test(chosen.free)) {
+      fld.classList.add('bad');
+      err.textContent = a.field.format === 'portion' ? 'That isn’t a portion marking. Type it in capitals, in parentheses, as it should appear.'
+        : 'That isn’t a marking. Type it in capitals, as it should appear.';
+      free.focus();
+      return;
+    }
     if (chosen) return host.onAct?.(f, 'answered', chosen);
     fld.classList.add('bad');
     err.textContent = form.querySelector('input[type=radio]') ? 'Pick one reading, type an answer, or "not my call".' : 'Type an answer, or "not my call".';
@@ -513,7 +526,10 @@ export function artifact(a, host = {}) {
   head.append(el('span', `mq-stamp ${tone}`, word));
   c.append(head);
   c.append(el('p', 'mq-p', a.says.text));
-  if (a.derived_value) {
+  if (a.derived_value && !isMarking(a.derived_value)) {
+    // Typed notice content: its words are the host's to show; Marque says it's derived.
+    c.append(el('p', 'mq-p', 'Marque has a notice to add here.'));
+  } else if (a.derived_value) {
     c.append(placed(mark(a.derived_value, { size: 'lg', state: 'derived' })));
     if (a.placement) c.append(el('span', 'mq-place', `Placed: ${a.placement.replace(/_/g, ' ')}`));
     // Generated, not applied: the person can apply it; the host writes it (docs/COMPONENTS.md, C9).
@@ -557,7 +573,7 @@ export function artifact(a, host = {}) {
       // A filled field stays correctable: a typo, or Classified By when someone else made the call.
       // Read-only too: the correction waits with the other answers.
       if (has) {
-        const change = button('ghost', 'Change', () => { const n = entry(k, fld, key); v.replaceWith(n); n.querySelector('input').focus(); });
+        const change = button('ghost', 'Change', () => { const n = entry(k, fld, key); v.replaceWith(n); const i = n.querySelector('input'); i.dataset.opened = '1'; i.focus(); });
         change.dataset.change = `${a.id}:${k}`;
         v.append(' ', change);
       }
@@ -675,7 +691,7 @@ export function receipt(doc, session = {}) {
     const did = acts(a);
     const b = el('div', 'b');
     b.append(el('span', null, `${a.kind} · ${a.state.replace(/_/g, ' ')}${did ? ` · ${did}` : ''}`));
-    if (a.derived_value) b.append(placed(mark(a.derived_value, { size: 'xs', state: 'changed' })));
+    if (isMarking(a.derived_value)) b.append(placed(mark(a.derived_value, { size: 'xs', state: 'changed' })));
     ln.append(el('span', 't', where(a)), b);
     r.append(ln);
   }
@@ -769,7 +785,9 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
       // The card stays open where the finding now lives, and keeps focus if it had it.
       const inPane = body.contains(document.activeElement);
       cur.open = f.id;
-      host.onChange?.(cur.state, { id: f.id, act, value });
+      // A host that re-lints at once redraws inside onChange; this finding's draft went with the act.
+      acting = f.id;
+      try { host.onChange?.(cur.state, { id: f.id, act, value }); } finally { acting = null; }
       draw(inPane ? f.id : null, { fresh: true });
     },
   };
@@ -793,8 +811,11 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   };
 
   /** What the person has picked or typed and not yet sent, by a key that survives a redraw. */
+  let acting = null, gen = 0; // the finding being acted on (its draft is spent); which draw is current
   const drafts = () => [...body.querySelectorAll('[data-draft]')]
-    .filter((x) => (x.type === 'radio' ? x.checked : x.value.trim() && x.value !== x.defaultValue))
+    .filter((x) => !acting || !x.dataset.draft.startsWith(`${acting}:`))
+    // An opened correction counts as soon as it's open, typed in or not.
+    .filter((x) => (x.type === 'radio' ? x.checked : x.dataset.opened || (x.value.trim() && x.value !== x.defaultValue)))
     .map((x) => ({ key: x.dataset.draft, value: x.value, radio: x.type === 'radio', focused: x === document.activeElement }));
   function restore(list) {
     const find = (d) => [...body.querySelectorAll('[data-draft]')].find((x) => x.dataset.draft === d.key && (d.radio ? x.type === 'radio' && x.value === d.value : x.type !== 'radio'));
@@ -827,7 +848,9 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     body.replaceChildren(pane(v, h));
     refocus(focusId);
     // After the open card is back (a microtask) and focus with it.
-    if (kept.length) queueMicrotask(() => queueMicrotask(() => restore(kept)));
+    // Only into this draw: a later one collects its own.
+    const mine = ++gen;
+    if (kept.length) queueMicrotask(() => queueMicrotask(() => { if (gen === mine) restore(kept); }));
   }
   draw();
 

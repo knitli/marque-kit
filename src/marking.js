@@ -106,6 +106,8 @@ export function render(marking, o = {}) {
   if (o.stacked) { root.classList.add('stacked'); root.dataset.stack = 'fixed'; }
   root.setAttribute('dir', 'ltr');
   root.dataset.text = m.text;
+  // Read out as words, not slashes: a labelled group, so its help tokens are still reachable inside.
+  root.setAttribute('role', 'group'); root.setAttribute('aria-label', spoken(m, o.vocab));
   if (o.form === 'summary') return summary(m, root);
   m.layers.forEach((layer, li) => {
     if (li > 0) root.appendChild(document.createElement('wbr'));
@@ -202,5 +204,7 @@ export function spoken(marking, vocab = {}) {
     if (!tok) continue;
     words.push(vocab[tok] || (/^[A-Z]{3,4}$/.test(tok) ? tok.split('').join('-') : tok));
   }
+  // Masks are said as what they are, never as what they cover.
+  for (const mask of m.masks || []) words.push(mask.kind === 'concealed' ? 'source concealed' : `${mask.len} characters not identified`);
   return words.join(', ');
 }
