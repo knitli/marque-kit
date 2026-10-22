@@ -46,7 +46,7 @@ A host mounts the pane and listens:
 ```js
 import { mount } from '@marque/kit';
 const p = mount(el, { doc, state, vocab, moment: 'editing', onChange: (state, act) => save(state), onHelp, onJump });
-p.update({ doc });              // after a re-lint
+p.update({ doc });              // after a re-lint; async hosts add { linted: n, seq }
 p.update({ moment: 'finalize' }); // the host's moment; the kit never guesses it
 ```
 

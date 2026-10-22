@@ -45,7 +45,7 @@
 <script type="module">
 import { render as mark, settle } from '../src/marking.js';
 import { mount, gate, receipt, derivation, markClass } from '../src/render.js';
-import { why, explain, passage, lookup, float } from '../src/help.js';
+import { why, explain, passage, lookup, float, tips } from '../src/help.js';
 import { docView } from '../src/state.js';
 
 const $ = (s) => document.querySelector(s);
@@ -181,6 +181,7 @@ $('#moment').addEventListener('change', (e) => setMoment(e.target.value));
 $('#engine').addEventListener('change', (e) => p.update({ engine: e.target.value }));
 $('#ro').addEventListener('change', (e) => p.update({ readOnly: e.target.checked }));
 $('#finalize').addEventListener('click', () => p.host.onGate());
+tips($('#gate'), vocab, p.host); // the gate renders outside the pane
 draw();
 </script>
 </body>

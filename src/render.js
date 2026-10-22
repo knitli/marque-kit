@@ -597,8 +597,9 @@ export function receipt(doc, session = {}) {
   // Each act with what was said and when, so a changed answer keeps the one it replaced.
   const said = (v) => v?.reading?.result?.text ?? v?.free
     ?? (v?.fields ? Object.entries(v.fields).map(([k, t]) => `${k.replace(/_/g, ' ')} ${t}`).join(', ') : '');
-  const op = (v) => (v?.apply ? 'apply' : v?.remove ? 'remove' : said(v));
-  const acts = (x) => (x.history || []).map((e) => [e.act.replace(/_/g, ' '), op(e.value), e.at].filter(Boolean).join(' ')).join(' → ');
+  const op = (e) => (e.act === 'changed' && e.value == null ? 'back to Marque\u2019s result'
+    : e.value?.apply ? 'apply' : e.value?.remove ? 'remove' : said(e.value));
+  const acts = (x) => (x.history || []).map((e) => [e.act.replace(/_/g, ' '), op(e), e.at].filter(Boolean).join(' ')).join(' → ');
   for (const f of doc.findings) {
     const ln = el('div', 'ln');
     ln.append(el('span', 't', where(f)));
@@ -637,9 +638,13 @@ export function receipt(doc, session = {}) {
  *
  *   const p = mount(el, { doc, state, moment, onChange, onHelp, onJump, ... });
  *   p.update({ doc })       // after a re-lint
- *   p.update({ doc, linted: n }) // async: n = p.state.log.length when that lint began
+ *   p.update({ doc, linted: n, seq }) // async: n = p.state.log.length when that lint
+ *                                     // began; seq = the host's request counter
  *   p.update({ moment })    // the host's moment changed
  *   p.view()                // the document with the person's acts on it
+ *
+ * Help on tokens is bound inside the pane; a host that renders gate() or a
+ * card elsewhere binds tips(surface, vocab, p.host) on that surface too.
  *
  * The kit records each act in `state` (src/state.js) and hands it to
  * `onChange(state, act)` for the host to persist and apply; `act` is null
@@ -648,7 +653,7 @@ export function receipt(doc, session = {}) {
  * required is announced in a polite live region; Quiet changes are not.
  */
 export function mount(root, { doc = null, state = empty(), moment = 'editing', engine = 'ok', readOnly = false, ...host } = {}) {
-  const cur = { doc, state, moment, engine, readOnly, open: null };
+  const cur = { doc, state, moment, engine, readOnly, open: null, seq: null };
   let said = null;
   const live = el('div', 'mq-sr'); live.setAttribute('aria-live', 'polite');
   const body = el('div');
@@ -714,9 +719,11 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   draw();
 
   return {
-    update({ linted: upTo, ...next }) {
+    update({ linted: upTo, seq, ...next }) {
       // A lint that began before the one already shown is stale: keep the newer document.
-      if (next.doc && upTo != null && upTo < (cur.state.linted ?? 0)) delete next.doc;
+      // `seq` orders lints that began at the same point in the log.
+      if (next.doc && ((upTo != null && upTo < (cur.state.linted ?? 0)) || (seq != null && cur.seq != null && seq <= cur.seq))) delete next.doc;
+      else if (next.doc && seq != null) cur.seq = seq;
       Object.assign(cur, next);
       // A new lint is the host saying it applied what the person answered: everything
       // up to `upTo`, the log length when the host started that lint (default: all of it).
