@@ -8,7 +8,7 @@
  *
  * A state is plain JSON so a host can keep it anywhere (document properties,
  * a server, localStorage):
- *   { log: [{ id, act, value, at }], seen: [id], linted: n }
+ *   { log: [{ id, act, value, at }], seen: [{ id, result }], linted: n }
  * The log is append-only. Changing an answer adds a line and never rewrites
  * one, so the receipt shows both answers (docs/COMPONENTS.md, "Answered").
  *
@@ -40,8 +40,12 @@ export function record(state, id, act, value = null, at = new Date().toISOString
 }
 
 /** Seen only quiets (docs/DERIVATION.md): a Noticeable becomes Quiet; nothing else moves. */
-export function see(state, id) {
-  return state.seen.includes(id) ? state : { ...state, seen: [...state.seen, id] };
+/** Seen is of a result, not an id: ids survive re-lints, so a new result
+ *  under the same id is unseen again. */
+const shown = (f) => f.outcome?.result?.text ?? null;
+const wasSeen = (state, f) => state.seen.some((s) => s.id === f.id && s.result === shown(f));
+export function see(state, f) {
+  return wasSeen(state, f) ? state : { ...state, seen: [...state.seen, { id: f.id, result: shown(f) }] };
 }
 
 export const last = (state, id) => state.log.findLast((e) => e.id === id) || null;
@@ -62,7 +66,7 @@ export const linted = (state) => ({ ...state, linted: state.log.length });
 
 /** One finding or artifact as it stands with the person's acts on it. */
 export function view(f, state) {
-  const v = { ...f, seen: !!f.seen || state.seen.includes(f.id), person: last(state, f.id), history: history(state, f.id) };
+  const v = { ...f, seen: !!f.seen || wasSeen(state, f), person: last(state, f.id), history: history(state, f.id) };
   if (f.fields || f.if_taken) return artifactView(v, state);
   const e = live(state, f.id);
   if (!e) return v;

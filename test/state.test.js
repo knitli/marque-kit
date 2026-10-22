@@ -44,6 +44,11 @@ assert.deepEqual(g.can.map(id), [P5, 'a-banner'], 'the derived banner is a card,
 assert.deepEqual(g.later.map(id), [P4, 'a-cab'], 'absent mark and CAB wait for finalize');
 g = sections(docView(doc, empty()), 'finalize');
 assert.deepEqual(g.must.map(id), [P3, P4, 'a-cab'], 'at finalize they all block');
+// Artifacts follow Table 2 like findings: optional + finalize blocks at the gate; blocks: now blocks while editing.
+const withBanner = (b) => ({ ...doc, document: { ...doc.document, artifacts: doc.document.artifacts.map((a) => a.id === 'a-banner' ? { ...a, ...b } : a) } });
+assert.ok(sections(withBanner({ needs_person: 'optional', blocks: 'finalize' }), 'finalize').must.some((a) => a.id === 'a-banner'));
+assert.ok(sections(withBanner({ needs_person: 'optional', blocks: 'finalize' }), 'editing').can.some((a) => a.id === 'a-banner'));
+assert.ok(sections(withBanner({ needs_person: 'required', blocks: 'now' }), 'editing').must.some((a) => a.id === 'a-banner'));
 
 /* Acts. */
 assert.throws(() => record(empty(), P3, 'undo'), /Unknown act/);
@@ -88,8 +93,11 @@ assert.equal(v.outcome.result.text, f(P2).marking.as_written.text);
 assert.equal(v.history[0].act, 'kept_as_written');
 
 // Seen only quiets.
-assert.equal(rung(view(f(P2), see(empty(), P2))), 'quiet');
-assert.equal(rung(view(f(P3), see(empty(), P3))), 'action', 'seen never touches a required finding');
+assert.equal(rung(view(f(P2), see(empty(), f(P2)))), 'quiet');
+assert.equal(rung(view(f(P3), see(empty(), f(P3)))), 'action', 'seen never touches a required finding');
+// A new result under the same id is unseen again.
+const p2b = { ...f(P2), outcome: { ...f(P2).outcome, result: { text: '(S//REL TO USA, FVEY, NZL)' } } };
+assert.equal(rung(view(p2b, see(empty(), f(P2)))), 'noticeable');
 
 // The CAB: Derived From filled → Declassify On opens → both filled → no longer blocks.
 const cab = doc.document.artifacts.find((a) => a.id === 'a-cab');

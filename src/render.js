@@ -245,12 +245,14 @@ export function card(f, host = {}) {
 }
 
 /* ── C6 · the collapsed row ──────────────────────────────────────────── */
-/** An artifact's rung (docs/COMPONENTS.md, Artifact card): a required blank
- *  is Action required, Blocking at the gate; a derived value nobody has
+/** An artifact's rung (docs/COMPONENTS.md, Artifact card): Table 2 when it
+ *  needs a person, as for a finding. Otherwise a derived value nobody has
  *  written yet, or an artifact that isn't required, is Advisory; anything
  *  else (a non-canonical fix, a block the person filled in) is done. */
-const artRung = (a, moment) => a.needs_person === 'required' ? (GATE.has(moment) ? 'blocking' : 'action')
+const artRung = (a, moment) => a.needs_person !== 'none' ? rung(a, moment)
   : a.state === 'present_not_required' || (a.state === 'absent_but_required' && a.derived_value) ? 'advisory' : 'quiet';
+/** A required artifact that only blocks at finalize waits for it, like an absent mark. */
+const artWaits = (a, moment) => a.blocks === 'finalize' && !GATE.has(moment);
 
 export function row(f, host = {}) {
   const isArtifact = !!f.kind;
@@ -264,7 +266,8 @@ export function row(f, host = {}) {
   li.append(what);
   const end = el('div', 'end');
   const [tone, word] = isArtifact
-    ? (r === 'blocking' ? ['attn', stampOf(f, r, host.moment)[1]] : r === 'action' ? ['quiet', 'At finalize'] : r === 'advisory' ? ['act', 'Derived'] : ['quiet', 'Changed'])
+    ? (r === 'blocking' ? ['attn', stampOf(f, r, host.moment)[1]] : r === 'action' ? (artWaits(f, host.moment) ? ['quiet', 'At finalize'] : ['attn', 'Needs you'])
+      : r === 'advisory' ? ['act', 'Derived'] : ['quiet', 'Changed'])
     : stampOf(f, r, host.moment);
   end.append(el('span', `mq-stamp sm ${tone}`, word));
   li.append(end);
@@ -307,7 +310,7 @@ export function sections(doc, moment = 'editing') {
   for (const a of doc.document.artifacts) {
     if (a.state === 'present') continue; // a receipt entry, not a card
     const r = artRung(a, moment);
-    (r === 'blocking' ? g.must : r === 'action' ? g.later : r === 'advisory' ? g.can : g.done).push(a);
+    (r === 'blocking' ? g.must : r === 'action' ? (artWaits(a, moment) ? g.later : g.must) : r === 'advisory' ? g.can : g.done).push(a);
   }
   return g;
 }
@@ -334,6 +337,9 @@ export function status(doc, host = {}) {
     s.append(el('span', 'mq-stamp', 'Ready'));
     if (overrides) s.append(el('span', 'mq-stamp', `${overrides} reported`), words(overrides === 1 ? 'one marking kept as written' : `${overrides} markings kept as written`));
     else if (changes(g.done)) s.append(words(`${plural(changes(g.done), 'change', 'changes')} made quietly`));
+  } else if (!g.must.length && doc.document.pending?.length) {
+    // Everything is answered; the host hasn't written it yet.
+    s.append(el('span', 'mq-stamp', 'Not ready'), words(`${plural(doc.document.pending.length, 'answer', 'answers')} waiting to be written into the document`));
   } else if (GATE.has(host.moment)) {
     s.classList.add('must');
     const n = doc.document.blocking.length;
@@ -442,9 +448,10 @@ export function pane(doc, host = {}) {
 
 /* ── C9 · artifact card (banner, CAB) ────────────────────────────────── */
 export function artifact(a, host = {}) {
-  const must = a.needs_person === 'required';
-  const atGate = GATE.has(host.moment);
-  const c = el('article', `mq-card ${must && atGate ? 'must-act' : a.state === 'absent_but_required' ? 'absent' : ''}`.trim());
+  const r = artRung(a, host.moment);
+  const must = r === 'blocking' || r === 'action';
+  const atGate = must && !artWaits(a, host.moment); // gold now, not at finalize
+  const c = el('article', `mq-card ${atGate ? 'must-act' : a.state === 'absent_but_required' ? 'absent' : ''}`.trim());
   c.dataset.artifact = a.id;
   const head = el('div', 'mq-card-head');
   head.append(el('span', 'mq-label', NAME[a.kind] || a.kind));
@@ -582,7 +589,7 @@ export function receipt(doc, session = {}) {
  *
  * The kit records each act in `state` (src/state.js) and hands it to
  * `onChange(state, act)` for the host to persist and apply; `act` is null
- * when only the seen list changed. An answer stays pending, and the document
+ * when only bookkeeping changed (the seen list, the lint checkpoint). An answer stays pending, and the document
  * not ready, until the host re-lints and passes the new `doc`. A new Action
  * required is announced in a polite live region; Quiet changes are not.
  */
@@ -604,7 +611,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
       cur.open = f?.id ?? null;
       // Opening it is seeing it. Recorded now, drawn next time, so rows never move under the pointer.
       if (f) {
-        const s = see(cur.state, f.id);
+        const s = see(cur.state, f);
         if (s !== cur.state) { cur.state = s; host.onChange?.(s, null); }
       }
       host.onOpen?.(f);
@@ -656,7 +663,10 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     update(next) {
       Object.assign(cur, next);
       // A new lint is the host saying it applied what the person answered.
-      if (next.doc) cur.state = linted(cur.state);
+      if (next.doc) {
+        const s = linted(cur.state);
+        if (s.linted !== cur.state.linted) { cur.state = s; host.onChange?.(s, null); }
+      }
       draw();
     },
     view: () => cur.doc && docView(cur.doc, cur.state),
