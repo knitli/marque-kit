@@ -183,6 +183,8 @@
 .mq-manual p { margin: 0 0 10px; }
 .mq-manual ul { margin: 0 0 10px; padding-left: 20px; }
 .mq-manual li { margin: 0 0 6px; }
+.mq-manual table { border-collapse: collapse; margin: 0 0 10px; }
+.mq-manual td { border: 1px solid var(--mq-rule); padding: 4px 6px; vertical-align: top; }
 .mq-manual mark { background: var(--mq-attn-tint); color: inherit; padding: 0 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 .mq-manual .pg { font-family: var(--mq-font-mark), ui-monospace, monospace; font-size: var(--mq-size-xs); letter-spacing: .08em; color: var(--mq-text-muted); text-transform: uppercase; }
 .mq-float { position: fixed; }

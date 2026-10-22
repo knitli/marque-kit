@@ -786,9 +786,11 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     destroy() { unwatch(); release(root); root.replaceChildren(); if (added) root.classList.remove('mq'); },
     update({ linted: upTo, seq, ...next }) {
       // A lint that began before the one already shown is stale: keep the newer document.
-      // `seq` orders lints that began at the same point in the log.
-      if (next.doc && ((upTo != null && upTo < (cur.state.linted ?? 0)) || (seq != null && cur.seq != null && seq <= cur.seq))) delete next.doc;
-      else if (next.doc && seq != null) cur.seq = seq;
+      // `seq` orders lints that began at the same point in the log. A stale lint's
+      // failure is as stale as its document: neither replaces the newer one.
+      const lint = 'doc' in next || 'engine' in next;
+      if (lint && ((upTo != null && upTo < (cur.state.linted ?? 0)) || (seq != null && cur.seq != null && seq <= cur.seq))) { delete next.doc; delete next.engine; }
+      else if (lint && seq != null) cur.seq = seq;
       Object.assign(cur, next);
       // A new lint is the host saying it applied what the person answered: everything
       // up to `upTo`, the log length when the host started that lint (default: all of it).

@@ -15,7 +15,7 @@
 // [foreground, background, floor]; a tint is laid over the surface first.
 export const PAIRS = [
   ['text', 'surface', 4.5], ['text-muted', 'surface', 4.5],
-  ['act-ink', 'surface', 4.5], ['act-on', 'act', 4.5], ['act-ink', 'act-tint', 4.5],
+  ['act-ink', 'surface', 4.5], ['act-on', 'act', 4.5], ['act-on', 'act-hover', 4.5], ['act-ink', 'act-tint', 4.5],
   ['attn-on', 'attn', 4.5], ['attn-ink', 'surface', 4.5], ['attn-ink', 'attn-tint', 4.5],
   ['error-ink', 'surface', 4.5], ['focus', 'surface', 3.0],
   ['text', 'ground', 4.5], ['text-muted', 'ground', 4.5], // the pane's own headings sit on the ground

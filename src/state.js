@@ -221,6 +221,6 @@ export function docView(doc, state) {
   // A write to a finding the lint withdrew has nowhere to go; its acts stay in `withdrawn`.
   const pending = [...new Set(since(state).map((e) => e.id))].filter((id) => all.has(id) && !all.get(id).stale && writes(state, id));
   const withdrawn = [...new Set(state.log.map((e) => e.id))].filter((id) => !all.has(id))
-    .map((id) => ({ id, about: history(state, id).findLast((e) => e.about)?.about, history: history(state, id) }));
+    .map((id) => structuredClone({ id, about: history(state, id).findLast((e) => e.about)?.about, history: history(state, id) }));
   return { ...doc, findings, document: { ...doc.document, artifacts, blocking, pending, withdrawn, ready: !blocking.length && !pending.length } };
 }

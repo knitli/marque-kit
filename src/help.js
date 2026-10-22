@@ -163,19 +163,33 @@ function manualBlocks(text) {
   const out = [];
   let para = null, list = null;
   const inline = (node, s) => {
-    for (const part of flat(s).split(/(\*\*[^*]+\*\*|\*[^*]+\*)/)) {
+    // The manual's tables carry <b> and <br>; built as nodes, never parsed as HTML.
+    for (const part of flat(s).split(/(<b>.*?<\/b>|<br\s*\/?>|\*\*[^*]+\*\*|\*[^*]+\*)/)) {
       if (!part) continue;
-      if (part.startsWith('**')) node.append(el('b', null, part.slice(2, -2)));
+      if (part.startsWith('<br')) node.append(el('br'));
+      else if (part.startsWith('<b>')) node.append(el('b', null, part.slice(3, -4)));
+      else if (part.startsWith('**')) node.append(el('b', null, part.slice(2, -2)));
       else if (part.startsWith('*')) node.append(el('i', null, part.slice(1, -1)));
       else node.append(part);
     }
   };
-  const close = () => { para = null; list = null; };
+  let table = null;
+  const close = () => { para = null; list = null; table = null; };
   for (const line of text.split('\n')) {
     let m;
     if ((m = line.match(/^\s*begin page (\d+)/))) { close(); out.push(el('div', 'pg', `page ${m[1]}`)); continue; }
     if (/^\s*end page \d+/.test(line) || /^\s*---\s*$/.test(line)) { close(); continue; }
     if (!line.trim()) { close(); continue; }
+    if (/^\s*\|/.test(line)) {
+      para = null; list = null;
+      const cells = line.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+      if (cells.every((c) => /^[-:]*$/.test(c))) continue; // the rule under the header, or an empty header
+      if (!table) { table = el('table'); out.push(table); }
+      const tr = el('tr');
+      for (const c of cells) { const td = el('td'); inline(td, c); tr.append(td); }
+      table.append(tr); continue;
+    }
+    table = null;
     if ((m = line.match(/^#{1,6}\s+(.*)/))) { close(); const h = el('h4'); inline(h, m[1]); out.push(h); continue; }
     if ((m = line.match(/^\s*[-*]\s+(.*)/))) {
       para = null;
