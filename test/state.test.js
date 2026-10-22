@@ -262,4 +262,19 @@ assert.equal(view(derivedCab, record(empty(), 'a-cab', 'answered', { fields: { d
   assert.deepEqual(docView({ ...doc, document: { ...doc.document, artifacts: doc.document.artifacts.map((a) => (a.id === 'a-banner' ? next : a)) } }, s).document.pending, []);
 }
 
+// An answer to a question whose field changed doesn't carry over, even with the same words.
+{
+  const s = record(empty(), P4, 'answered', { free: 'U' }, undefined, snapshot(f(P4)));
+  const now = { ...f(P4), asks: { ...f(P4).asks, field: { ...f(P4).asks.field, type: 'prose' } } };
+  assert.equal(view(now, s).stale, true);
+}
+// A typed field on a field that changed or went away doesn't carry over.
+{
+  const s = record(empty(), 'a-cab', 'answered', { fields: { derived_from: 'Multiple Sources' } }, undefined, snapshot(cab));
+  assert.equal(view(cab, s).fields.derived_from.value, 'Multiple Sources');
+  const { derived_from, ...rest } = cab.fields;
+  assert.equal(view({ ...cab, fields: rest }, s).stale, true);
+  assert.equal(view({ ...cab, fields: { ...cab.fields, derived_from: { ...derived_from, hint: 'a source list' } } }, s).stale, true);
+}
+
 console.log('state: ok');

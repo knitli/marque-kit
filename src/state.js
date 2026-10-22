@@ -49,7 +49,7 @@ export const snapshot = (f) => structuredClone({ // a record, not a view of a do
   // What taking the act back restores: Marque's own words, never body text.
   ...(f.outcome && { outcome: { kind: f.outcome.kind, result: f.outcome.result, readings: f.outcome.readings } }),
   ...(f.asks && { asks: f.asks }), needs_person: f.needs_person, blocks: f.blocks,
-  ...(f.state && { state: f.state }),
+  ...(f.state && { state: f.state }), ...(f.fields && { fields: f.fields }),
 });
 
 /** Seen only quiets (docs/DERIVATION.md): a Noticeable becomes Quiet; nothing else moves. */
@@ -95,12 +95,16 @@ export const linted = (state, n = state.log.length) => ({ ...state, linted: Math
 
 /** The finding isn't the one the act was taken on: another marking or question under the same id. */
 const moved = (e, f) => !!e.about
-  && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || (e.about.asks?.text ?? null) !== (f.asks?.text ?? null));
+  // The whole question, not only its words: a new field type or format changes what an answer means.
+  && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || JSON.stringify(e.about.asks ?? null) !== JSON.stringify(f.asks ?? null));
 const stale = (e, f) => moved(e, f)
   // A reading picked is stale once the finding no longer offers it.
   || (!!e.value?.reading && !(f.outcome?.readings || []).some((r) => r.result?.text === e.value.reading.result?.text));
 /** An artifact op is stale once the artifact isn't the one it was taken on. */
-const staleOp = (e, a) => !!e.about && (e.about.state !== a.state || e.about.result !== (a.derived_value?.text ?? null));
+const staleOp = (e, a) => !!e.about && (e.about.state !== a.state || e.about.result !== (a.derived_value?.text ?? null)
+  // A typed field is stale once the field is gone or asks for something else; its state and value are the overlay's.
+  || Object.keys(e.value?.fields || {}).some((k) => !a.fields?.[k] || (e.about.fields?.[k] && schema(e.about.fields[k]) !== schema(a.fields[k]))));
+const schema = ({ state, value, source, ...fl }) => JSON.stringify(fl);
 
 /** One finding or artifact as it stands with the person's acts on it. */
 export function view(f, state) {

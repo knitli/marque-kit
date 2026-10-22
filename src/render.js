@@ -229,7 +229,7 @@ export function card(f, host = {}) {
   if (f.outcome?.kind === 'chosen_over' && f.outcome.readings?.length && !f.overridden && !settled(f)) {
     const alt = f.outcome.readings[0];
     const dep = el('div', 'mq-dep');
-    dep.append(el('span', null, 'Or, as you also wrote:'), placed(mark(alt.result, { size: 'sm' })));
+    dep.append(el('span', null, 'Or, as you also wrote:'), placed(mark(alt.result, { size: 'sm', help })));
     dep.append(button('ghost', alt.reading, () => host.onAct?.(f, 'changed', { reading: alt, index: 0 })));
     c.append(dep);
   }
@@ -563,8 +563,10 @@ export function gate(doc, host = {}) {
     answered.forEach((f) => g.append(card(f, h)));
     return g;
   }
-  g.append(el('h3', 'mq-q', ids.length === 1 ? 'One thing before this can go out.' : `${ids.length} things before this can go out.`));
-  for (const id of ids) {
+  // An answer still waiting to be written holds it up too.
+  const all = [...ids, ...(doc.document.pending || []).filter((id) => !ids.includes(id))];
+  g.append(el('h3', 'mq-q', all.length === 1 ? 'One thing before this can go out.' : `${all.length} things before this can go out.`));
+  for (const id of all) {
     const f = doc.findings.find((x) => x.id === id);
     const a = f ? null : doc.document.artifacts.find((x) => x.id === id);
     if (f) g.append(card(f, h)); else if (a) g.append(artifact(a, h));
@@ -668,6 +670,8 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   let said = doc ? null : new Set(), unseen = false;
   const live = el('div', 'mq-sr'); live.setAttribute('aria-live', 'polite');
   const body = el('div');
+  // The kit root carries the tokens; one above it (with its theme) wins, so only add it when there is none.
+  if (!root.closest('.mq')) root.classList.add('mq');
   root.replaceChildren(body, live);
   let theme = check(root); // before the first draw, so a failing host token never shows
   host.onTheme?.(theme);

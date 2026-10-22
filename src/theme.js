@@ -32,6 +32,9 @@ const lum = (c) => {
 /** WCAG contrast of two opaque colours. */
 export const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
 
+// theme.css's token blocks; a host's own `.mq { … }` is not one of them.
+const norm = (sel) => sel.replace(/[\s"']/g, '');
+const THEMES = new Set(['.mq,[data-mq-theme=light]', '[data-mq-theme=dark]', '[data-mq-theme=auto]'].map(norm));
 const applies = (root, sel) => { try { return !!root.closest(sel); } catch { return false; } }; // ::before and the like
 const same = (a, b) => a.replace(/\s+/g, '') === b.replace(/\s+/g, '');
 
@@ -42,13 +45,13 @@ function shipped(root) {
     for (const r of rules) {
       // A style rule has cssRules too (nesting), so it is matched first.
       if (r.style && r.selectorText) {
-        if (applies(root, r.selectorText)) for (const p of r.style) if (p.startsWith('--mq-')) out[p] = r.style.getPropertyValue(p).trim();
+        if (THEMES.has(norm(r.selectorText)) && applies(root, r.selectorText)) for (const p of r.style) if (p.startsWith('--mq-')) out[p] = r.style.getPropertyValue(p).trim();
       } else if (r.cssRules && (!r.media || matchMedia(r.media.mediaText).matches)) walk(r.cssRules);
     }
   };
+  // Found by the kit's own theme selectors, so a bundled, inlined or renamed theme.css still counts.
   for (const sheet of document.styleSheets) {
-    if (!/theme\.css(\?|$)/.test(sheet.href || '')) continue;
-    try { walk(sheet.cssRules); } catch { /* a sheet from another origin can't be read; nothing to fall back to */ }
+    try { walk(sheet.cssRules); } catch { /* another origin without CORS: unreadable */ }
   }
   return out;
 }
@@ -70,8 +73,10 @@ export function check(root) {
   const host = (t) => ship[`--mq-${t}`] && !same(cs.getPropertyValue(`--mq-${t}`), ship[`--mq-${t}`]);
   const rejected = [];
   const fall = (t, measured, floor) => {
-    rejected.push({ token: `--mq-${t}`, measured: Math.round(measured * 100) / 100, floor });
-    if (host(t)) { root.style.setProperty(`--mq-${t}`, ship[`--mq-${t}`]); pinned.get(root).push(`--mq-${t}`); }
+    // fallback: false when theme.css couldn't be read (another origin without CORS): reported, not fixed.
+    const fallback = host(t);
+    rejected.push({ token: `--mq-${t}`, measured: Math.round(measured * 100) / 100, floor, fallback });
+    if (fallback) { root.style.setProperty(`--mq-${t}`, ship[`--mq-${t}`]); pinned.get(root).push(`--mq-${t}`); }
   };
   for (const [fg, bg, floor] of PAIRS) {
     const surface = over(read('surface'), [255, 255, 255]);
@@ -84,7 +89,7 @@ export function check(root) {
   }
   for (const [t, floor] of SIZES) { const m = px(t); if (m < floor) fall(t, m, floor); }
   probe.remove();
-  for (const r of rejected) console.warn(`Marque theme: ${r.token} measured ${r.measured}, floor ${r.floor}; shipped value used`);
+  for (const r of rejected) console.warn(`Marque theme: ${r.token} measured ${r.measured}, floor ${r.floor}; ${r.fallback ? 'shipped value used' : 'no shipped value could be read to fall back to'}`);
   return { checked: PAIRS.length + SIZES.length, rejected };
 }
 
