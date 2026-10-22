@@ -44,8 +44,9 @@ export function record(state, id, act, value = null, at = new Date().toISOString
 }
 
 /** What an act is about, kept with it: markings, rule and place, never body text. */
+const ruleOf = (f) => (f.rule ? `${f.rule.scheme}:${f.rule.predicate}` : f.kind ?? null);
 export const snapshot = (f) => structuredClone({ // a record, not a view of a document that may change in place
-  rule: f.rule ? `${f.rule.scheme}:${f.rule.predicate}` : f.kind, anchor: f.anchor, kind: f.kind,
+  rule: ruleOf(f), anchor: f.anchor, kind: f.kind,
   as_written: f.marking?.as_written?.text ?? null, result: f.outcome?.result?.text ?? f.derived_value?.text ?? null,
   // What taking the act back restores: Marque's own words, never body text.
   ...(f.outcome && { outcome: { kind: f.outcome.kind, result: f.outcome.result, readings: f.outcome.readings } }),
@@ -98,11 +99,12 @@ function reversed(state, id, e = last(state, id)) {
 export const linted = (state, n = state.log.length) => ({ ...state, linted: Math.max(state.linted ?? 0, Math.min(n, state.log.length)) });
 
 /** JSON with object keys sorted, arrays in order: the same question reserialised is the same question. */
-const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((n) => [n, x[n]])) : x));
+export const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((n) => [n, x[n]])) : x));
 /** The finding isn't the one the act was taken on: another marking or question under the same id. */
 const moved = (e, f) => !!e.about
   // The whole question, not only its words: a new field type or format changes what an answer means.
-  && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || canon(e.about.asks ?? null) !== canon(f.asks ?? null)
+  // Another rule under the same id is another finding, whatever it says.
+  && ((e.about.rule ?? null) !== ruleOf(f) || e.about.as_written !== (f.marking?.as_written?.text ?? null) || canon(e.about.asks ?? null) !== canon(f.asks ?? null)
     || e.about.result !== (f.outcome?.result?.text ?? null));
 const stale = (e, f) => moved(e, f)
   // A reading picked is stale once the finding no longer offers it, from the readings or the question's own options.
@@ -179,10 +181,12 @@ function overlay(f, state, took) {
     }
     case 'kept_as_written':
       // The person kept one marking against one fix; a different one under the same id is open again.
-      if (e.about && (e.about.as_written !== (f.marking?.as_written?.text ?? null) || e.about.result !== (f.outcome?.result?.text ?? null))) return { ...v, person: null, stale: true };
+      if (e.about && ((e.about.rule ?? null) !== ruleOf(f) || e.about.as_written !== (f.marking?.as_written?.text ?? null) || e.about.result !== (f.outcome?.result?.text ?? null))) return { ...v, person: null, stale: true };
       return { ...v, overridden: true, outcome: { ...f.outcome, kind: 'kept_as_written', result: f.marking?.as_written, readings: [] }, needs_person: 'none', blocks: 'never' };
     default: { // deferred, declined: still open, as the question a pending take-back reopened if there is one
       const on = answeredOn(state, f, e);
+      // Put off on another question: the one asked now hasn't been put off.
+      if (moved(e, on)) return { ...v, person: null, stale: true };
       return { ...v, ...(on !== f && { asks: on.asks, outcome: on.outcome, needs_person: on.needs_person, blocks: on.blocks }), deferred: e.act };
     }
   }

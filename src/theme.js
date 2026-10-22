@@ -16,14 +16,14 @@
 export const PAIRS = [
   ['text', 'surface', 4.5], ['text-muted', 'surface', 4.5],
   ['act-ink', 'surface', 4.5], ['act-on', 'act', 4.5], ['act-on', 'act-hover', 4.5], ['act-ink', 'act-tint', 4.5], ['text', 'act-tint', 4.5], ['text-muted', 'act-tint', 4.5], // options and rows, hovered or chosen
-  ['attn-on', 'attn', 4.5], ['attn-ink', 'surface', 4.5], ['attn-ink', 'attn-tint', 4.5],
+  ['attn-on', 'attn', 4.5], ['attn-ink', 'surface', 4.5], ['attn-ink', 'attn-tint', 4.5], ['text', 'attn-tint', 4.5], // a cited sentence, highlighted
   ['error-ink', 'surface', 4.5], ['focus', 'surface', 3.0], ['focus', 'ground', 3.0],
   ['attn-ink', 'ground', 4.5], // the brand's gold and the Needs-you section mark
   ['text', 'ground', 4.5], ['text-muted', 'ground', 4.5], ['act-ink', 'ground', 4.5], // the pane's headings, footer links and section marks sit on the ground
-  ['text', 'surface-sunken', 4.5], ['text-muted', 'surface-sunken', 4.5], // open rows, wells, notices
+  ['text', 'surface-sunken', 4.5], ['text-muted', 'surface-sunken', 4.5], ['act-ink', 'surface-sunken', 4.5], // open rows, wells, notices
   ['rule-strong', 'surface', 3.0], // card, option and input borders: a non-text part
 ];
-export const SIZES = [['size-xs', 12], ['size-sm', 13]];
+export const SIZES = [['size-xs', 12], ['size-sm', 13], ['size-md', 13]]; // md carries banner markings
 /** The narrowest pane a card fits (docs/THEME.md); under it the kit shows rows only. */
 export const FLOOR = 240;
 

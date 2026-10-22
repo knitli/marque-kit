@@ -276,6 +276,17 @@ assert.equal(view(derivedCab, record(empty(), 'a-cab', 'answered', { fields: { d
   assert.equal(view({ ...cab, fields: rest }, s).stale, true);
   assert.equal(view({ ...cab, fields: { ...cab.fields, derived_from: { ...derived_from, hint: 'a source list' } } }, s).stale, true);
 }
+// A deferral, or an answer, on another question or rule under the same id doesn't carry over.
+{
+  const p3 = f(P3);
+  const s = record(empty(), p3.id, 'deferred', null, undefined, snapshot(p3));
+  assert.equal(view(p3, s).deferred, 'deferred');
+  const asked = { ...p3, asks: { ...p3.asks, text: 'Which countries own this information?' } };
+  assert.equal(view(asked, s).stale, true);
+  assert.equal(view(asked, s).deferred, undefined);
+  const a = record(empty(), p3.id, 'answered', { reading: p3.outcome.readings[0] }, undefined, snapshot(p3));
+  assert.equal(view({ ...p3, rule: { ...p3.rule, predicate: 'another' } }, a).stale, true);
+}
 // A host editing a view doesn't edit the log.
 {
   const s = record(empty(), 'a-cab', 'answered', { fields: { derived_from: 'Multiple Sources' } });

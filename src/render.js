@@ -33,7 +33,7 @@
  */
 
 import { render as mark, settle, resettle } from './marking.js';
-import { empty, record, see, linted, snapshot, docView, decision } from './state.js';
+import { empty, record, see, linted, snapshot, docView, decision, canon } from './state.js';
 import { cite, hasTip, tips } from './help.js';
 import { check, watch, release } from './theme.js';
 
@@ -647,8 +647,8 @@ export function receipt(doc, session = {}) {
     const b = el('div', 'b');
     const did = acts(f);
     b.append(el('span', null, `${f.rule.scheme}:${f.rule.predicate} · ${f.outcome.kind.replace(/_/g, ' ')}${did ? ` · ${did}` : ''}`));
-    if (f.marking?.as_written) b.append(mark(f.marking.as_written, { size: 'xs' }));
-    if (f.outcome?.result) b.append(mark(f.outcome.result, { size: 'xs', state: 'changed' }));
+    if (f.marking?.as_written) b.append(placed(mark(f.marking.as_written, { size: 'xs' })));
+    if (f.outcome?.result) b.append(placed(mark(f.outcome.result, { size: 'xs', state: 'changed' })));
     ln.append(b); r.append(ln);
   }
   // Every artifact, card or not: present and absent-not-required ones live only here.
@@ -657,7 +657,7 @@ export function receipt(doc, session = {}) {
     const did = acts(a);
     const b = el('div', 'b');
     b.append(el('span', null, `${a.kind} · ${a.state.replace(/_/g, ' ')}${did ? ` · ${did}` : ''}`));
-    if (a.derived_value) b.append(mark(a.derived_value, { size: 'xs', state: 'changed' }));
+    if (a.derived_value) b.append(placed(mark(a.derived_value, { size: 'xs', state: 'changed' })));
     ln.append(el('span', 't', where(a)), b);
     r.append(ln);
   }
@@ -668,7 +668,7 @@ export function receipt(doc, session = {}) {
     ln.append(el('span', 't', a.anchor || a.kind ? where(a) : '—'));
     const b = el('div', 'b');
     b.append(el('span', null, `${a.rule ? `${a.rule} · ` : ''}no longer reported · ${acts(x)}`));
-    if (a.as_written) b.append(mark({ text: a.as_written }, { size: 'xs' }));
+    if (a.as_written) b.append(placed(mark({ text: a.as_written }, { size: 'xs' })));
     ln.append(b);
     r.append(ln);
   }
@@ -777,7 +777,7 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     if (v && (ok || cur.engine === 'checking')) {
       const now = sections(v, cur.moment).must;
       // Keyed by the question too: one asked again under the same id is news.
-      const key = (f) => `${f.id} ${JSON.stringify(f.asks ?? null)}`;
+      const key = (f) => `${f.id} ${canon(f.asks ?? null)}`;
       if (said && ok) say = now.filter((f) => !said.has(key(f))).map((f) => `${spokenWhere(f)} needs you.`).join(' ');
       // While checking, only the first results set the baseline; what arrives after is told once it's done.
       if (ok || !said) said = new Set(now.map(key));
