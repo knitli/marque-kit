@@ -4,11 +4,7 @@
   "source": "fixtures/memo.txt",
   "document": {
     "ready": false,
-    "blocking": [
-      "f-p3-ownership",
-      "f-p4-portion-mark-absent",
-      "a-cab"
-    ],
+    "blocking": ["f-p3-ownership", "f-p4-portion-mark-absent", "a-cab"],
     "artifacts": [
       {
         "id": "a-banner",
@@ -62,12 +58,7 @@
         "derivation": [
           {
             "axis": "classification",
-            "inputs": [
-              "f-p2-rel-to-separator",
-              "f-p3-ownership",
-              "f-p5-noforn-rel-conflict",
-              "f-p6-rel-to-separator"
-            ],
+            "inputs": ["f-p2-rel-to-separator", "f-p3-ownership", "f-p5-noforn-rel-conflict", "f-p6-rel-to-separator"],
             "output": "SECRET",
             "citation": {
               "source": "capco_2016",
@@ -78,9 +69,7 @@
           },
           {
             "axis": "fgi",
-            "inputs": [
-              "f-p3-ownership"
-            ],
+            "inputs": ["f-p3-ownership"],
             "output": "//FGI AUS GBR",
             "citation": {
               "source": "capco_2016",
@@ -91,9 +80,7 @@
           },
           {
             "axis": "dissem",
-            "inputs": [
-              "f-p5-noforn-rel-conflict"
-            ],
+            "inputs": ["f-p5-noforn-rel-conflict"],
             "output": "//NOFORN",
             "citation": {
               "source": "capco_2016",
@@ -105,9 +92,7 @@
         ],
         "needs_person": "none",
         "blocks": "finalize",
-        "depends_on": [
-          "f-p5-noforn-rel-conflict"
-        ],
+        "depends_on": ["f-p5-noforn-rel-conflict"],
         "if_taken": {
           "f-p5-noforn-rel-conflict": {
             "text": "SECRET//FGI AUS GBR//REL TO USA, GBR",
@@ -202,10 +187,7 @@
       "anchor": {
         "kind": "span",
         "portion": 2,
-        "span": [
-          119,
-          139
-        ]
+        "span": [119, 139]
       },
       "marking": {
         "as_written": {
@@ -245,10 +227,7 @@
           "page": 151,
           "short": "Each code is separated by a comma and a space."
         },
-        "help": [
-          "REL TO",
-          "FVEY"
-        ]
+        "help": ["REL TO", "FVEY"]
       },
       "outcome": {
         "kind": "applied",
@@ -298,10 +277,7 @@
       "anchor": {
         "kind": "span",
         "portion": 3,
-        "span": [
-          244,
-          280
-        ]
+        "span": [244, 280]
       },
       "marking": {
         "as_written": {
@@ -350,10 +326,7 @@
           "page": 55,
           "short": "USA is always included in the JOINT marking [LIST], as USA is always a co-owner/producer."
         },
-        "help": [
-          "JOINT",
-          "REL TO"
-        ]
+        "help": ["JOINT", "REL TO"]
       },
       "outcome": {
         "kind": "choices",
@@ -363,11 +336,7 @@
           {
             "asserts": {
               "ownership": "jointly_owned",
-              "owners": [
-                "AUS",
-                "GBR",
-                "USA"
-              ]
+              "owners": ["AUS", "GBR", "USA"]
             },
             "reading": "The U.S., the UK and Australia produced it together",
             "result": {
@@ -411,17 +380,12 @@
               ],
               "masks": []
             },
-            "changes": [
-              "classification"
-            ]
+            "changes": ["classification"]
           },
           {
             "asserts": {
               "ownership": "foreign_owned",
-              "owners": [
-                "AUS",
-                "GBR"
-              ]
+              "owners": ["AUS", "GBR"]
             },
             "reading": "The UK and Australia, without the U.S.",
             "result": {
@@ -459,19 +423,13 @@
               ],
               "masks": []
             },
-            "changes": [
-              "classification"
-            ]
+            "changes": ["classification"]
           },
           {
             "asserts": {
               "ownership": "foreign_owned_with_foreign_content",
-              "owners": [
-                "GBR"
-              ],
-              "fgi": [
-                "AUS"
-              ]
+              "owners": ["GBR"],
+              "fgi": ["AUS"]
             },
             "reading": "It's British, with some Australian information",
             "result": {
@@ -513,10 +471,7 @@
               ],
               "masks": []
             },
-            "changes": [
-              "classification",
-              "fgi"
-            ]
+            "changes": ["classification", "fgi"]
           }
         ],
         "fallback": {
@@ -579,10 +534,7 @@
       "anchor": {
         "kind": "portion",
         "portion": 4,
-        "span": [
-          415,
-          494
-        ]
+        "span": [415, 494]
       },
       "marking": {
         "as_written": null,
@@ -628,9 +580,7 @@
               ],
               "masks": []
             },
-            "changes": [
-              "classification"
-            ]
+            "changes": ["classification"]
           }
         ],
         "field": {
@@ -656,10 +606,7 @@
       "anchor": {
         "kind": "span",
         "portion": 5,
-        "span": [
-          499,
-          522
-        ]
+        "span": [499, 522]
       },
       "marking": {
         "as_written": {
@@ -702,10 +649,7 @@
           "page": 145,
           "short": "Cannot be used with REL TO, RELIDO, EYES ONLY, or DISPLAY ONLY."
         },
-        "help": [
-          "NF",
-          "REL TO"
-        ]
+        "help": ["NF", "REL TO"]
       },
       "outcome": {
         "kind": "chosen_over",
@@ -734,10 +678,7 @@
           {
             "asserts": {
               "dissem": "rel_to",
-              "rel": [
-                "USA",
-                "GBR"
-              ]
+              "rel": ["USA", "GBR"]
             },
             "reading": "Releasable to the UK, as you also wrote",
             "result": {
@@ -766,9 +707,7 @@
               ],
               "masks": []
             },
-            "changes": [
-              "dissem"
-            ]
+            "changes": ["dissem"]
           }
         ],
         "reason": null
@@ -789,10 +728,7 @@
       "anchor": {
         "kind": "span",
         "portion": 6,
-        "span": [
-          579,
-          600
-        ]
+        "span": [579, 600]
       },
       "marking": {
         "as_written": {
@@ -835,9 +771,7 @@
           "page": 151,
           "short": "Each code is separated by a comma and a space."
         },
-        "help": [
-          "REL TO"
-        ]
+        "help": ["REL TO"]
       },
       "outcome": {
         "kind": "applied",

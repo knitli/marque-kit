@@ -21,35 +21,36 @@
 
 /* Light — the default, and what a Word or Outlook pane looks like.
    Knitli calls this the Reference surface.                                 */
-.mq, [data-mq-theme="light"] {
+.mq,
+[data-mq-theme='light'] {
   /* ground and surfaces */
-  --mq-ground: #f1f7ed;            /* behind everything; Knitli mint-200     */
-  --mq-surface: #ffffff;           /* cards, popovers, the pane itself       */
-  --mq-surface-sunken: #e4ecdd;    /* wells, the collapsed "done quietly"    */
+  --mq-ground: #f1f7ed; /* behind everything; Knitli mint-200     */
+  --mq-surface: #ffffff; /* cards, popovers, the pane itself       */
+  --mq-surface-sunken: #e4ecdd; /* wells, the collapsed "done quietly"    */
 
   /* text — two steps, deliberately. A third was sub-AA on the dark card.   */
   --mq-text: #2f3732;
   --mq-text-muted: #5c655e;
 
   /* rules */
-  --mq-rule: rgba(47,55,50,.16);   /* hairlines between rows                 */
-  --mq-rule-strong: #2f3732;       /* card and option borders                */
+  --mq-rule: rgba(47, 55, 50, 0.16); /* hairlines between rows                 */
+  --mq-rule-strong: #2f3732; /* card and option borders                */
 
   /* act — blue. The system did it, or the person can. Never "must".
      act is a fill (button, stamp); act-ink is the same idea as text or a
      line on the surface. They differ on dark, so keep both.                 */
   --mq-act: #4464ad;
   --mq-act-ink: #4464ad;
-  --mq-act-on: #ffffff;            /* text on an act fill                    */
-  --mq-act-tint: rgba(68,100,173,.10);
+  --mq-act-on: #ffffff; /* text on an act fill                    */
+  --mq-act-tint: rgba(68, 100, 173, 0.1);
   --mq-act-hover: #33518f;
 
   /* attn — gold. A person must look. The only colour that means that.
      attn-ink is gold as text or a rule; on light it must darken to read.   */
   --mq-attn: #cda824;
   --mq-attn-ink: #836a0e;
-  --mq-attn-on: #2f3732;           /* dark ink on gold, never white          */
-  --mq-attn-tint: rgba(205,168,36,.12);
+  --mq-attn-on: #2f3732; /* dark ink on gold, never white          */
+  --mq-attn-tint: rgba(205, 168, 36, 0.12);
 
   /* error — the engine failed, not the marking. Brick, not red-red.        */
   --mq-error: #8f4f38;
@@ -65,67 +66,67 @@
   --mq-font-body: 'Literata', Georgia, serif;
   --mq-font-mark: 'OCR-B';
   --mq-font-code: 'Fira Code', ui-monospace, monospace;
-  --mq-display-width: 112;         /* Archivo wdth axis; ignored by others   */
-  --mq-size-xs: 12px;              /* labels, stamps                         */
-  --mq-size-sm: 13.5px;            /* markings, small text, buttons          */
-  --mq-size-base: 15.5px;          /* UI text, options                       */
-  --mq-size-md: 16.5px;            /* card headings                          */
-  --mq-size-lg: 21px;              /* the question                           */
+  --mq-display-width: 112; /* Archivo wdth axis; ignored by others   */
+  --mq-size-xs: 12px; /* labels, stamps                         */
+  --mq-size-sm: 13.5px; /* markings, small text, buttons          */
+  --mq-size-base: 15.5px; /* UI text, options                       */
+  --mq-size-md: 16.5px; /* card headings                          */
+  --mq-size-lg: 21px; /* the question                           */
 
   /* form */
-  --mq-radius: 0;                  /* paper doesn't round                    */
-  --mq-border: 2px;                /* card and control borders               */
+  --mq-radius: 0; /* paper doesn't round                    */
+  --mq-border: 2px; /* card and control borders               */
   --mq-border-hair: 1px;
-  --mq-unit: 4px;                  /* spacing unit; the kit uses multiples.
+  --mq-unit: 4px; /* spacing unit; the kit uses multiples.
                                       A dense host sets 3px.                 */
-  --mq-shadow-overlay: 0 8px 28px rgba(47,55,50,.18);  /* popovers only     */
+  --mq-shadow-overlay: 0 8px 28px rgba(47, 55, 50, 0.18); /* popovers only     */
 
   /* motion — one duration, one curve. No bounce, no spin.                  */
   --mq-duration: 180ms;
-  --mq-ease: cubic-bezier(.2,0,.2,1);
+  --mq-ease: cubic-bezier(0.2, 0, 0.2, 1);
 
   color-scheme: light;
 }
 
 /* Dark — Marque's own chrome. Knitli calls this the Instrument surface.    */
-[data-mq-theme="dark"] {
+[data-mq-theme='dark'] {
   --mq-ground: #262d28;
   --mq-surface: #2e3630;
   --mq-surface-sunken: #232a25;
 
   --mq-text: #dde4d8;
-  --mq-text-muted: #a3ada4;       /* 4.7:1 on a hovered row (act-tint over surface) */
+  --mq-text-muted: #a3ada4; /* 4.7:1 on a hovered row (act-tint over surface) */
 
   --mq-rule: #414a44;
-  --mq-rule-strong: #76827a;       /* Knitli: #5a655d (2.05:1 on the card).
+  --mq-rule-strong: #76827a; /* Knitli: #5a655d (2.05:1 on the card).
                                       Raised to clear 3:1 so option boxes
                                       are visible as boxes.                 */
 
   --mq-act: #4464ad;
-  --mq-act-ink: #9db2e0;           /* blue-500 as text here is 2.5:1         */
+  --mq-act-ink: #9db2e0; /* blue-500 as text here is 2.5:1         */
   --mq-act-on: #ffffff;
-  --mq-act-tint: rgba(68,100,173,.18);
+  --mq-act-tint: rgba(68, 100, 173, 0.18);
   --mq-act-hover: #5273bd;
 
   --mq-attn: #cda824;
-  --mq-attn-ink: #e3cd7c;          /* Knitli: gold-500 (4.41:1 on the gold
+  --mq-attn-ink: #e3cd7c; /* Knitli: gold-500 (4.41:1 on the gold
                                       tint, a hair under AA). gold-300 is
                                       Knitli's own "gold on a dark ground"
                                       reserve: 6.35:1 on the tint.          */
   --mq-attn-on: #2f3732;
-  --mq-attn-tint: rgba(205,168,36,.12);
+  --mq-attn-tint: rgba(205, 168, 36, 0.12);
 
   --mq-error: #8f4f38;
-  --mq-error-ink: #d4907a;         /* Knitli has no dark error ink; brick
+  --mq-error-ink: #d4907a; /* Knitli has no dark error ink; brick
                                       on the card is 1.98:1. This is 4.79.  */
   --mq-error-on: #ffffff;
 
   --mq-focus: #9db2e0;
 
-  --mq-radius: 2px;                /* hairlines and a 2px corner on dark     */
+  --mq-radius: 2px; /* hairlines and a 2px corner on dark     */
   --mq-border: 1px;
   --mq-border-hair: 1px;
-  --mq-shadow-overlay: 0 8px 28px rgba(0,0,0,.45);
+  --mq-shadow-overlay: 0 8px 28px rgba(0, 0, 0, 0.45);
 
   color-scheme: dark;
 }
@@ -140,29 +141,56 @@
    or "dark" explicitly. The dark block repeats here because CSS has no way
    to alias a selector.                                                      */
 @media (prefers-color-scheme: dark) {
-  [data-mq-theme="auto"] {
-    --mq-ground: #262d28; --mq-surface: #2e3630; --mq-surface-sunken: #232a25;
-    --mq-text: #dde4d8; --mq-text-muted: #a3ada4;
-    --mq-rule: #414a44; --mq-rule-strong: #76827a;
-    --mq-act: #4464ad; --mq-act-ink: #9db2e0; --mq-act-on: #ffffff;
-    --mq-act-tint: rgba(68,100,173,.18); --mq-act-hover: #5273bd;
-    --mq-attn: #cda824; --mq-attn-ink: #e3cd7c; --mq-attn-on: #2f3732;
-    --mq-attn-tint: rgba(205,168,36,.12);
-    --mq-error: #8f4f38; --mq-error-ink: #d4907a; --mq-error-on: #ffffff;
+  [data-mq-theme='auto'] {
+    --mq-ground: #262d28;
+    --mq-surface: #2e3630;
+    --mq-surface-sunken: #232a25;
+    --mq-text: #dde4d8;
+    --mq-text-muted: #a3ada4;
+    --mq-rule: #414a44;
+    --mq-rule-strong: #76827a;
+    --mq-act: #4464ad;
+    --mq-act-ink: #9db2e0;
+    --mq-act-on: #ffffff;
+    --mq-act-tint: rgba(68, 100, 173, 0.18);
+    --mq-act-hover: #5273bd;
+    --mq-attn: #cda824;
+    --mq-attn-ink: #e3cd7c;
+    --mq-attn-on: #2f3732;
+    --mq-attn-tint: rgba(205, 168, 36, 0.12);
+    --mq-error: #8f4f38;
+    --mq-error-ink: #d4907a;
+    --mq-error-on: #ffffff;
     --mq-focus: #9db2e0;
-    --mq-radius: 2px; --mq-border: 1px;
-    --mq-shadow-overlay: 0 8px 28px rgba(0,0,0,.45);
+    --mq-radius: 2px;
+    --mq-border: 1px;
+    --mq-shadow-overlay: 0 8px 28px rgba(0, 0, 0, 0.45);
     color-scheme: dark;
   }
 }
 
 /* The kit root. Everything the kit renders sits inside one of these.      */
-.mq { background: var(--mq-ground); color: var(--mq-text);
-      font-family: var(--mq-font-body); font-size: var(--mq-size-base); line-height: 1.5;
-      container-type: inline-size; container-name: mq;
-      -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
-.mq-mount { container-type: inline-size; container-name: mq; }   /* each pane its own container */
-.mq *, .mq *::before, .mq *::after { box-sizing: border-box; min-width: 0; }
+.mq {
+  background: var(--mq-ground);
+  color: var(--mq-text);
+  font-family: var(--mq-font-body);
+  font-size: var(--mq-size-base);
+  line-height: 1.5;
+  container-type: inline-size;
+  container-name: mq;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.mq-mount {
+  container-type: inline-size;
+  container-name: mq;
+} /* each pane its own container */
+.mq *,
+.mq *::before,
+.mq *::after {
+  box-sizing: border-box;
+  min-width: 0;
+}
 
 /* ═══ 3 · FIT ═════════════════════════════════════════════════════════ */
 /* A marking never overflows its container and never breaks inside a token.
@@ -192,22 +220,51 @@
    CSS alone wraps greedily (as many layers per line as fit). The kit's
    Marking adds .stacked the moment any break is needed, so a marking that
    wraps always wraps the same way: every layer on its own line.            */
-.mq-mark { font-family: var(--mq-font-mark), ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
-           font-size: var(--mq-size-sm); letter-spacing: .04em; line-height: 1.45;
-           display: inline-block; max-width: 100%; vertical-align: baseline;
-           white-space: normal; overflow-wrap: normal; word-break: keep-all; hyphens: none;
-           padding-left: .65em; text-indent: -.65em;         /* hanging indent = 1 char */
-           direction: ltr; unicode-bidi: isolate;             /* a marking is always LTR */
-           filter: none !important; opacity: 1 !important; text-shadow: none !important;
-           overflow: visible; text-overflow: clip; }
-.mq-mark .mq-l, .mq-mark .mq-i { white-space: nowrap; }     /* breaks only at <wbr>     */
-.mq-mark.stacked .mq-l { display: block; }                   /* one layer per line       */
-.mq-mark.stacked > wbr { display: none; }                    /* a <wbr> between two blocks
+.mq-mark {
+  font-family: var(--mq-font-mark), ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: var(--mq-size-sm);
+  letter-spacing: 0.04em;
+  line-height: 1.45;
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: baseline;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  hyphens: none;
+  padding-left: 0.65em;
+  text-indent: -0.65em; /* hanging indent = 1 char */
+  direction: ltr;
+  unicode-bidi: isolate; /* a marking is always LTR */
+  filter: none !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+  overflow: visible;
+  text-overflow: clip;
+}
+.mq-mark .mq-l,
+.mq-mark .mq-i {
+  white-space: nowrap;
+} /* breaks only at <wbr>     */
+.mq-mark.stacked .mq-l {
+  display: block;
+} /* one layer per line       */
+.mq-mark.stacked > wbr {
+  display: none;
+} /* a <wbr> between two blocks
                                                                  makes an empty line in Chrome */
-.mq-mark.stacked .mq-l:first-child { text-indent: -.65em; }
-.mq-mark.stacked .mq-l + .mq-l { text-indent: -.65em; }
-.mq-mark.lg { font-size: var(--mq-size-md); }                /* banners in a status strip */
-.mq-mark.xs { font-size: var(--mq-size-xs); }                /* never smaller            */
+.mq-mark.stacked .mq-l:first-child {
+  text-indent: -0.65em;
+}
+.mq-mark.stacked .mq-l + .mq-l {
+  text-indent: -0.65em;
+}
+.mq-mark.lg {
+  font-size: var(--mq-size-md);
+} /* banners in a status strip */
+.mq-mark.xs {
+  font-size: var(--mq-size-xs);
+} /* never smaller            */
 
 /* ── Long markings: four forms of one marking ───────────────────────────
    Marque accepts markings up to 4096 bytes, and a coalition portion with
@@ -237,129 +294,350 @@
    cards never render it inline; the row says so in words and opens the
    popover, which scrolls. In the document itself the kit draws nothing but
    the inline shape — the host's text is the host's.                        */
-.mq-fold  { font-family: var(--mq-font-body); font-size: var(--mq-size-xs); font-weight: 600; letter-spacing: 0;
-            color: var(--mq-act-ink); text-decoration: underline dotted; text-decoration-thickness: 2px;
-            text-underline-offset: 3px; cursor: pointer; white-space: nowrap; text-indent: 0; }
-.mq-fold:hover { text-decoration-style: solid; }  /* hover changes the shape; act-hover is a fill, not a text colour */
-.mq-count { font-family: var(--mq-font-body); font-size: var(--mq-size-xs); font-weight: 600; letter-spacing: 0; text-indent: 0;
-            color: var(--mq-text-muted); border: var(--mq-border-hair) solid var(--mq-rule-strong);
-            border-radius: var(--mq-radius); padding: 1px 6px; white-space: nowrap; vertical-align: 1px; }
-.mq-mark.summary { line-height: 1.9; }
-.mq-l.differs { background: var(--mq-attn-tint); box-decoration-break: clone; -webkit-box-decoration-break: clone;
-                padding: 1px 4px 1px calc(4px + .65em); margin-left: calc(-4px - .65em); border-radius: var(--mq-radius); }
-.mq-mark.stacked .mq-l.differs { margin-left: -4px; padding-left: 4px; text-indent: -.65em; padding-left: calc(4px + .65em); }
-.mq-pop.marking { max-height: 60vh; overflow: auto; padding: calc(var(--mq-unit) * 3); }
-.mq-pop.marking .mq-mark { font-size: var(--mq-size-sm); }
+.mq-fold {
+  font-family: var(--mq-font-body);
+  font-size: var(--mq-size-xs);
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--mq-act-ink);
+  text-decoration: underline dotted;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-indent: 0;
+}
+.mq-fold:hover {
+  text-decoration-style: solid;
+} /* hover changes the shape; act-hover is a fill, not a text colour */
+.mq-count {
+  font-family: var(--mq-font-body);
+  font-size: var(--mq-size-xs);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-indent: 0;
+  color: var(--mq-text-muted);
+  border: var(--mq-border-hair) solid var(--mq-rule-strong);
+  border-radius: var(--mq-radius);
+  padding: 1px 6px;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+.mq-mark.summary {
+  line-height: 1.9;
+}
+.mq-l.differs {
+  background: var(--mq-attn-tint);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding: 1px 4px 1px calc(4px + 0.65em);
+  margin-left: calc(-4px - 0.65em);
+  border-radius: var(--mq-radius);
+}
+.mq-mark.stacked .mq-l.differs {
+  margin-left: -4px;
+  padding-left: 4px;
+  text-indent: -0.65em;
+  padding-left: calc(4px + 0.65em);
+}
+.mq-pop.marking {
+  max-height: 60vh;
+  overflow: auto;
+  padding: calc(var(--mq-unit) * 3);
+}
+.mq-pop.marking .mq-mark {
+  font-size: var(--mq-size-sm);
+}
 
 /* A marking inside running prose (the "was …" line, a reason sentence)
    keeps its own rules; the prose around it wraps normally.                 */
-.mq p .mq-mark, .mq .mq-prose .mq-mark { vertical-align: baseline; }
+.mq p .mq-mark,
+.mq .mq-prose .mq-mark {
+  vertical-align: baseline;
+}
 
 /* Containers never clip a marking. A card grows; a row wraps.              */
-.mq-card, .mq-row, .mq-opt { overflow: visible; }
-.mq-row { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--mq-unit) * 2) calc(var(--mq-unit) * 3); }
+.mq-card,
+.mq-row,
+.mq-opt {
+  overflow: visible;
+}
+.mq-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--mq-unit) * 2) calc(var(--mq-unit) * 3);
+}
 
 /* Prose has a measure; UI text does not truncate.                          */
-.mq-prose { max-width: 62ch; overflow-wrap: anywhere; }
-.mq-ui    { overflow-wrap: anywhere; }
+.mq-prose {
+  max-width: 62ch;
+  overflow-wrap: anywhere;
+}
+.mq-ui {
+  overflow-wrap: anywhere;
+}
 
 /* Narrow panes. Word's task pane is ~320px; Outlook's is similar. Below
    360px of kit width an option's marking always sits under its prose, a
    card's footer stacks its two links, and the stamp row wraps.             */
 @container mq (max-width: 360px) {
-  .mq-opt .mq-txt { flex-direction: column; }
-  .mq-foot { flex-direction: column; align-items: flex-start; gap: calc(var(--mq-unit) * 1.5); }
-  .mq-card { padding: calc(var(--mq-unit) * 3); }
+  .mq-opt .mq-txt {
+    flex-direction: column;
+  }
+  .mq-foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: calc(var(--mq-unit) * 1.5);
+  }
+  .mq-card {
+    padding: calc(var(--mq-unit) * 3);
+  }
 }
 /* The floor. Below this the kit tells the host it cannot lay out a card
    and renders the collapsed row only.                                      */
-.mq { min-width: 240px; }
-.mq.mq-narrow { min-width: 0; }   /* under the floor: rows only, in the room the host gave */
+.mq {
+  min-width: 240px;
+}
+.mq.mq-narrow {
+  min-width: 0;
+} /* under the floor: rows only, in the room the host gave */
 
 /* ═══ 4 · SHAPES ══════════════════════════════════════════════════════ */
 /* Colour rides along; the shape carries the meaning, so a colour-blind
    reader, a greyscale print and forced-colours mode all still get it.      */
-.mq-changed  { text-decoration: underline; text-decoration-thickness: 1px;
-               text-underline-offset: 3px; text-decoration-color: currentColor; }
-.mq-can-act  { text-decoration: underline dotted; text-decoration-thickness: 2px;
-               text-underline-offset: 3px; text-decoration-color: var(--mq-act-ink); }
-.mq-must-act { border-bottom: 3px double var(--mq-attn-ink); padding-bottom: 1px; }
-.mq-absent   { outline: 1.5px dashed var(--mq-text-muted); outline-offset: 2px; }
+.mq-changed {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: currentColor;
+}
+.mq-can-act {
+  text-decoration: underline dotted;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--mq-act-ink);
+}
+.mq-must-act {
+  border-bottom: 3px double var(--mq-attn-ink);
+  padding-bottom: 1px;
+}
+.mq-absent {
+  outline: 1.5px dashed var(--mq-text-muted);
+  outline-offset: 2px;
+}
 /* On a wrapped marking the underline follows every line; the double rule
    is drawn under the whole block, which is what "must act" on a stacked
    banner should look like.                                                  */
-.mq-mark.mq-must-act { display: inline-block; }
+.mq-mark.mq-must-act {
+  display: inline-block;
+}
 
 /* The same shapes on a card. */
-.mq-card           { background: var(--mq-surface); color: var(--mq-text);
-                     border: var(--mq-border) solid var(--mq-rule-strong); border-radius: var(--mq-radius);
-                     padding: calc(var(--mq-unit) * 3.5); display: flex; flex-direction: column; gap: calc(var(--mq-unit) * 2.75); }
-.mq-card.must-act  { border: 4px double var(--mq-attn-ink); }
-.mq-card.can-act   { border-style: dotted; border-color: var(--mq-act-ink); }
-.mq-card.absent    { border-style: dashed; border-color: var(--mq-text-muted); }
+.mq-card {
+  background: var(--mq-surface);
+  color: var(--mq-text);
+  border: var(--mq-border) solid var(--mq-rule-strong);
+  border-radius: var(--mq-radius);
+  padding: calc(var(--mq-unit) * 3.5);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--mq-unit) * 2.75);
+}
+.mq-card.must-act {
+  border: 4px double var(--mq-attn-ink);
+}
+.mq-card.can-act {
+  border-style: dotted;
+  border-color: var(--mq-act-ink);
+}
+.mq-card.absent {
+  border-style: dashed;
+  border-color: var(--mq-text-muted);
+}
 
 /* ═══ 5 · STATES & SURROUNDINGS ═══════════════════════════════════════ */
 
 /* Focus is always visible. Never removed, never restyled to nothing.       */
-.mq :focus-visible { outline: 2px solid var(--mq-focus); outline-offset: 2px; }
+.mq :focus-visible {
+  outline: 2px solid var(--mq-focus);
+  outline-offset: 2px;
+}
 
 /* Options: rest, hover, chosen, disabled. Chosen is act-ink — the person
    acted; it is not gold, because gold would say "still needs you".         */
-.mq-opt { display: flex; gap: calc(var(--mq-unit) * 2.5); align-items: flex-start; cursor: pointer;
-          padding: calc(var(--mq-unit) * 2.5); border: var(--mq-border) solid var(--mq-rule-strong);
-          border-radius: var(--mq-radius); transition: background var(--mq-duration) var(--mq-ease), border-color var(--mq-duration) var(--mq-ease); }
-.mq-opt:hover { background: var(--mq-act-tint); }
-.mq-opt:has(input:checked) { border-color: var(--mq-act-ink); background: var(--mq-act-tint); }
-.mq-opt:has(input:disabled) { cursor: not-allowed; opacity: .45; }
-.mq-opt input { accent-color: var(--mq-act-ink); }
+.mq-opt {
+  display: flex;
+  gap: calc(var(--mq-unit) * 2.5);
+  align-items: flex-start;
+  cursor: pointer;
+  padding: calc(var(--mq-unit) * 2.5);
+  border: var(--mq-border) solid var(--mq-rule-strong);
+  border-radius: var(--mq-radius);
+  transition:
+    background var(--mq-duration) var(--mq-ease),
+    border-color var(--mq-duration) var(--mq-ease);
+}
+.mq-opt:hover {
+  background: var(--mq-act-tint);
+}
+.mq-opt:has(input:checked) {
+  border-color: var(--mq-act-ink);
+  background: var(--mq-act-tint);
+}
+.mq-opt:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.mq-opt input {
+  accent-color: var(--mq-act-ink);
+}
 
 /* Buttons: one primary (gold — a person must act), one secondary, one
    ghost. Hover darkens or lightens along the ramp; press is a 1.5% scale.  */
-.mq-btn { font-family: var(--mq-font-display); font-variation-settings: 'wdth' 100; font-weight: 700;
-          font-size: var(--mq-size-xs); letter-spacing: .02em; line-height: 1; padding: 8px 14px; min-height: 32px;
-          border: var(--mq-border) solid var(--mq-rule-strong); border-radius: var(--mq-radius);
-          background: transparent; color: var(--mq-text); cursor: pointer;
-          transition: background var(--mq-duration) var(--mq-ease), color var(--mq-duration) var(--mq-ease), border-color var(--mq-duration) var(--mq-ease); }
-.mq-btn:hover { background: var(--mq-act-tint); }
-.mq-btn:active { transform: scale(.985); }
-.mq-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
-.mq-btn.attn { background: var(--mq-attn); border-color: var(--mq-attn); color: var(--mq-attn-on); }
-.mq-btn.attn:hover { filter: brightness(.94); }
-.mq-btn.act  { background: var(--mq-act); border-color: var(--mq-act); color: var(--mq-act-on); }
-.mq-btn.act:hover { background: var(--mq-act-hover); border-color: var(--mq-act-hover); }
-.mq-btn.ghost { border-color: transparent; font-family: var(--mq-font-body); font-weight: 500; font-size: var(--mq-size-sm);
-                text-decoration: underline; text-underline-offset: 4px; padding: 8px 4px; }
-.mq-btn.ghost:hover { background: transparent; color: var(--mq-act-ink); }
+.mq-btn {
+  font-family: var(--mq-font-display);
+  font-variation-settings: 'wdth' 100;
+  font-weight: 700;
+  font-size: var(--mq-size-xs);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 8px 14px;
+  min-height: 32px;
+  border: var(--mq-border) solid var(--mq-rule-strong);
+  border-radius: var(--mq-radius);
+  background: transparent;
+  color: var(--mq-text);
+  cursor: pointer;
+  transition:
+    background var(--mq-duration) var(--mq-ease),
+    color var(--mq-duration) var(--mq-ease),
+    border-color var(--mq-duration) var(--mq-ease);
+}
+.mq-btn:hover {
+  background: var(--mq-act-tint);
+}
+.mq-btn:active {
+  transform: scale(0.985);
+}
+.mq-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+.mq-btn.attn {
+  background: var(--mq-attn);
+  border-color: var(--mq-attn);
+  color: var(--mq-attn-on);
+}
+.mq-btn.attn:hover {
+  filter: brightness(0.94);
+}
+.mq-btn.act {
+  background: var(--mq-act);
+  border-color: var(--mq-act);
+  color: var(--mq-act-on);
+}
+.mq-btn.act:hover {
+  background: var(--mq-act-hover);
+  border-color: var(--mq-act-hover);
+}
+.mq-btn.ghost {
+  border-color: transparent;
+  font-family: var(--mq-font-body);
+  font-weight: 500;
+  font-size: var(--mq-size-sm);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  padding: 8px 4px;
+}
+.mq-btn.ghost:hover {
+  background: transparent;
+  color: var(--mq-act-ink);
+}
 
 /* Links: act-ink, underlined, thicker on hover. Never colour alone.        */
-.mq a, .mq-link { color: var(--mq-act-ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
-.mq a:hover, .mq-link:hover { text-decoration-thickness: 2px; }
+.mq a,
+.mq-link {
+  color: var(--mq-act-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.mq a:hover,
+.mq-link:hover {
+  text-decoration-thickness: 2px;
+}
 
 /* Layers. Three, fixed. A popover sits on its card, a tooltip on
    everything in the pane, the section window above the pane. The only
    shadow in the kit is on a popover.                                        */
-.mq-pop     { z-index: 10; background: var(--mq-surface); border: var(--mq-border) solid var(--mq-rule-strong);
-              border-radius: var(--mq-radius); box-shadow: var(--mq-shadow-overlay); }
-.mq-tip     { z-index: 20; background: var(--mq-text); color: var(--mq-surface); border-radius: var(--mq-radius); }
-.mq-window  { z-index: 30; }
+.mq-pop {
+  z-index: 10;
+  background: var(--mq-surface);
+  border: var(--mq-border) solid var(--mq-rule-strong);
+  border-radius: var(--mq-radius);
+  box-shadow: var(--mq-shadow-overlay);
+}
+.mq-tip {
+  z-index: 20;
+  background: var(--mq-text);
+  color: var(--mq-surface);
+  border-radius: var(--mq-radius);
+}
+.mq-window {
+  z-index: 30;
+}
 
 /* Glyphs. No icon font. Status is a word (NEEDS YOU, REPORTED), never a
    symbol. The arrow is drawn in CSS — the OCR-B binary transposes U+2190
    and U+2192, so a typed arrow in the mark font renders backwards. § and ·
    are typed in the body font.                                               */
-.mq-arrow { display: inline-block; width: 1.6em; height: 2px; background: var(--mq-act-ink); position: relative; vertical-align: middle; }
-.mq-arrow::after { content: ""; position: absolute; right: -1px; top: -4px; width: 8px; height: 8px;
-                   border-top: 2px solid var(--mq-act-ink); border-right: 2px solid var(--mq-act-ink); transform: rotate(45deg); }
+.mq-arrow {
+  display: inline-block;
+  width: 1.6em;
+  height: 2px;
+  background: var(--mq-act-ink);
+  position: relative;
+  vertical-align: middle;
+}
+.mq-arrow::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid var(--mq-act-ink);
+  border-right: 2px solid var(--mq-act-ink);
+  transform: rotate(45deg);
+}
 
 /* Print. Light theme, no fills, no shadows; the shapes and the words carry
    everything. A printed receipt is the audit's human form.                 */
 @media print {
-  .mq, [data-mq-theme] { --mq-ground: #fff; --mq-surface: #fff; --mq-surface-sunken: #fff;
-       --mq-text: #000; --mq-text-muted: #333; --mq-rule: #999; --mq-rule-strong: #000;
-       --mq-act-ink: #000; --mq-attn-ink: #000; --mq-act-tint: transparent; --mq-attn-tint: transparent;
-       --mq-shadow-overlay: none; }
-  .mq-btn, .mq-tip { display: none; }
-  .mq-mark.stacked .mq-l { display: block; }
+  .mq,
+  [data-mq-theme] {
+    --mq-ground: #fff;
+    --mq-surface: #fff;
+    --mq-surface-sunken: #fff;
+    --mq-text: #000;
+    --mq-text-muted: #333;
+    --mq-rule: #999;
+    --mq-rule-strong: #000;
+    --mq-act-ink: #000;
+    --mq-attn-ink: #000;
+    --mq-act-tint: transparent;
+    --mq-attn-tint: transparent;
+    --mq-shadow-overlay: none;
+  }
+  .mq-btn,
+  .mq-tip {
+    display: none;
+  }
+  .mq-mark.stacked .mq-l {
+    display: block;
+  }
 }
 
 /* Forced colours (Windows contrast themes). Fills go away; the shapes stay.
@@ -367,21 +645,51 @@
    alone, and the stamp becomes outlined text — which is why the stamp also
    says NEEDS YOU in words.                                                   */
 @media (forced-colors: active) {
-  .mq { --mq-ground: Canvas; --mq-surface: Canvas; --mq-surface-sunken: Canvas;
-        --mq-text: CanvasText; --mq-text-muted: CanvasText;
-        --mq-rule: CanvasText; --mq-rule-strong: CanvasText;
-        --mq-act: ButtonFace; --mq-act-ink: LinkText; --mq-act-on: ButtonText; --mq-act-tint: transparent;
-        --mq-attn: ButtonFace; --mq-attn-ink: CanvasText; --mq-attn-on: ButtonText; --mq-attn-tint: transparent;
-        --mq-error-ink: CanvasText; --mq-focus: Highlight; --mq-shadow-overlay: none; }
-  .mq-card, .mq-card.must-act, .mq-card.can-act, .mq-card.absent, .mq-opt { forced-color-adjust: none; }
-  .mq-mark { forced-color-adjust: auto; }
+  .mq {
+    --mq-ground: Canvas;
+    --mq-surface: Canvas;
+    --mq-surface-sunken: Canvas;
+    --mq-text: CanvasText;
+    --mq-text-muted: CanvasText;
+    --mq-rule: CanvasText;
+    --mq-rule-strong: CanvasText;
+    --mq-act: ButtonFace;
+    --mq-act-ink: LinkText;
+    --mq-act-on: ButtonText;
+    --mq-act-tint: transparent;
+    --mq-attn: ButtonFace;
+    --mq-attn-ink: CanvasText;
+    --mq-attn-on: ButtonText;
+    --mq-attn-tint: transparent;
+    --mq-error-ink: CanvasText;
+    --mq-focus: Highlight;
+    --mq-shadow-overlay: none;
+  }
+  .mq-card,
+  .mq-card.must-act,
+  .mq-card.can-act,
+  .mq-card.absent,
+  .mq-opt {
+    forced-color-adjust: none;
+  }
+  .mq-mark {
+    forced-color-adjust: auto;
+  }
   /* An inverted fill loses to the text backplate; the tip becomes an outlined box. */
-  .mq-tip { background: Canvas; color: CanvasText; border: 1px solid CanvasText; }
+  .mq-tip {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mq { --mq-duration: 0ms; }
-  .mq-btn:active { transform: none; }
+  .mq {
+    --mq-duration: 0ms;
+  }
+  .mq-btn:active {
+    transform: none;
+  }
 }
 
 /* ── What the kit does at mount (mq.theme.check), stated here so the CSS
