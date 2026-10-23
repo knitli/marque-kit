@@ -61,7 +61,7 @@
 .mq-field.bad input { border-color: var(--mq-error-ink); }
 
 /* ── The pane ───────────────────────────────────────────────────────────── */
-.mq-pane  { display: flex; flex-direction: column; gap: calc(var(--mq-unit) * 3.5); padding: calc(var(--mq-unit) * 3); }
+.mq-pane  { background: var(--mq-ground); display: flex; flex-direction: column; gap: calc(var(--mq-unit) * 3.5); padding: calc(var(--mq-unit) * 3); }
 .mq-pane-head { display: flex; justify-content: space-between; align-items: center; gap: calc(var(--mq-unit) * 2);
             padding-bottom: calc(var(--mq-unit) * 2.5); border-bottom: var(--mq-border) solid var(--mq-rule-strong); flex-wrap: wrap; }
 .mq-brand { font-family: var(--mq-font-mark), ui-monospace, monospace; font-size: var(--mq-size-md); letter-spacing: .04em; color: var(--mq-text); }
@@ -183,12 +183,14 @@
 .mq-manual p { margin: 0 0 10px; }
 .mq-manual ul { margin: 0 0 10px; padding-left: 20px; }
 .mq-manual li { margin: 0 0 6px; }
+.mq-manual table { border-collapse: collapse; margin: 0 0 10px; }
+.mq-manual td { border: 1px solid var(--mq-rule); padding: 4px 6px; vertical-align: top; }
 .mq-manual mark { background: var(--mq-attn-tint); color: inherit; padding: 0 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 .mq-manual .pg { font-family: var(--mq-font-mark), ui-monospace, monospace; font-size: var(--mq-size-xs); letter-spacing: .08em; color: var(--mq-text-muted); text-transform: uppercase; }
 .mq-float { position: fixed; }
 .mq-float.pop { box-shadow: var(--mq-shadow-overlay); max-height: calc(100vh - 48px); overflow: auto; }
 .mq-float.window { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); box-shadow: var(--mq-shadow-overlay); }
-.mq-tip.mq-float { display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
+.mq-tip.mq-float { display: flex; flex-direction: column; gap: 4px; }
 .mq-tip .mq-src { color: inherit; }
 .mq-close { font-family: var(--mq-font-body); font-size: var(--mq-size-sm); font-weight: 600; color: var(--mq-act-ink); background: transparent; border: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 

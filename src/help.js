@@ -24,6 +24,7 @@
  */
 
 import { render as mark } from './marking.js';
+import { decision } from './state.js';
 
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -121,6 +122,9 @@ export function explain(code, vocab, host = {}) {
   return p;
 }
 
+/** The person's own answer stands on this finding, live or already written. */
+const answered = (f) => decision(f)?.value != null;
+
 /** Tier 2 for a finding: the rule in plain words, the manual's sentence, the
  *  citation with a way in, and only then what overriding costs, if it can be. */
 export function why(f, host = {}, rung = null) {
@@ -137,11 +141,13 @@ export function why(f, host = {}, rung = null) {
   // The ISM caveat, when present, must show.
   if (f.says.caveat) p.append(el('p', 'mq-p', f.says.caveat));
   if (rung === 'advisory' && f.outcome?.kind === 'chosen_over' && f.outcome.readings?.length) {
-    p.append(el('p', 'mq-keep', 'Both readings are ones you wrote. Choosing between them is yours, and neither is recorded as an override.'));
-  } else if ((rung === 'noticeable' || rung === 'quiet') && f.marking?.as_written && f.person?.value == null && !f.overridden) {
+    p.append(el('p', 'mq-keep', 'Both readings are ones you wrote. Choosing between them is yours, and neither is recorded as an override. Keeping the marking as written, with neither, is an override and is reported.'));
+  } else if ((rung === 'noticeable' || rung === 'quiet') && f.outcome?.kind === 'applied' && f.marking?.as_written && !answered(f) && !f.overridden) {
     // Only Marque's own fix can be overridden: never a person's answer, and never a mark nobody wrote.
     const k = el('div', 'mq-keep');
-    k.append(button('ghost', 'Keep it as written', () => host.onAct?.(f, 'kept_as_written')), ' Marque still reports it in the audit.');
+    // Recorded once: the popover closes first, so the button can't record it again
+    // and focus is back in the pane before it redraws.
+    k.append(button('ghost', 'Keep it as written', () => { p.dispatchEvent(new Event('mq-close', { bubbles: true })); host.onAct?.(f, 'kept_as_written'); }), ' Marque still reports it in the audit.');
     p.append(k);
   }
   return p;
@@ -157,19 +163,33 @@ function manualBlocks(text) {
   const out = [];
   let para = null, list = null;
   const inline = (node, s) => {
-    for (const part of flat(s).split(/(\*\*[^*]+\*\*|\*[^*]+\*)/)) {
+    // The manual's tables carry <b> and <br>; built as nodes, never parsed as HTML.
+    for (const part of flat(s).split(/(<b>.*?<\/b>|<br\s*\/?>|\*\*[^*]+\*\*|\*[^*]+\*)/)) {
       if (!part) continue;
-      if (part.startsWith('**')) node.append(el('b', null, part.slice(2, -2)));
+      if (part.startsWith('<br')) node.append(el('br'));
+      else if (part.startsWith('<b>')) node.append(el('b', null, part.slice(3, -4)));
+      else if (part.startsWith('**')) node.append(el('b', null, part.slice(2, -2)));
       else if (part.startsWith('*')) node.append(el('i', null, part.slice(1, -1)));
       else node.append(part);
     }
   };
-  const close = () => { para = null; list = null; };
+  let table = null;
+  const close = () => { para = null; list = null; table = null; };
   for (const line of text.split('\n')) {
     let m;
     if ((m = line.match(/^\s*begin page (\d+)/))) { close(); out.push(el('div', 'pg', `page ${m[1]}`)); continue; }
     if (/^\s*end page \d+/.test(line) || /^\s*---\s*$/.test(line)) { close(); continue; }
     if (!line.trim()) { close(); continue; }
+    if (/^\s*\|/.test(line)) {
+      para = null; list = null;
+      const cells = line.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+      if (cells.every((c) => /^[-:]*$/.test(c))) continue; // the rule under the header, or an empty header
+      if (!table) { table = el('table'); out.push(table); }
+      const tr = el('tr');
+      for (const c of cells) { const td = el('td'); inline(td, c); tr.append(td); }
+      table.append(tr); continue;
+    }
+    table = null;
     if ((m = line.match(/^#{1,6}\s+(.*)/))) { close(); const h = el('h4'); inline(h, m[1]); out.push(h); continue; }
     if ((m = line.match(/^\s*[-*]\s+(.*)/))) {
       para = null;
@@ -221,8 +241,10 @@ export function passage(c, manual, host = {}, { plain } = {}) {
   doc.append(...manualBlocks(s.text));
   body.append(doc);
   // Land on the quote: each fragment between ellipses, wherever it sits.
-  const frags = (c.short || '').split('…').map(flat).filter(Boolean);
-  const blocks = [...doc.querySelectorAll('p, li, h4')];
+  // Matched against the rendered text, so the quote loses the same markup the manual does.
+  const bare = (t) => flat(t.replace(/<br\s*\/?>|<\/?b>/g, '').replace(/\*\*([^*]+)\*\*|\*([^*]+)\*/g, '$1$2'));
+  const frags = (c.short || '').split('…').map(bare).filter(Boolean);
+  const blocks = [...doc.querySelectorAll('p, li, h4, td, th')];
   for (const fr of frags) {
     for (const b of blocks) {
       const t = b.textContent, i = t.indexOf(fr);
@@ -237,6 +259,7 @@ export function passage(c, manual, host = {}, { plain } = {}) {
 
 /* ── C13 · vocabulary lookup ─────────────────────────────────────────── */
 function distance(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 3; // only 2 or less is used: a long paste never builds the matrix
   const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
   for (let j = 1; j <= b.length; j++) d[0][j] = j;
   for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
@@ -348,27 +371,42 @@ function onEsc(e) {
  * closes on a click outside; kind 'window' sits beside the pane and stays
  * open while the person works. Neither is modal. Returns close().
  */
+/** Put a fixed overlay at viewport `x`, `y`. A `.mq` root is a container, and a
+ *  container holds its fixed children, so their origin is measured, not assumed. */
+function place(n, x, y) {
+  n.style.left = n.style.top = '0px';
+  const o = n.getBoundingClientRect();
+  n.style.left = `${x - o.left}px`; n.style.top = `${y - o.top}px`;
+}
+
+/** Close every overlay inside `node`, through its own close path: a mount being destroyed takes its overlays with it. */
+export function closeWithin(node, { windows = true } = {}) {
+  // A window (the manual, a lookup) isn't tied to a finding: a redraw leaves it open with `windows: false`.
+  for (const e of [...stack].reverse()) if (node.contains(e.content) && (windows || e.kind !== 'window')) e.close();
+}
+
 export function float(content, anchor, { kind = 'pop', onClose } = {}) {
-  const root = anchor?.closest?.('.mq') || document.querySelector('.mq') || document.body;
+  // The pane's own mount first, so its overlays go when it does; then the kit root.
+  const root = anchor?.closest?.('.mq-mount, .mq') || document.querySelector('.mq') || document.body;
   content.classList.add('mq-float', kind);
   if (!content.hasAttribute('role')) content.setAttribute('role', 'dialog'); // non-modal: no aria-modal
   root.append(content);
   const r = anchor?.getBoundingClientRect?.();
   const vw = document.documentElement.clientWidth;
   if (kind === 'pop' && r) {
-    content.style.top = `${Math.min(r.bottom + 6, innerHeight - content.offsetHeight - 8)}px`;
-    content.style.left = `${Math.max(8, Math.min(r.left, vw - content.offsetWidth - 8))}px`;
+    place(content, Math.max(8, Math.min(r.left, vw - content.offsetWidth - 8)), Math.min(r.bottom + 6, innerHeight - content.offsetHeight - 8));
   } else {
     // Beside the pane where there's room; over the page where there isn't. Never over the pane.
     const pane = (anchor?.closest?.('.mq-pane') || root.querySelector('.mq-pane'))?.getBoundingClientRect();
-    const room = pane ? pane.left - 32 : 0;
-    content.style.top = '24px';
-    if (room >= 520) content.style.right = `${vw - pane.left + 16}px`;
-    else content.style.left = '16px';
+    const need = content.offsetWidth + 32;
+    const x = pane && pane.left >= need ? pane.left - 16 - content.offsetWidth
+      : pane && vw - pane.right >= need ? pane.right + 16 : 16;
+    place(content, x, 24);
   }
   const back = document.activeElement;
   const outside = (e) => { if (!content.contains(e.target) && e.target !== anchor) close(); };
-  const entry = { close };
+  const entry = { close, content, kind };
+  content.addEventListener('mq-close', close); // content asks to close itself after an act
   function close() {
     const i = stack.indexOf(entry); if (i < 0) return;
     stack.splice(i, 1);
@@ -379,7 +417,8 @@ export function float(content, anchor, { kind = 'pop', onClose } = {}) {
   }
   stack.push(entry);
   if (!escBound) { document.addEventListener('keydown', onEsc, true); escBound = true; }
-  if (kind === 'pop') setTimeout(() => document.addEventListener('pointerdown', outside, true));
+  // Not if it closed before the timer ran: the listener would outlive it.
+  if (kind === 'pop') setTimeout(() => { if (stack.includes(entry)) document.addEventListener('pointerdown', outside, true); });
   const first = content.querySelector('button, a[href], input, summary, [tabindex]');
   content.tabIndex = -1;
   (kind === 'window' ? content.querySelector('input') || content : first || content).focus({ preventScroll: true });
@@ -397,31 +436,47 @@ export function float(content, anchor, { kind = 'pop', onClose } = {}) {
 export function tips(root, vocab, host = {}) {
   let timer = null, shown = null;
   const id = `mq-tip-${Math.random().toString(36).slice(2, 8)}`;
-  const hide = () => { clearTimeout(timer); if (shown) { shown.tok.removeAttribute('aria-describedby'); shown.t.remove(); shown = null; } };
+  // Hoverable (WCAG 1.4.13): leaving the token gives the pointer a moment to reach the tip, and the tip keeps itself open.
+  let leaving = null;
+  const stay = () => clearTimeout(leaving);
+  const leave = () => { clearTimeout(leaving); leaving = setTimeout(hide, 300); };
+  const hide = () => { clearTimeout(timer); clearTimeout(leaving); if (shown) { shown.tok.removeAttribute('aria-describedby'); shown.t.remove(); shown = null; } };
   const show = (tok) => {
     hide();
+    if (!root.contains(tok)) return; // redrawn while the tip waited: nothing to point at
     const t = tip(tok.dataset.help, vocab); if (!t) return;
     t.id = id; t.classList.add('mq-float');
     // Inside the token's landmark, so a screen reader finds it where the token is.
     (tok.closest('[role=dialog], main, aside, section') || tok.closest('.mq') || document.body).append(t);
     const r = tok.closest('.mq-mark')?.getBoundingClientRect() || tok.getBoundingClientRect();
     const vw = document.documentElement.clientWidth;
-    t.style.top = `${r.bottom + 6}px`;
-    t.style.left = `${Math.max(8, Math.min(tok.getBoundingClientRect().left, vw - t.offsetWidth - 8))}px`;
+    // Below the marking, or above it when there's no room below.
+    const vh = document.documentElement.clientHeight;
+    place(t, Math.max(8, Math.min(tok.getBoundingClientRect().left, vw - t.offsetWidth - 8)), r.bottom + 6 + t.offsetHeight > vh - 8 ? Math.max(8, r.top - 6 - t.offsetHeight) : r.bottom + 6);
+    t.addEventListener('pointerenter', stay); t.addEventListener('pointerleave', leave);
     tok.setAttribute('aria-describedby', id);
     shown = { tok, t };
   };
-  const tokOf = (e) => e.target.closest?.('.mq-tok');
-  const over = (e) => { const t = tokOf(e); if (t) { clearTimeout(timer); timer = setTimeout(() => show(t), 300); } };
-  const out = (e) => { if (tokOf(e)) hide(); };
+  // Only a marking's code opens a dialog; a country or group keeps to its tooltip. Said before it's reached.
+  const popup = (t) => { if (t && entry(vocab, t.dataset.help)?.kind === 'marking') t.setAttribute('aria-haspopup', 'dialog'); return t; };
+  const tokOf = (e) => popup(e.target.closest?.('.mq-tok'));
+  const over = (e) => { const t = tokOf(e); if (!t) return; if (shown?.tok === t) return stay(); clearTimeout(timer); timer = setTimeout(() => show(t), 300); };
+  const out = (e) => { if (!tokOf(e)) return; clearTimeout(timer); if (shown) leave(); };
+  const blur = (e) => { if (tokOf(e)) hide(); };
   const focus = (e) => { const t = tokOf(e); if (t) show(t); };
   const key = (e) => {
     const t = tokOf(e); if (!t) return;
     if (e.key === 'Escape' && shown) { e.stopPropagation(); hide(); }
-    if (e.key === 'Enter') { e.preventDefault(); hide(); host.onHelp?.({ kind: 'token', code: t.dataset.help, anchor: t }); }
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); deeper(t); } // a button takes both
   };
-  const click = (e) => { const t = tokOf(e); if (t) { hide(); host.onHelp?.({ kind: 'token', code: t.dataset.help, anchor: t }); } };
-  const on = [['pointerover', over], ['pointerout', out], ['focusin', focus], ['focusout', out], ['keydown', key], ['click', click]];
+  // Countries and groups are tier 1 only: activating one keeps its tooltip rather than asking for nothing.
+  const deeper = (t) => {
+    if (entry(vocab, t.dataset.help)?.kind !== 'marking') return show(t);
+    hide(); host.onHelp?.({ kind: 'token', code: t.dataset.help, anchor: t });
+  };
+  // A token inside a reading's label opens help, never picks the reading.
+  const click = (e) => { const t = tokOf(e); if (t) { e.preventDefault(); e.stopPropagation(); deeper(t); } };
+  const on = [['pointerover', over], ['pointerout', out], ['focusin', focus], ['focusout', blur], ['keydown', key], ['click', click]];
   on.forEach(([k, fn]) => root.addEventListener(k, fn));
   return () => { hide(); on.forEach(([k, fn]) => root.removeEventListener(k, fn)); };
 }

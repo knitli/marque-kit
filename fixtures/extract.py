@@ -26,7 +26,8 @@ def read_csv(name):
 tetra_codes = {r['Value'] for r in read_csv('CVEnumISMCATTetragraph.csv')}
 relto = read_csv('CVEnumISMCATRelTo.csv')
 names = {r['Value']: r['Description'] for r in relto}
-trigraphs = [{'code': r['Value'], 'name': r['Description']} for r in relto if re.fullmatch(r'[A-Z]{3}', r['Value'])]
+# A three-letter group (NSG) is a tetragraph-list value, not a country.
+trigraphs = [{'code': r['Value'], 'name': r['Description']} for r in relto if re.fullmatch(r'[A-Z]{3}', r['Value']) and r['Value'] not in tetra_codes]
 
 ns = {'ism': 'urn:us:gov:ic:ism'}
 tetragraphs = []

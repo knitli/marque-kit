@@ -45,7 +45,7 @@
 <script type="module">
 import { render as mark, settle } from '../src/marking.js';
 import { mount, gate, receipt, derivation, markClass } from '../src/render.js';
-import { why, explain, passage, lookup, float } from '../src/help.js';
+import { why, explain, passage, lookup, float, tips } from '../src/help.js';
 import { docView } from '../src/state.js';
 
 const $ = (s) => document.querySelector(s);
@@ -60,18 +60,25 @@ const dec = new TextDecoder();
    (src/state.js) and hands each one here; a real host persists the state,
    applies the edit, re-lints and calls p.update({ doc }). There is no engine
    here, so the stand-in re-lint is the kit's own overlay on the fixture. */
-const strip = ({ person, history, ...x }) => x;
+const strip = ({ person, history, applying, ...x }) => (applying ? { ...x, state: x.state === 'present_not_required' ? 'absent_not_required' : 'present' } : x);
+// A written answer is applied, as the engine would report it.
+const written = (x) => (x.asked ? { ...strip(x), outcome: { ...x.outcome, kind: 'applied' } } : strip(x));
+// Each lint starts from the document as the last one left it, as a real re-lint reads the edited file.
+let applied = doc;
 const relint = (s) => {
-  const v = docView(doc, { ...s, linted: 0 });
-  return { ...v, findings: v.findings.map(strip), document: { ...v.document, artifacts: v.document.artifacts.map(strip), pending: [] } };
+  const v = docView(applied, s);
+  // What blocks is what still needs a person and blocks finalize: an answer taken back blocks again.
+  const blocking = [...v.findings, ...v.document.artifacts].filter((x) => x.needs_person === 'required' && x.blocks !== 'never').map((x) => x.id);
+  applied = { ...v, findings: v.findings.map(written), document: { ...v.document, artifacts: v.document.artifacts.map(strip), blocking, pending: [], withdrawn: [] } };
+  return applied;
 };
 const p = mount($('#pane'), {
   doc,
   vocab,
   onLookup(anchor) { openLookup(anchor); },
   onChange(s, act) {
-    if (!act) return; // only the seen list moved
-    if (!$('#ro').checked) p.update({ doc: relint(s) }); // read-only: answers wait
+    // Only the seen list moved: nothing to relint, but the page's marks follow the pane.
+    if (act && !$('#ro').checked) p.update({ doc: relint(s) }); // read-only: answers wait
     draw();
   },
   onHelp(req) { help(req); },
@@ -139,6 +146,7 @@ function help(req) {
   }
   if (req.kind === 'derivation') {
     const box = Object.assign(document.createElement('div'), { className: 'mq-pop' });
+    box.setAttribute('aria-label', 'How Marque got here'); // the dialog's name, as its heading says
     box.append(Object.assign(document.createElement('div'), { className: 'mq-h', textContent: 'How Marque got here' }), derivation(req.artifact, p.view(), h));
     tier2?.(); tier2 = float(box, req.anchor, { onClose: () => { tier2 = null; } });
     return;
@@ -179,8 +187,10 @@ function setMoment(m) { $('#moment').value = m; p.update({ moment: m }); draw();
 $('#theme').addEventListener('change', (e) => { if (e.target.value) document.body.dataset.mqTheme = e.target.value; else delete document.body.dataset.mqTheme; });
 $('#moment').addEventListener('change', (e) => setMoment(e.target.value));
 $('#engine').addEventListener('change', (e) => p.update({ engine: e.target.value }));
-$('#ro').addEventListener('change', (e) => p.update({ readOnly: e.target.checked }));
+// Leaving read-only writes the answers that waited.
+$('#ro').addEventListener('change', (e) => { p.update(e.target.checked ? { readOnly: true } : { readOnly: false, doc: relint(p.state) }); draw(); });
 $('#finalize').addEventListener('click', () => p.host.onGate());
+tips($('#gate'), vocab, p.host); // the gate renders outside the pane
 draw();
 </script>
 </body>

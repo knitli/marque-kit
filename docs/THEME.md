@@ -163,7 +163,7 @@ yes
 --mq-text-muted
 the "was", reasons, labels, citations at rest
 #5c655e
-#98a39a
+#a3ada4
 yes
 Rules
 --mq-rule

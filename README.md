@@ -21,6 +21,7 @@ src/render.js      finding JSON → DOM: rung(), markClass(), card(), row(), pan
                    derivation(), receipt(), and mount(): the pane wired to the kit's state, the one call a host needs
 src/help.js        help in three tiers (tooltip, Why?, the manual section) and the vocabulary lookup;
                    writes no help text of its own, it renders the engine's
+src/theme.js       the theme gate at mount: contrast and size floors, falling back to shipped values
 src/state.js       the kit's half of the ladder: what the person did (answered, changed, kept as written,
                    deferred, declined), keyed by finding id, append-only, plain JSON the host persists
 fixtures/memo.txt            a six-paragraph memo with five things wrong
@@ -46,11 +47,12 @@ A host mounts the pane and listens:
 ```js
 import { mount } from '@marque/kit';
 const p = mount(el, { doc, state, vocab, moment: 'editing', onChange: (state, act) => save(state), onHelp, onJump });
-p.update({ doc });              // after a re-lint
+p.update({ doc });              // after a re-lint; async hosts add { linted: n, seq }
 p.update({ moment: 'finalize' }); // the host's moment; the kit never guesses it
+p.destroy();                    // when the pane goes away
 ```
 
-`act` is null when only the seen list changed. An answer shows on its card at once but stays in `document.pending`, and the document is not ready, until the host applies it, re-lints and calls `p.update({ doc })`. `@marque/kit/help` has what a host needs to answer `onHelp` and `onLookup`.
+`act` is null when only the seen list changed. An answer shows on its card at once but stays in `document.pending`, and the document is not ready, until the host applies it, re-lints and calls `p.update({ doc })`. `@marque/kit/help` has what a host needs to answer `onHelp` and `onLookup`. At mount the kit measures the host's `--mq-*` tokens against the contrast and size floors (`@marque/kit/theme`); a failing token falls back to the shipped value, and the report is `p.theme` and `onTheme(report)`. Under forced colours the system palette stands and only sizes and the mark font are measured. When the room the host gives the pane is under 240px, the report says `narrow: true` and the kit shows rows only: opening one calls `onOpen(f)` for the host to show it its own way.
 
 The demo is static files over any HTTP server; it needs one only because ES modules won't load from `file://`.
 

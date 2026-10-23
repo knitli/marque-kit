@@ -72,9 +72,38 @@ export function parse(text) {
  *  into { text, layers:[{tokens:[{t, help?}]}], masks:[] }. */
 export function normalise(marking) {
   if (typeof marking === 'string') return parse(marking);
-  if (marking && marking.layers) return marking;
-  if (marking && marking.text) return parse(marking.text);
+  if (marking && marking.layers) return conceal(marking);
+  if (marking && marking.text) return conceal({ ...parse(marking.text), masks: marking.masks || [] });
   throw new TypeError('marking must be a string or {text, layers}');
+}
+
+/** A mask given as a span ([start, end) in UTF-8 bytes of `text`, as every span is) covers bytes the tokens
+ *  may still carry: those bytes go, in what is drawn, said and copied, and the mask stands where they were
+ *  (a `{ t: '', mask }` token); the rest of a token it cuts through stays. */
+const utf8 = new TextEncoder(), utf8d = new TextDecoder();
+function conceal(m) {
+  const spans = (m.masks || []).filter((k) => Array.isArray(k.span)).sort((x, y) => x.span[0] - y.span[0]);
+  if (!spans.length) return m;
+  const placed = new Set();
+  let at = 0;
+  const layers = m.layers.map((l) => ({ ...l, tokens: l.tokens.flatMap((tok) => {
+    const b = utf8.encode(tok.t), s = at, e = (at += b.length);
+    const over = spans.filter((k) => k.span[0] < e && s < k.span[1]);
+    if (!over.length) return [tok];
+    const out = [];
+    let c = s;
+    for (const k of over) {
+      if (k.span[0] > c) out.push({ ...tok, t: utf8d.decode(b.slice(c - s, k.span[0] - s)) });
+      if (!placed.has(k)) { placed.add(k); out.push({ t: '', mask: { ...k, len: k.len ?? k.span[1] - k.span[0] } }); }
+      c = Math.max(c, k.span[1]);
+    }
+    if (c < e) out.push({ ...tok, t: utf8d.decode(b.slice(c - s)) });
+    return out;
+  }) }));
+  const masks = m.masks.filter((k) => !Array.isArray(k.span)); // the rest are drawn at their layer's end
+  const b = [...spans].sort((x, y) => y.span[0] - x.span[0]).reduce((t, k) => [...t.slice(0, k.span[0]), ...t.slice(k.span[1])], [...utf8.encode(m.text)]);
+  const text = utf8d.decode(new Uint8Array(b));
+  return { ...m, text, layers, masks };
 }
 
 function el(tag, cls, text) {
@@ -103,9 +132,11 @@ export function render(marking, o = {}) {
   const root = el('span', 'mq-mark');
   if (o.state) root.classList.add(o.state);
   if (o.size && o.size !== 'sm') root.classList.add(o.size);
-  if (o.stacked) root.classList.add('stacked');
+  if (o.stacked) { root.classList.add('stacked'); root.dataset.stack = 'fixed'; }
   root.setAttribute('dir', 'ltr');
   root.dataset.text = m.text;
+  // Read out as words, not slashes: a labelled group, so its help tokens are still reachable inside.
+  root.setAttribute('role', 'group'); root.setAttribute('aria-label', spoken(m, o.vocab)); models.set(root, m);
   if (o.form === 'summary') return summary(m, root);
   m.layers.forEach((layer, li) => {
     if (li > 0) root.appendChild(document.createElement('wbr'));
@@ -121,10 +152,13 @@ export function render(marking, o = {}) {
     }
     shown.forEach((t, i) => {
       if (i > 0) L.appendChild(document.createElement('wbr'));
+      if (t.mask) { L.appendChild(maskEl(t.mask)); return; }
       const text = (hidden.length && i === shown.length - 1) ? t.t.replace(/[, ]+$/, '') : t.t;
       const span = el('span', 'mq-i', text);
       const help = t.help || (o.help?.includes(bare(t.t)) ? bare(t.t) : null);
-      if (help) { span.classList.add('mq-tok'); span.tabIndex = 0; span.dataset.help = help; }
+      // Enter opens its help: a button, to a screen reader too. Whether it opens a dialog
+      // depends on the vocabulary, so tips() says that.
+      if (help) { span.classList.add('mq-tok'); span.tabIndex = 0; span.dataset.help = help; span.setAttribute('role', 'button'); }
       L.appendChild(span);
     });
     if (hidden.length) {
@@ -140,23 +174,30 @@ export function render(marking, o = {}) {
     root.appendChild(L);
   });
   // masks: typed regions from the engine (knitli/marque-dev#2634)
-  for (const mask of m.masks || []) {
-    const L = root.querySelectorAll('.mq-l')[mask.layer];
-    if (!L) continue;
-    const s = el('span', mask.kind === 'concealed' ? 'mq-conceal' : 'mq-mask',
-      (mask.kind === 'concealed' ? '█' : '_').repeat(mask.len));
-    s.tabIndex = 0;
-    s.title = mask.kind === 'concealed' ? 'Source concealed.' : `${mask.len} characters Marque couldn't identify.`;
-    L.appendChild(s);
-  }
+  for (const mask of m.masks || []) root.querySelectorAll('.mq-l')[mask.layer]?.appendChild(maskEl(mask));
   return root;
+}
+
+const chars = (n) => `${n} character${n === 1 ? '' : 's'}`;
+/** The marking as plain text with its masks drawn, never the bytes they cover: for a label that can't hold a marking. */
+export function masked(marking) {
+  const m = normalise(marking);
+  return m.layers.map((l, i) => l.tokens.map((t) => (t.mask ? glyphs(t.mask) : t.t)).join('')
+    + (m.masks || []).filter((k) => k.layer === i).map(glyphs).join('')).join('');
+}
+const glyphs = (mask) => (mask.kind === 'concealed' ? '█' : '_').repeat(mask.len);
+function maskEl(mask) {
+  const s = el('span', mask.kind === 'concealed' ? 'mq-conceal' : 'mq-mask', glyphs(mask));
+  s.tabIndex = 0;
+  s.title = mask.kind === 'concealed' ? 'Source concealed.' : `${chars(mask.len)} Marque couldn't identify.`;
+  return s;
 }
 
 function summary(m, root) {
   root.classList.add('summary');
   m.layers.forEach((layer, li) => {
     if (li > 0) root.appendChild(document.createElement('wbr'));
-    const toks = layer.tokens.map((t) => t.t);
+    const toks = layer.tokens.map((t) => (t.mask ? glyphs(t.mask) : t.t));
     const codes = toks.filter(isCode);
     const L = el('span', 'mq-l');
     if (codes.length > 5) {
@@ -177,6 +218,12 @@ function summary(m, root) {
  * it always wraps the same way (CSS alone wraps greedily and orphans `GBR)`).
  * Call once per render, and again on container resize if the host allows.
  */
+/** Measure again after the room changed: a marking stacked at one width may fit at another. */
+export function resettle(root) {
+  if (root.dataset.stack !== 'fixed') root.classList.remove('stacked');
+  return settle(root);
+}
+
 export function settle(root) {
   if (root.classList.contains('stacked') || root.classList.contains('summary')) return root;
   const one = root.getBoundingClientRect().height;
@@ -185,14 +232,34 @@ export function settle(root) {
   return root;
 }
 
+/** A code's words from the kit's vocabulary (help, trigraphs, tetragraphs), or a plain { code: words } map:
+ *  a country or group by its name, a marking by its banner form. */
+const word = (vocab, tok) => {
+  if (!vocab) return null;
+  if (typeof vocab[tok] === 'string') return vocab[tok];
+  const named = [...(vocab.trigraphs || []), ...(vocab.tetragraphs || [])].find((x) => x.code === tok)?.name;
+  const banner = vocab.help?.[tok]?.examples?.find((x) => x.kind === 'banner')?.form;
+  return named || (banner && banner !== tok ? banner : null);
+};
+// Each rendered marking keeps its model, so a pane can say its markings in its own vocabulary.
+const models = new WeakMap();
+/** Say every marking under `node` again with `vocab` (a mount's own). */
+export function relabel(node, vocab) {
+  for (const n of node.querySelectorAll('.mq-mark')) if (models.has(n)) n.setAttribute('aria-label', spoken(models.get(n), vocab));
+}
+
 /** Spoken form for assistive tech: "Secret, releasable to U-S-A and F-V-E-Y". */
 export function spoken(marking, vocab = {}) {
   const m = normalise(marking);
   const words = [];
-  for (const layer of m.layers) for (const { t } of layer.tokens) {
+  // Masks are said as what they are, never as what they cover: in place, or at the end for one given by layer.
+  const said = (mask) => (mask.kind === 'concealed' ? 'source concealed' : `${chars(mask.len)} not identified`);
+  for (const layer of m.layers) for (const { t, mask } of layer.tokens) {
+    if (mask) { words.push(said(mask)); continue; }
     const tok = bare(t);
     if (!tok) continue;
-    words.push(vocab[tok] || (/^[A-Z]{3,4}$/.test(tok) ? tok.split('').join('-') : tok));
+    words.push(word(vocab, tok) || (/^[A-Z]{3,4}$/.test(tok) ? tok.split('').join('-') : tok));
   }
+  for (const mask of m.masks || []) words.push(said(mask));
   return words.join(', ');
 }

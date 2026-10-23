@@ -94,7 +94,7 @@
   --mq-surface-sunken: #232a25;
 
   --mq-text: #dde4d8;
-  --mq-text-muted: #98a39a;
+  --mq-text-muted: #a3ada4;       /* 4.7:1 on a hovered row (act-tint over surface) */
 
   --mq-rule: #414a44;
   --mq-rule-strong: #76827a;       /* Knitli: #5a655d (2.05:1 on the card).
@@ -142,7 +142,7 @@
 @media (prefers-color-scheme: dark) {
   [data-mq-theme="auto"] {
     --mq-ground: #262d28; --mq-surface: #2e3630; --mq-surface-sunken: #232a25;
-    --mq-text: #dde4d8; --mq-text-muted: #98a39a;
+    --mq-text: #dde4d8; --mq-text-muted: #a3ada4;
     --mq-rule: #414a44; --mq-rule-strong: #76827a;
     --mq-act: #4464ad; --mq-act-ink: #9db2e0; --mq-act-on: #ffffff;
     --mq-act-tint: rgba(68,100,173,.18); --mq-act-hover: #5273bd;
@@ -161,6 +161,7 @@
       font-family: var(--mq-font-body); font-size: var(--mq-size-base); line-height: 1.5;
       container-type: inline-size; container-name: mq;
       -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+.mq-mount { container-type: inline-size; container-name: mq; }   /* each pane its own container */
 .mq *, .mq *::before, .mq *::after { box-sizing: border-box; min-width: 0; }
 
 /* ═══ 3 · FIT ═════════════════════════════════════════════════════════ */
@@ -273,6 +274,7 @@
 /* The floor. Below this the kit tells the host it cannot lay out a card
    and renders the collapsed row only.                                      */
 .mq { min-width: 240px; }
+.mq.mq-narrow { min-width: 0; }   /* under the floor: rows only, in the room the host gave */
 
 /* ═══ 4 · SHAPES ══════════════════════════════════════════════════════ */
 /* Colour rides along; the shape carries the meaning, so a colour-blind
@@ -389,10 +391,8 @@
    theme.rejected[{token, measured, floor}], and that token falls back to
    the shipped value for the active theme. The finding renders either way;
    it never renders unreadable.
-     text / surface ................ 4.5     attn-on / attn .............. 4.5
-     text-muted / surface .......... 4.5     attn-ink / surface .......... 4.5
-     act-ink / surface ............. 4.5     attn-ink / attn-tint ........ 4.5
-     act-on / act .................. 4.5     error-ink / surface ......... 4.5
-     act-ink / act-tint ............ 4.5     focus / surface ............. 3.0
-   Font floors: size-xs ≥ 12px, size-sm ≥ 13px; the mark font resolves to
-   a monospace or falls back to one. Width floor: the kit root ≥ 240px.    */
+   The pairs are PAIRS in src/theme.js: text 4.5, lines and focus 3.0.
+   test/theme.test.js reads this file and kit.css and fails on any pairing
+   they paint that is neither measured there nor excused with a reason.
+   Font floors: size-xs ≥ 12px, size-sm and size-md ≥ 13px; the mark font
+   resolves to a monospace or falls back to one. Width floor: 240px.       */
