@@ -76,9 +76,9 @@ Banner derived: `SECRET//FGI AUS GBR//NOFORN`, or `…//REL TO USA, GBR` if ¶5'
 
 ## Working here
 
-- `pnpm check` (format, lint, typecheck) and `pnpm test` (node runs the `.ts` tests as written) before a commit. `pnpm fix` formats. `pnpm build` writes `dist/`. `pnpm demo` to look. Markdown and the two extracted fixtures aren't formatted: a renumbered list changes what a doc says.
+- `pnpm check` (format, lint, typecheck) and `pnpm test` (node runs the `.ts` tests as written) before a commit. `pnpm fix` formats. `pnpm build` writes `dist/`. `pnpm demo` to look. Markdown and the two extracted fixtures aren't formatted: a renumbered list changes what a doc says. CI (`.github/workflows/ci.yml`) runs check, test and build on every PR and push to `main`.
 - Check contrast when a token changes: the pairs and floors are `PAIRS` and `SIZES` in `src/theme.ts`. AA 4.5 on text pairs, 3.0 on lines and focus. `test/theme.test.ts` fails when `kit.css` or `theme.css` paints a pairing that isn't measured there or excused in the test with a reason; a new colour use means deciding which.
 - The docs under `docs/` were extracted from the canvas on 21 Oct 2026 and are now the source. Edit them here; the canvas is history.
 - Engine gaps go to marque-dev as issues, labelled `ui-kit` (+ `engine`, `audit`, `office`, `capco/ism` as they apply), and get a row in `docs/ENGINE-ASKS.md`. The Linear triage agent assigns cluster and lineage.
 - Commits and PRs end with the attribution lines the session provides.
-- SPDX header on every file: `SPDX-FileCopyrightText: 2026 Knitli Inc.` / `SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense`.
+- SPDX header on every file: `SPDX-FileCopyrightText: 2026 Knitli Inc.` / `SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense`. A file that can't carry a comment (JSON, lockfiles, `memo.txt`) goes in `REUSE.toml`. CI runs `reuse lint`.
