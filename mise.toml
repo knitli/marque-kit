@@ -1,0 +1,45 @@
+[tools]
+node = "26"
+pnpm = "12.14"
+viteplus = "latest"
+python = "3.13"
+
+[settings]
+experimental = true
+lockfile = true
+lockfile_auto_prune = true
+gpg_verify = true
+pin = true
+slsa = true
+
+[settings.npm]
+package_manager = "pnpm"
+
+[settings.pypi]
+uvx = true
+
+[settings.skills]
+auto_sync = true
+
+[settings.task]
+run_auto_install = true
+
+[deps]
+pnpm = { auto = true, sources = [
+  "package.json",
+  "pnpm-lock.yaml",
+], run = "pnpm i -y" }
+
+[tasks]
+
+[tasks.fix]
+run = "vp check --fix"
+tools.viteplus = "latest"
+
+[tasks.check]
+run = "vp check"
+tools.viteplus = "latest"
+
+[tasks.fmt]
+run = "vp fmt --write"
+tools.viteplus = "latest"

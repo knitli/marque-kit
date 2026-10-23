@@ -9,3 +9,14 @@ dist/
 .DS_Store
 # screenshots and scratch from local runs
 /shots/
+.wrangler/
+.astro/
+.worktrees/
+# for stray npm and bun uses
+bun.lock
+package.lock
+.claude/worktrees
+.muse/
+.serena/
+.vitest/
+claudedocs/
