@@ -126,9 +126,10 @@ const pinned = new WeakMap();
 
 /** Put back what the host had on `root` before check() pinned fallbacks there. */
 export function release(root) {
-  for (const { t, ship, value, priority } of pinned.get(root) || []) {
+  for (const { t, ship, put = ship, value, priority } of pinned.get(root) || []) {
     const now = root.style.getPropertyValue(t);
-    if (!same(now, ship)) continue; // the host has set it again, or taken it away, since
+    // What the kit last put there, the print palette's value mid-print included, is still the kit's to take back.
+    if (!same(now, put)) continue; // the host has set it again, or taken it away, since
     if (value) root.style.setProperty(t, value, priority); else root.style.removeProperty(t);
   }
   pinned.delete(root);
@@ -240,10 +241,10 @@ export function watch(root, onTheme) {
   // takes the print palette's value (the screen fallback where print sets none), and the screen pins come back after.
   const printing = () => {
     const pal = printPalette();
-    for (const { t, ship } of pinned.get(root) || []) root.style.setProperty(t, pal[t] ?? ship, 'important');
+    for (const p of pinned.get(root) || []) root.style.setProperty(p.t, (p.put = pal[p.t] ?? p.ship), 'important');
     last = sig();
   };
-  const printed = () => { for (const { t, ship } of pinned.get(root) || []) root.style.setProperty(t, ship, 'important'); run(); };
+  const printed = () => { for (const p of pinned.get(root) || []) root.style.setProperty(p.t, (p.put = p.ship), 'important'); run(); };
   addEventListener('beforeprint', printing); addEventListener('afterprint', printed);
   // A host web font for marks may load after the first check measured its fallback: check again once it has.
   const fonts = document.fonts, loaded = () => { if (root.isConnected) run(); };

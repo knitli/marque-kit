@@ -32,8 +32,8 @@
  * engine's document as-is.
  */
 
-import { render as mark, settle, resettle, relabel } from './marking.js';
-import { empty, record, see, linted, snapshot, docView, decision, canon } from './state.js';
+import { render as mark, settle, resettle, relabel, masked } from './marking.js';
+import { empty, record, see, linted, snapshot, docView, decision, canon, face } from './state.js';
 import { cite, hasTip, tips, closeWithin } from './help.js';
 import { check, watch, release } from './theme.js';
 
@@ -149,10 +149,10 @@ function asks(f, host, r, help) {
   // Answer is never disabled: pressed with nothing chosen, it says what's missing (docs/COMPONENTS.md, C4).
   const err = el('div', 'err'); err.id = `${name}-err`; err.setAttribute('role', 'alert');
   // A typed marking has to look like one before it's written: capitals and marking punctuation,
-  // a portion in parentheses, a banner without.
+  // a portion in parentheses, a banner without, and a classification word in it, not punctuation alone.
   const shape = { portion: /^\([A-Z0-9/ ,_-]+\)$/, banner: /^[A-Z0-9/ ,_-]+$/ }[a.field?.format] || /^\(?[A-Z0-9/ ,_-]+\)?$/;
   const commit = () => {
-    if (chosen?.free && a.field?.type === 'marking' && !shape.test(chosen.free)) {
+    if (chosen?.free && a.field?.type === 'marking' && !(shape.test(chosen.free) && /[A-Z]/.test(chosen.free))) {
       fld.classList.add('bad');
       err.textContent = a.field.format === 'portion' ? 'That isn’t a portion marking. Type it in capitals, in parentheses, as it should appear.'
         : 'That isn’t a marking. Type it in capitals, as it should appear.';
@@ -705,13 +705,16 @@ export function receipt(doc, session = {}) {
   r.append(hd);
   // Each act with what was said and when, so a changed answer keeps the one it replaced.
   // A reading by its words and its marking: two readings can write the same marking.
-  const said = (v) => (v?.reading ? `${v.reading.result?.text ?? ''} (${v.reading.reading})`.trim() : null) ?? v?.free
+  const said = (v) => (v?.reading ? `${v.reading.result ? masked(v.reading.result) : ''} (${v.reading.reading})`.trim() : null) ?? v?.free
     ?? (v?.fields ? Object.entries(v.fields).map(([k, t]) => `${k.replace(/_/g, ' ')} ${t}`).join(', ') : '');
   // Typed notice content by its identity, so the receipt says which version was approved.
   const content = (c) => { try { return Object.entries(JSON.parse(c)).map(([k, v]) => `${k.replace(/_/g, ' ')} ${v}`).join(', '); } catch { return c; } };
+  // A snapshot's markings as drawn, masks and all: a concealed code never prints as text.
+  const result = (a) => (a?.result_marking ?? a?.result ? masked(a.result_marking ?? a.result) : '');
+  const written = (a) => (a.marking ?? a.as_written ? masked(a.marking ?? a.as_written) : '');
   const op = (e) => (e.act === 'changed' && e.value == null ? 'back to Marque\u2019s result'
-    : e.act === 'kept_as_written' ? (e.about?.result ? `instead of ${e.about.result}` : '')
-    : e.value?.apply ? `apply${e.about?.result ? ` ${e.about.result}` : e.about?.content ? ` ${content(e.about.content)}` : ''}` : e.value?.remove ? 'remove' : said(e.value));
+    : e.act === 'kept_as_written' ? (result(e.about) ? `instead of ${result(e.about)}` : '')
+    : e.value?.apply ? `apply${result(e.about) ? ` ${result(e.about)}` : e.about?.content ? ` ${content(e.about.content)}` : ''}` : e.value?.remove ? 'remove' : said(e.value));
   // An act taken on another rule or marking under this id says which, from its own snapshot.
   const about = (e, x) => {
     const rule = x.rule ? `${x.rule.scheme}:${x.rule.predicate}` : x.kind;
@@ -719,8 +722,9 @@ export function receipt(doc, session = {}) {
     // Taken at another paragraph or page under this id: the receipt says where it was.
     const was = 'anchor' in e.about ? where({ ...x, anchor: e.about.anchor }) : null;
     const at = was && was !== where(x) ? `at ${was}` : '';
-    if (e.about.rule && e.about.rule !== rule) return [`on ${e.about.rule}${e.about.as_written ? ` ${e.about.as_written}` : ''}`, at].filter(Boolean).join(' ');
-    return [e.about.as_written !== (x.marking?.as_written?.text ?? null) && e.about.as_written ? `asked of ${e.about.as_written}` : '', at].filter(Boolean).join(' ');
+    const asked = written(e.about);
+    if (e.about.rule && e.about.rule !== rule) return [`on ${e.about.rule}${asked ? ` ${asked}` : ''}`, at].filter(Boolean).join(' ');
+    return [asked && face(e.about.marking ?? e.about.as_written) !== face(x.marking?.as_written ?? null) ? `asked of ${asked}` : '', at].filter(Boolean).join(' ');
   };
   const acts = (x) => (x.history || []).map((e) => [e.act.replace(/_/g, ' '), op(e), about(e, x), e.at].filter(Boolean).join(' ')).join(' → ');
   for (const f of doc.findings) {

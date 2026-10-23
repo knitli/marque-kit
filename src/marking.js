@@ -179,6 +179,12 @@ export function render(marking, o = {}) {
 }
 
 const chars = (n) => `${n} character${n === 1 ? '' : 's'}`;
+/** The marking as plain text with its masks drawn, never the bytes they cover: for a label that can't hold a marking. */
+export function masked(marking) {
+  const m = normalise(marking);
+  return m.layers.map((l, i) => l.tokens.map((t) => (t.mask ? glyphs(t.mask) : t.t)).join('')
+    + (m.masks || []).filter((k) => k.layer === i).map(glyphs).join('')).join('');
+}
 const glyphs = (mask) => (mask.kind === 'concealed' ? '█' : '_').repeat(mask.len);
 function maskEl(mask) {
   const s = el('span', mask.kind === 'concealed' ? 'mq-conceal' : 'mq-mask', glyphs(mask));

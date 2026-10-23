@@ -463,5 +463,18 @@ for (const act of ['deferred', 'declined']) {
   assert.ok(fallback, 'the fixture has a fallback');
   assert.deepEqual(view(written, s).outcome.fallback, fallback);
 }
+// A mask added under the same text is another marking: an act taken on the unmasked one doesn't carry over.
+{
+  const p3 = f(P3);
+  const a = record(empty(), p3.id, 'answered', { reading: p3.outcome.readings[0] }, undefined, snapshot(p3));
+  const hid = { ...p3, marking: { ...p3.marking, as_written: { ...p3.marking.as_written, masks: [{ kind: 'concealed', span: [12, 15] }] } } };
+  assert.notEqual(view(p3, a).stale, true);
+  assert.equal(view(hid, a).stale, true);
+  const p2 = f(P2);
+  const k = record(empty(), P2, 'kept_as_written', null, undefined, snapshot(p2));
+  const res = { ...p2, outcome: { ...p2.outcome, result: { ...p2.outcome.result, masks: [{ kind: 'unidentified', span: [12, 13] }] } } };
+  assert.equal(view(p2, k).overridden, true);
+  assert.equal(view(res, k).overridden, undefined);
+}
 
 console.log('state: ok');

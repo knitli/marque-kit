@@ -46,6 +46,10 @@ export function record(state, id, act, value = null, at = new Date().toISOString
 /** What an act is about, kept with it: markings, rule and place, never body text. */
 /** A marking-valued derived value is a string or carries text; anything else is typed content, kept whole. */
 const textOf = (v) => (typeof v === 'string' ? v : typeof v?.text === 'string' ? v.text : null);
+/** A marking by what it shows: its text and its typed masks. A snapshot's bare text has none. */
+export const face = (m) => (m == null ? null : canon({ text: textOf(m), masks: m.masks ?? [] }));
+const sameAsWritten = (about, f) => face(about.marking ?? about.as_written) === face(f.marking?.as_written ?? null);
+const sameResult = (about, r) => face(about.result_marking ?? about.result) === face(r ?? null);
 const typed = (v) => (v && textOf(v) == null ? canon(v) : null);
 const ruleOf = (f) => (f.rule ? `${f.rule.scheme}:${f.rule.predicate}` : f.kind ?? null);
 export const snapshot = (f) => structuredClone({ // a record, not a view of a document that may change in place
@@ -53,6 +57,8 @@ export const snapshot = (f) => structuredClone({ // a record, not a view of a do
   as_written: f.marking?.as_written?.text ?? null, result: f.outcome?.result?.text ?? textOf(f.derived_value),
   // The marking whole, layers and typed masks with it, so the receipt redraws it masked.
   ...(f.marking?.as_written && { marking: f.marking.as_written }),
+  // The result whole too: a mask added under the same text is another marking.
+  ...((f.outcome?.result ?? (textOf(f.derived_value) != null ? f.derived_value : null)) && { result_marking: f.outcome?.result ?? f.derived_value }),
   // A typed derived value (a notice's content) isn't text: kept whole, so an apply is of this one.
   ...(typed(f.derived_value) && { content: typed(f.derived_value) }),
   // Where an artifact goes: an apply was approved for this place.
@@ -113,8 +119,8 @@ export const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'obje
 const moved = (e, f) => !!e.about
   // The whole question, not only its words: a new field type or format changes what an answer means.
   // Another rule under the same id is another finding, whatever it says.
-  && ((e.about.rule ?? null) !== ruleOf(f) || e.about.as_written !== (f.marking?.as_written?.text ?? null) || canon(e.about.asks ?? null) !== canon(f.asks ?? null)
-    || e.about.result !== (f.outcome?.result?.text ?? null)
+  && ((e.about.rule ?? null) !== ruleOf(f) || !sameAsWritten(e.about, f) || canon(e.about.asks ?? null) !== canon(f.asks ?? null)
+    || !sameResult(e.about, f.outcome?.result)
     // Another place is another finding; a span moves with edits above it, so only the paragraph or page counts.
     || ('anchor' in e.about && place(e.about.anchor) !== place(f.anchor)));
 const place = (a) => canon({ kind: a?.kind ?? null, portion: a?.portion ?? null, page: a?.page ?? null });
@@ -134,7 +140,7 @@ function answeredOn(state, f, e) {
   return back?.about?.outcome ? restore(f, back.about) : f;
 }
 /** An artifact op is stale once the artifact isn't the one it was taken on. */
-const staleOp = (e, a) => !!e.about && (e.about.state !== a.state || e.about.result !== textOf(a.derived_value)
+const staleOp = (e, a) => !!e.about && (e.about.state !== a.state || !sameResult(e.about, textOf(a.derived_value) != null ? a.derived_value : null)
   || (e.about.content ?? null) !== typed(a.derived_value)
   || ('placement' in e.about && (e.about.placement !== (a.placement ?? null) || e.about.scope !== (a.scope ?? null)))
   // A typed field is stale once the field is gone, asks for something else, or the lint now gives it another
@@ -204,7 +210,7 @@ function overlay(f, state, took) {
     }
     case 'kept_as_written':
       // The person kept one marking against one fix; a different one under the same id is open again.
-      if (e.about && ((e.about.rule ?? null) !== ruleOf(f) || e.about.as_written !== (f.marking?.as_written?.text ?? null) || e.about.result !== (f.outcome?.result?.text ?? null)
+      if (e.about && ((e.about.rule ?? null) !== ruleOf(f) || !sameAsWritten(e.about, f) || !sameResult(e.about, f.outcome?.result)
         || ('anchor' in e.about && place(e.about.anchor) !== place(f.anchor)))) return { ...v, person: null, stale: true };
       return { ...v, overridden: true, outcome: { ...f.outcome, kind: 'kept_as_written', result: f.marking?.as_written, readings: [] }, needs_person: 'none', blocks: 'never' };
     default: { // deferred, declined: still open, as the question a pending take-back reopened if there is one
