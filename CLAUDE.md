@@ -10,13 +10,13 @@ Guidance for working in this repo. The kit is the human-facing half of Marque; t
 
 ## What this is
 
-A UI kit for hosts that show Marque findings to a person: a web page, a Word or Outlook task pane, Marque's own surfaces. Plain CSS and ES modules, no framework, no build. `src/` is the kit; `docs/` is the design it implements; `fixtures/` is the memo every example uses; `demo/` renders it.
+A UI kit for hosts that show Marque findings to a person: a web page, a Word or Outlook task pane, Marque's own surfaces. TypeScript and plain CSS, no framework, no runtime dependencies; `vp pack` builds `dist/` (DECISIONS #20). `src/` is the kit; `src/types.ts` is the contract in types; `docs/` is the design it implements; `fixtures/` is the memo every example uses; `demo/` renders it.
 
 ## Fixed, by decision (docs/DECISIONS.md)
 
 These are not style preferences. Each has a dated maintainer decision behind it; change the decision first, then the code.
 
-- **Five rungs, computed in the kit.** `rung()` in `src/render.js` is the published derivation ([docs/DERIVATION.md](docs/DERIVATION.md)): `needs_person` × `blocks` × host moment. The engine never emits a rung; severity never sets one.
+- **Five rungs, computed in the kit.** `rung()` in `src/render.ts` is the published derivation ([docs/DERIVATION.md](docs/DERIVATION.md)): `needs_person` × `blocks` × host moment. The engine never emits a rung; severity never sets one.
 - **Gold = must act. Blue = can act.** Nothing else is gold. Gold appears on Action required and Blocking only.
 - **Shape carries meaning, colour rides along.** Thin underline = changed; 2px dotted act-ink = can act; 3px double attn-ink = must act; dashed = absent. On cards: `.mq-card.can-act / .must-act / .absent`. A greyscale print and forced-colours mode still read.
 - **Question first.** When a finding asks, the question is the card's heading; the marking is context; `says.text` explains; `Why?` and the citation sit in the footer.
@@ -27,7 +27,7 @@ These are not style preferences. Each has a dated maintainer decision behind it;
 - **Theme is free; behaviour is fixed.** Hosts may set `--mq-*` tokens. They may not change the rungs, the shapes' meanings, the fit rules, the free answer, "not my call", or the override record.
 - **Judge the text, never the person.** Messages say what the marking is and what Marque did. Never "you forgot".
 
-## Markings (src/marking.js, docs/THEME.md "Fit" and "Long markings")
+## Markings (src/marking.ts, docs/THEME.md "Fit" and "Long markings")
 
 - A marking is `.mq-mark > .mq-l (layer) > .mq-i (token)`; all three `nowrap`; `<wbr>` between layers and between tokens. Break order: between layers (`//`) → after a list comma → between tokens → before `/`. **Never inside a token**: `REL TO`, `TOP SECRET`, `SI-G`, `DISPLAY ONLY`.
 - If it had to wrap, `settle()` adds `.stacked`: one layer per line, hanging indent .65em. CSS alone wraps greedily and orphans `GBR)`.
@@ -64,19 +64,20 @@ Banner derived: `SECRET//FGI AUS GBR//NOFORN`, or `…//REL TO USA, GBR` if ¶5'
 
 ## Never
 
-- Never introduce a colour, size or shape outside `theme.css`. `kit.css` and `render.js` read tokens and class names only.
+- Never introduce a colour, size or shape outside `theme.css`. `kit.css` and `render.ts` read tokens and class names only.
 - Never put a colour-only signal anywhere; every state has a shape or a word.
 - Never render a template label or an internal id to a person.
 - Never let a marking break inside a token, truncate, or shrink below 13px.
 - Never show a generated value as applied; the host applies.
 - Never hide an override.
 - Never fabricate or copy a citation without re-verifying it at the new site.
-- Never add a framework, a build step, or a runtime dependency without a decision in docs/DECISIONS.md.
+- Never add a framework, a second build step, or a runtime dependency without a decision in docs/DECISIONS.md.
+- Never type a contract slot as `any`, or widen one to quiet the checker. A shape the engine emits goes in `src/types.ts` first.
 
 ## Working here
 
-- `npm run check` before a commit (syntax + the parser test). `npm run demo` to look.
-- Check contrast when a token changes: the pairs and floors are `PAIRS` and `SIZES` in `src/theme.js`. AA 4.5 on text pairs, 3.0 on lines and focus. `test/theme.test.js` fails when `kit.css` or `theme.css` paints a pairing that isn't measured there or excused in the test with a reason; a new colour use means deciding which.
+- `pnpm check` (format, lint, typecheck) and `pnpm test` (node runs the `.ts` tests as written) before a commit. `pnpm fix` formats. `pnpm build` writes `dist/`. `pnpm demo` to look. Markdown and the two extracted fixtures aren't formatted: a renumbered list changes what a doc says.
+- Check contrast when a token changes: the pairs and floors are `PAIRS` and `SIZES` in `src/theme.ts`. AA 4.5 on text pairs, 3.0 on lines and focus. `test/theme.test.ts` fails when `kit.css` or `theme.css` paints a pairing that isn't measured there or excused in the test with a reason; a new colour use means deciding which.
 - The docs under `docs/` were extracted from the canvas on 21 Oct 2026 and are now the source. Edit them here; the canvas is history.
 - Engine gaps go to marque-dev as issues, labelled `ui-kit` (+ `engine`, `audit`, `office`, `capco/ism` as they apply), and get a row in `docs/ENGINE-ASKS.md`. The Linear triage agent assigns cluster and lineage.
 - Commits and PRs end with the attribution lines the session provides.

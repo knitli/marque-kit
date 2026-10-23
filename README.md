@@ -8,7 +8,7 @@ SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
 
 The parts a host shows a person when Marque finds something: the finding card, the decision prompt, the pane, the inline mark in the document, the banner and authority-block cards, the finalize gate, the derivation panel, the audit receipt, and the theme layer under all of them.
 
-Plain CSS and ES modules. No framework, no build step. It runs in a web page, a Word or Outlook task pane, and anything else with a DOM.
+TypeScript and plain CSS. No framework, no runtime dependencies; `dist/` is built with `vp pack`. It runs in a web page, a Word or Outlook task pane, and anything else with a DOM.
 
 ## What's here
 
@@ -16,13 +16,14 @@ Plain CSS and ES modules. No framework, no build step. It runs in a web page, a 
 src/theme.css      the theme layer: --mq-* tokens (light default, dark, auto), how a marking fits,
                    the four shapes that carry meaning, control states, print, forced colours
 src/kit.css        the components, built only on theme.css
-src/marking.js     the marking primitive: layers, tokens, four forms, never breaks inside a token
-src/render.js      finding JSON → DOM: rung(), markClass(), card(), row(), pane(), status(), artifact(), gate(),
+src/marking.ts     the marking primitive: layers, tokens, four forms, never breaks inside a token
+src/render.ts      finding JSON → DOM: rung(), markClass(), card(), row(), pane(), status(), artifact(), gate(),
                    derivation(), receipt(), and mount(): the pane wired to the kit's state, the one call a host needs
-src/help.js        help in three tiers (tooltip, Why?, the manual section) and the vocabulary lookup;
+src/help.ts        help in three tiers (tooltip, Why?, the manual section) and the vocabulary lookup;
                    writes no help text of its own, it renders the engine's
-src/theme.js       the theme gate at mount: contrast and size floors, falling back to shipped values
-src/state.js       the kit's half of the ladder: what the person did (answered, changed, kept as written,
+src/theme.ts       the theme gate at mount: contrast and size floors, falling back to shipped values
+src/types.ts       the contract as types: findings, artifacts, the state log, the vocabulary, the host
+src/state.ts       the kit's half of the ladder: what the person did (answered, changed, kept as written,
                    deferred, declined), keyed by finding id, append-only, plain JSON the host persists
 fixtures/memo.txt            a six-paragraph memo with five things wrong
 fixtures/memo.findings.json  what Marque should say about it, in the contract's shape
@@ -32,14 +33,16 @@ fixtures/extract.py          regenerates the two above from a marque-dev checkou
 demo/index.html    the memo on the left, the pane on the right; answer ¶3 and watch the banner move
 docs/              the design, extracted from the canvas: CONTRACT, DERIVATION, MODEL, THEME,
                    COMPONENTS, DECISIONS, ENGINE-ASKS
-test/              the parser, the rung table, the state layer, lookup and citation landing under plain node
+test/              the parser, the rung table, the state layer, lookup and citation landing under plain node, which runs the .ts as written
 ```
 
 ## Run it
 
 ```sh
-npm run check      # syntax + the parser, rung, state and help tests (node ≥ 20)
-npm run demo       # then open http://localhost:8765/demo/
+pnpm check        # format, lint and typecheck (vp check)
+pnpm test         # the parser, rung, state, theme and help tests (node ≥ 26 runs the .ts directly)
+pnpm build        # dist/: the modules, their .d.ts, and the two stylesheets
+pnpm demo         # vp dev; open /demo/
 ```
 
 A host mounts the pane and listens:
@@ -54,7 +57,7 @@ p.destroy();                    // when the pane goes away
 
 `act` is null when only the seen list changed. An answer shows on its card at once but stays in `document.pending`, and the document is not ready, until the host applies it, re-lints and calls `p.update({ doc })`. `@marque/kit/help` has what a host needs to answer `onHelp` and `onLookup`. At mount the kit measures the host's `--mq-*` tokens against the contrast and size floors (`@marque/kit/theme`); a failing token falls back to the shipped value, and the report is `p.theme` and `onTheme(report)`. Under forced colours the system palette stands and only sizes and the mark font are measured. When the room the host gives the pane is under 240px, the report says `narrow: true` and the kit shows rows only: opening one calls `onOpen(f)` for the host to show it its own way.
 
-The demo is static files over any HTTP server; it needs one only because ES modules won't load from `file://`.
+The demo runs under `vp dev`, which serves the TypeScript source as modules.
 
 ## The idea in one paragraph
 

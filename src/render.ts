@@ -32,61 +32,177 @@
  * engine's document as-is.
  */
 
-import { render as mark, settle, resettle, relabel, masked } from './marking.js';
-import { empty, record, see, linted, snapshot, docView, decision, canon, face } from './state.js';
-import { cite, hasTip, tips, closeWithin } from './help.js';
-import { check, watch, release } from './theme.js';
+import { render as mark, settle, resettle, relabel, masked } from './marking.ts';
+import { empty, record, see, linted, snapshot, docView, decision, canon, face, isArtifact } from './state.ts';
+import { cite, hasTip, tips, closeWithin } from './help.ts';
+import { check, watch, release } from './theme.ts';
+import type {
+  Act,
+  ActValue,
+  Anchor,
+  ArtifactField,
+  ArtifactView,
+  Blocks,
+  Doc,
+  EngineState,
+  Finding,
+  FindingView,
+  Host,
+  LogEntry,
+  MarkingInput,
+  MarkingLike,
+  Moment,
+  NeedsPerson,
+  Rule,
+  Rung,
+  Snapshot,
+  State,
+  Subject,
+  ThemeReport,
+} from './types.ts';
+
+/** What rung() reads: the two inputs Marque emits, and whether a visible change was seen. */
+export interface Attention {
+  needs_person: NeedsPerson;
+  blocks: Blocks;
+  seen?: boolean | undefined;
+  marking?: Finding['marking'] | undefined;
+  outcome?: { result?: MarkingInput | null | undefined } | undefined;
+}
+/** The pane's four sections, in order. */
+export interface Sections {
+  must: Subject[];
+  can: Subject[];
+  later: Subject[];
+  done: Subject[];
+}
+/** A stamp: its tone class and its word. */
+type Stamp = [tone: string, word: string];
+/** A line on the receipt: a finding, an artifact, or acts on one the lint withdrew. */
+interface Receiptable extends Placed {
+  rule?: Rule | undefined;
+  marking?: Finding['marking'] | undefined;
+  history?: LogEntry[] | undefined;
+}
+/** A draft the person hasn't sent, by a key that survives a redraw. */
+interface Draft {
+  key: string;
+  asked: string | undefined;
+  value: string | undefined;
+  radio: boolean;
+  focused: boolean;
+}
+/** What the receipt is about: the session as the engine will seal it. */
+export interface Session {
+  schema?: string;
+  classifier_id?: string;
+  session_root?: string;
+}
+/** Anything with a place: a finding, an artifact, or an act's snapshot. */
+interface Placed {
+  anchor?: Anchor | null | undefined;
+  kind?: string | null | undefined;
+  scope?: string | null | undefined;
+}
+/** What mount() takes: the host, and the document and state to start from. */
+export interface MountOptions extends Host {
+  doc?: Doc | null;
+  state?: State;
+}
+/** What update() takes: a new lint, moment or engine state. */
+export interface Update {
+  doc?: Doc | null;
+  engine?: EngineState;
+  moment?: Moment;
+  readOnly?: boolean;
+  /** The log length when this lint began. */
+  linted?: number | undefined;
+  /** The host's request counter. */
+  seq?: number | undefined;
+}
+/** A mounted pane. */
+export interface Mounted {
+  /** The gate's report: { checked, rejected: [{ token, measured, floor, fallback }] }. */
+  readonly theme: ThemeReport | null;
+  destroy(): void;
+  update(next: Update): void;
+  view(): Doc | null;
+  readonly state: State;
+  host: Host;
+}
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
-const el = (tag, cls, text) => {
+const el = <K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  cls?: string | null,
+  text?: string | null,
+): HTMLElementTagNameMap[K] => {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
   if (text != null) n.textContent = text;
   return n;
 };
-const button = (cls, text, onClick) => {
-  const b = el('button', `mq-btn ${cls}`, text); b.type = 'button';
-  b.addEventListener('click', onClick); return b;
+const button = (cls: string, text: string, onClick: (e: MouseEvent) => void): HTMLButtonElement => {
+  const b = el('button', `mq-btn ${cls}`, text);
+  b.type = 'button';
+  b.addEventListener('click', onClick);
+  return b;
 };
 /** DOM ids per rendered copy: the gate and the pane can show the same finding at once. */
 let uid = 0;
-const placed = (m) => { queueMicrotask(() => settle(m)); return m; };
-const SHORT = { front_marking: 'BANNER', authority_block: 'CAB' };
-const NAME = { front_marking: 'Banner', authority_block: 'Authority block' };
-const page = (f) => (f.anchor?.kind === 'page' ? f.anchor.page : null);
-const where = (f) => f.anchor?.portion ? `¶${f.anchor.portion}` : page(f) != null ? `p${page(f)}` : SHORT[f.kind] || (f.scope === 'document' || f.anchor?.kind === 'document' ? 'DOC' : '—');
-const spokenWhere = (f) => f.anchor?.portion ? `Paragraph ${f.anchor.portion}` : page(f) != null ? `Page ${page(f)}` : NAME[f.kind] || 'The document';
+const placed = <T extends HTMLElement>(m: T): T => {
+  queueMicrotask(() => settle(m));
+  return m;
+};
+const SHORT: Record<string, string> = { front_marking: 'BANNER', authority_block: 'CAB' };
+const NAME: Record<string, string> = { front_marking: 'Banner', authority_block: 'Authority block' };
+const page = (f: Placed): number | null => (f.anchor?.kind === 'page' ? (f.anchor.page ?? null) : null);
+const where = (f: Placed): string =>
+  f.anchor?.portion
+    ? `¶${f.anchor.portion}`
+    : page(f) != null
+      ? `p${page(f)}`
+      : SHORT[f.kind ?? ''] || (f.scope === 'document' || f.anchor?.kind === 'document' ? 'DOC' : '—');
+const spokenWhere = (f: Placed): string =>
+  f.anchor?.portion
+    ? `Paragraph ${f.anchor.portion}`
+    : page(f) != null
+      ? `Page ${page(f)}`
+      : NAME[f.kind ?? ''] || 'The document';
 /** Field formats the kit can check, by the name a format string uses; one it doesn't know is the engine's to judge. */
-const FORMATS = {
-  YYYYMMDD: (t) => { // a real day: the date built from it is the same date back
+const FORMATS: Record<string, (t: string) => boolean> = {
+  YYYYMMDD: (t) => {
+    // a real day: the date built from it is the same date back
     if (!/^\d{8}$/.test(t)) return false;
     const d = new Date(Date.UTC(+t.slice(0, 4), +t.slice(4, 6) - 1, +t.slice(6)));
-    return d.getUTCFullYear() === +t.slice(0, 4) && d.getUTCMonth() === +t.slice(4, 6) - 1 && d.getUTCDate() === +t.slice(6);
+    return (
+      d.getUTCFullYear() === +t.slice(0, 4) && d.getUTCMonth() === +t.slice(4, 6) - 1 && d.getUTCDate() === +t.slice(6)
+    );
   },
   event: (t) => /[A-Za-z]/.test(t) && /\S\s+\S/.test(t), // an event is described in words, not one token
   '25X#/50X#/75X#': (t) => /^(25|50|75)X\d+(-[A-Z]+)?$/.test(t),
 };
 /** Does `t` fit a format such as "YYYYMMDD | event | 25X#/50X#/75X#"? Any one alternative will do. */
-const fits = (format, t) => {
+const fits = (format: string | null | undefined, t: string): boolean => {
   if (!format) return true;
   const alts = format.split('|').map((s) => s.trim());
-  return alts.some((f) => (FORMATS[f] ? FORMATS[f](t) : true));
+  return alts.some((f) => FORMATS[f]?.(t) ?? true);
 };
 /** A marking-valued artifact; a notice may carry typed content instead, which isn't one. */
-const isMarking = (v) => typeof v === 'string' || typeof v?.text === 'string';
-const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const isMarking = (v: unknown): v is MarkingLike =>
+  typeof v === 'string' || typeof (v as { text?: unknown } | null | undefined)?.text === 'string';
+const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
 /* ── 1b · rung ───────────────────────────────────────────────────────── */
 /** Moments at which an open "finalize" finding stops the operation. The host
  *  names its moment; Marque never knows it (docs/DERIVATION.md, Table 2). */
-const GATE = new Set(['finalize', 'send']);
+const GATE = new Set<Moment | undefined>(['finalize', 'send']);
 
 /**
  * needs_person × blocks × host moment → rung. The kit computes this
  * (decided 16 Oct); the engine emits only the two inputs.
- * @returns {'quiet'|'noticeable'|'advisory'|'action'|'blocking'}
  */
-export function rung(f, moment = 'editing') {
+export function rung(f: Attention, moment: Moment = 'editing'): Rung {
   const atGate = GATE.has(moment);
   if (f.needs_person !== 'none' && f.blocks === 'now') return 'blocking';
   if (f.needs_person === 'required') return atGate && f.blocks !== 'never' ? 'blocking' : 'action';
@@ -99,33 +215,49 @@ export function rung(f, moment = 'editing') {
 /** A change a person can see: the tokens differ, not just the whitespace
  *  between them (¶2's added comma, yes; ¶6's doubled space, no). */
 /** How many in `list` changed the document at all, whitespace included. */
-const changes = (list) => list.filter((f) => f.outcome?.result && f.marking?.as_written && f.outcome.result.text !== f.marking.as_written.text).length;
+const changes = (list: Subject[]): number =>
+  list.filter((f) => f.outcome?.result && f.marking?.as_written && f.outcome.result.text !== f.marking.as_written.text)
+    .length;
 
-function visiblyChanged(f) {
-  const was = f.marking?.as_written?.text, now = f.outcome?.result?.text;
+function visiblyChanged(f: Attention): boolean {
+  const was = f.marking?.as_written?.text,
+    now = f.outcome?.result?.text;
   if (!was || !now) return false;
-  const norm = (t) => t.replace(/\s+/g, ' ').trim();
+  const norm = (t: string): string => t.replace(/\s+/g, ' ').trim();
   return norm(was) !== norm(now);
 }
 
 const decided = decision;
-const settled = (f) => decided(f)?.value != null;
-const wasAsked = (f) => !!f.asked || !!f.history?.some((e) => e.act === 'answered' && !e.value?.apply); // an apply isn't an answer
-const SHAPE = { quiet: '', noticeable: '', advisory: 'can-act', action: 'must-act', blocking: 'must-act' };
-const STAMP = {
-  quiet: ['quiet', 'Done'], noticeable: ['quiet', 'Changed'], advisory: ['act', 'Alternative'],
-  action: ['attn', 'Needs you'], blocking: ['attn', 'Blocks finalize'],
+const settled = (f: Subject): boolean => decided(f)?.value != null;
+const wasAsked = (f: Subject): boolean =>
+  !!f.asked || !!f.history?.some((e) => e.act === 'answered' && !e.value?.apply); // an apply isn't an answer
+const SHAPE: Record<Rung, string> = {
+  quiet: '',
+  noticeable: '',
+  advisory: 'can-act',
+  action: 'must-act',
+  blocking: 'must-act',
+};
+const STAMP: Record<Rung, Stamp> = {
+  quiet: ['quiet', 'Done'],
+  noticeable: ['quiet', 'Changed'],
+  advisory: ['act', 'Alternative'],
+  action: ['attn', 'Needs you'],
+  blocking: ['attn', 'Blocks finalize'],
 };
 /** An absent marking while the person is still writing is not a demand yet:
  *  dashed, "at finalize", filed under "Before you finalize". It becomes gold
  *  the moment they try to finalize. */
-const waits = (f, moment) => f.marking?.shape === 'absent' && f.needs_person !== 'none' && f.blocks === 'finalize' && !GATE.has(moment);
-const shapeOf = (f, r, moment) => (waits(f, moment) ? 'absent' : SHAPE[r]);
-function stampOf(f, r, moment) {
+const waits = (f: Subject, moment?: Moment): boolean =>
+  f.marking?.shape === 'absent' && f.needs_person !== 'none' && f.blocks === 'finalize' && !GATE.has(moment);
+const shapeOf = (f: Subject, r: Rung, moment?: Moment): string => (waits(f, moment) ? 'absent' : SHAPE[r]);
+function stampOf(f: Subject, r: Rung, moment?: Moment): Stamp {
   if (f.overridden) return ['quiet', 'Reported'];
   if (settled(f)) return ['quiet', wasAsked(f) ? 'Answered' : 'Changed'];
-  if (r === 'blocking') return ['attn', f.blocks === 'now' ? 'Blocks now' : moment === 'send' ? 'Blocks sending' : 'Blocks finalize'];
-  if ((r === 'action' || r === 'advisory') && f.deferred) return ['quiet', f.deferred === 'declined' ? 'Not my call' : 'At finalize'];
+  if (r === 'blocking')
+    return ['attn', f.blocks === 'now' ? 'Blocks now' : moment === 'send' ? 'Blocks sending' : 'Blocks finalize'];
+  if ((r === 'action' || r === 'advisory') && f.deferred)
+    return ['quiet', f.deferred === 'declined' ? 'Not my call' : 'At finalize'];
   if (waits(f, moment)) return ['quiet', 'At finalize'];
   return STAMP[r];
 }
@@ -134,51 +266,83 @@ function stampOf(f, r, moment) {
 /** The shape class an adapter puts on the marking's span in the document:
  *  web overlay, ::highlight(), or Word's own underline (docs/MODEL.md, Hosts).
  *  Quiet has no mark. */
-export function markClass(f, moment = 'editing') {
+export function markClass(f: FindingView, moment: Moment = 'editing'): string {
   if (waits(f, moment)) return 'mq-absent';
   const r = rung(f, moment);
-  return r === 'action' || r === 'blocking' ? 'mq-must-act' : r === 'advisory' ? 'mq-can-act' : r === 'noticeable' ? 'mq-changed' : '';
+  return r === 'action' || r === 'blocking'
+    ? 'mq-must-act'
+    : r === 'advisory'
+      ? 'mq-can-act'
+      : r === 'noticeable'
+        ? 'mq-changed'
+        : '';
 }
 
 /* ── C4 · the asks renderer ──────────────────────────────────────────── */
-function asks(f, host, r, help) {
-  const a = f.asks; if (!a) return null;
+function asks(f: FindingView, host: Host, r: Rung, help: string[]): HTMLFormElement | null {
+  const a = f.asks;
+  if (!a) return null;
   const form = el('form', 'mq-ask');
   const name = `ask-${f.id}-${++uid}`;
-  let chosen = null;
+  let chosen: ActValue | null = null;
   // Answer is never disabled: pressed with nothing chosen, it says what's missing (docs/COMPONENTS.md, C4).
-  const err = el('div', 'err'); err.id = `${name}-err`; err.setAttribute('role', 'alert');
+  const err = el('div', 'err');
+  err.id = `${name}-err`;
+  err.setAttribute('role', 'alert');
   // A typed marking has to look like one before it's written: capitals and marking punctuation,
   // a portion in parentheses, a banner without, and a classification word in it, not punctuation alone.
-  const shape = { portion: /^\([A-Z0-9/ ,_-]+\)$/, banner: /^[A-Z0-9/ ,_-]+$/ }[a.field?.format] || /^\(?[A-Z0-9/ ,_-]+\)?$/;
+  const shape =
+    ({ portion: /^\([A-Z0-9/ ,_-]+\)$/, banner: /^[A-Z0-9/ ,_-]+$/ } as Record<string, RegExp>)[
+      a.field?.format ?? ''
+    ] || /^\(?[A-Z0-9/ ,_-]+\)?$/;
   const commit = () => {
     if (chosen?.free && a.field?.type === 'marking' && !(shape.test(chosen.free) && /[A-Z]/.test(chosen.free))) {
       fld.classList.add('bad');
-      err.textContent = a.field.format === 'portion' ? 'That isn’t a portion marking. Type it in capitals, in parentheses, as it should appear.'
-        : 'That isn’t a marking. Type it in capitals, as it should appear.';
+      err.textContent =
+        a.field?.format === 'portion'
+          ? 'That isn’t a portion marking. Type it in capitals, in parentheses, as it should appear.'
+          : 'That isn’t a marking. Type it in capitals, as it should appear.';
       free.focus();
       return;
     }
     if (chosen) return host.onAct?.(f, 'answered', chosen);
     fld.classList.add('bad');
-    err.textContent = form.querySelector('input[type=radio]') ? 'Pick one reading, type an answer, or "not my call".' : 'Type an answer, or "not my call".';
-    (form.querySelector('input[type=radio]') || free).focus();
+    err.textContent = form.querySelector('input[type=radio]')
+      ? 'Pick one reading, type an answer, or "not my call".'
+      : 'Type an answer, or "not my call".';
+    (form.querySelector<HTMLInputElement>('input[type=radio]') || free).focus();
   };
-  const clear = () => { fld.classList.remove('bad'); err.textContent = ''; };
-  form.addEventListener('submit', (e) => { e.preventDefault(); commit(); });
-  const options = a.options === 'outcome.readings' ? f.outcome.readings : (a.options || []);
+  const clear = () => {
+    fld.classList.remove('bad');
+    err.textContent = '';
+  };
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    commit();
+  });
+  const options = a.options === 'outcome.readings' ? (f.outcome.readings ?? []) : a.options || [];
 
   const fs = el('fieldset', 'mq-opts');
   fs.append(el('legend', null, a.text));
   options.forEach((o, i) => {
     const lab = el('label', 'mq-opt');
-    const inp = el('input'); inp.type = 'radio'; inp.name = name; inp.value = String(i); inp.dataset.draft = `${f.id}:reading`; inp.dataset.asked = canon(a); // a draft is for this question only
+    const inp = el('input');
+    inp.type = 'radio';
+    inp.name = name;
+    inp.value = String(i);
+    inp.dataset.draft = `${f.id}:reading`;
+    inp.dataset.asked = canon(a); // a draft is for this question only
     inp.dataset.reading = canon(o); // a draft is the reading itself, not its place in the list
-    inp.addEventListener('change', () => { chosen = { reading: o, index: i }; free.value = ''; clear(); });
+    inp.addEventListener('change', () => {
+      chosen = { reading: o, index: i };
+      free.value = '';
+      clear();
+    });
     const txt = el('div', 'mq-txt');
     txt.append(el('div', 'mq-pr', o.reading));
     if (o.result) txt.append(placed(mark(o.result, { size: 'sm', help })));
-    lab.append(inp, txt); fs.append(lab);
+    lab.append(inp, txt);
+    fs.append(lab);
   });
   form.append(fs);
 
@@ -186,37 +350,49 @@ function asks(f, host, r, help) {
   const fld = el('div', 'mq-field');
   const lab = el('label', null, a.field?.type === 'marking' ? 'Or type the marking' : 'Or type your answer');
   lab.htmlFor = `${name}-free`;
-  const free = el('input', 'mono'); free.id = `${name}-free`; free.type = 'text'; free.dataset.draft = `${f.id}:free`; free.dataset.asked = canon(a);
+  const free = el('input', 'mono');
+  free.id = `${name}-free`;
+  free.type = 'text';
+  free.dataset.draft = `${f.id}:free`;
+  free.dataset.asked = canon(a);
   free.placeholder = a.field?.hint || 'Type an answer';
   free.addEventListener('input', () => {
     const t = free.value.trim();
     // Blank text doesn't take the answer from a reading still picked.
-    chosen = t ? { free: t } : (chosen?.reading ? chosen : null);
-    if (t) { form.querySelectorAll('input[type=radio]').forEach((x) => { x.checked = false; }); clear(); }
+    chosen = t ? { free: t } : chosen?.reading ? chosen : null;
+    if (t) {
+      form.querySelectorAll<HTMLInputElement>('input[type=radio]').forEach((x) => {
+        x.checked = false;
+      });
+      clear();
+    }
   });
   free.setAttribute('aria-describedby', err.id);
   fld.append(lab, free, err);
   if (a.field?.waits_on) fld.append(el('div', 'hint', `Waits on ${a.field.waits_on.replace(/_/g, ' ')}.`));
-  if (f.deferred === 'declined') fld.append(el('div', 'hint', 'Marked not your call. Someone still has to answer it before the document goes out.'));
+  if (f.deferred === 'declined')
+    fld.append(el('div', 'hint', 'Marked not your call. Someone still has to answer it before the document goes out.'));
   form.append(fld);
 
   const acts = el('div', 'mq-acts');
   acts.append(button('attn', 'Answer', commit));
   // Blocking is the same card with defer removed (docs/DERIVATION.md).
-  if (r !== 'blocking' && f.deferred !== 'deferred') acts.append(button('ghost', 'Ask me at finalize', () => host.onAct?.(f, 'deferred')));
+  if (r !== 'blocking' && f.deferred !== 'deferred')
+    acts.append(button('ghost', 'Ask me at finalize', () => host.onAct?.(f, 'deferred')));
   if (f.deferred !== 'declined') acts.append(button('ghost', 'Not my call', () => host.onAct?.(f, 'declined')));
   form.append(acts);
   return form;
 }
 
 /* ── C3 · the finding card ───────────────────────────────────────────── */
-export function card(f, host = {}) {
+export function card(f: FindingView, host: Host = {}): HTMLElement {
   const moment = host.moment;
   const r = rung(f, moment);
   // Tokens the engine says have help, and the vocabulary can explain (tier 1).
   const help = host.vocab ? (f.says.help || []).filter((k) => hasTip(host.vocab, k)) : [];
   const c = el('article', `mq-card ${shapeOf(f, r, moment)}`.trim());
-  c.dataset.finding = f.id; c.dataset.rung = r;
+  c.dataset.finding = f.id;
+  c.dataset.rung = r;
 
   const head = el('div', 'mq-card-head');
   head.append(el('span', 'mq-label', where(f)));
@@ -225,13 +401,22 @@ export function card(f, host = {}) {
   c.append(head);
 
   if (r === 'blocking') {
-    c.append(el('p', 'mq-p', f.blocks === 'now' ? 'Marque stopped here. Nothing else is fixed until this is settled.'
-      : moment === 'send' ? 'You tried to send. This has to be answered first.' : 'This has to be answered before the document can be finalized.'));
+    c.append(
+      el(
+        'p',
+        'mq-p',
+        f.blocks === 'now'
+          ? 'Marque stopped here. Nothing else is fixed until this is settled.'
+          : moment === 'send'
+            ? 'You tried to send. This has to be answered first.'
+            : 'This has to be answered before the document can be finalized.',
+      ),
+    );
   }
 
   if (settled(f)) {
     // The answer becomes the headline; changing it is first-class, not an override.
-    const v = decided(f).value;
+    const v: ActValue = decided(f)?.value ?? {};
     c.append(el('h3', 'mq-q', v.reading?.reading || (wasAsked(f) && v.free ? `You wrote ${v.free}.` : 'Changed.')));
   } else if (f.overridden) {
     c.append(el('p', 'mq-p', 'Kept as written. Marque will report it.'));
@@ -248,10 +433,27 @@ export function card(f, host = {}) {
     const ctx = el('div', 'mq-was');
     ctx.append(el('span', null, 'As written'), placed(mark(f.marking.as_written, { size: 'sm', help })));
     c.append(ctx);
-  } else if (f.marking?.as_written && f.outcome?.result && (f.outcome.kind !== 'choices' || settled(f)) && !f.overridden) {
+  } else if (
+    f.marking?.as_written &&
+    f.outcome?.result &&
+    (f.outcome.kind !== 'choices' || settled(f)) &&
+    !f.overridden
+  ) {
     const was = el('div', 'mq-was');
-    was.append(el('span', null, 'Was'), placed(mark(f.marking.as_written, { size: 'sm', help })), el('span', null, '→'));
-    was.append(placed(mark(f.outcome.result, { size: 'sm', help, state: r === 'noticeable' || r === 'quiet' ? 'changed' : undefined })));
+    was.append(
+      el('span', null, 'Was'),
+      placed(mark(f.marking.as_written, { size: 'sm', help })),
+      el('span', null, '→'),
+    );
+    was.append(
+      placed(
+        mark(f.outcome.result, {
+          size: 'sm',
+          help,
+          state: r === 'noticeable' || r === 'quiet' ? 'changed' : undefined,
+        }),
+      ),
+    );
     c.append(was);
   } else if (!f.marking?.as_written && settled(f) && f.outcome?.result) {
     const now = el('div', 'mq-was');
@@ -267,14 +469,16 @@ export function card(f, host = {}) {
 
   // The alternative the author also wrote (advisory): one action away.
   if (f.outcome?.kind === 'chosen_over' && f.outcome.readings?.length && !f.overridden && !settled(f)) {
-    const alt = f.outcome.readings[0];
+    const alt = f.outcome.readings[0]!;
     const dep = el('div', 'mq-dep');
-    dep.append(el('span', null, 'Or, as you also wrote:'), placed(mark(alt.result, { size: 'sm', help })));
+    dep.append(el('span', null, 'Or, as you also wrote:'));
+    if (alt.result) dep.append(placed(mark(alt.result, { size: 'sm', help })));
     dep.append(button('ghost', alt.reading, () => host.onAct?.(f, 'changed', { reading: alt, index: 0 })));
     c.append(dep);
   }
 
-  const ask = asks(f, host, r, help); if (ask) c.append(ask);
+  const ask = asks(f, host, r, help);
+  if (ask) c.append(ask);
 
   // Conservative fallback, named, for the unattended boundary.
   if (f.outcome?.fallback && r === 'blocking') {
@@ -286,17 +490,27 @@ export function card(f, host = {}) {
   }
 
   const foot = el('div', 'mq-foot');
-  const why = el('a', 'mq-why', 'Why?'); why.href = '#';
-  why.addEventListener('click', (e) => { e.preventDefault(); host.onHelp?.({ kind: 'why', finding: f, rung: r, anchor: why }); });
+  const why = el('a', 'mq-why', 'Why?');
+  why.href = '#';
+  why.addEventListener('click', (e) => {
+    e.preventDefault();
+    host.onHelp?.({ kind: 'why', finding: f, rung: r, anchor: why });
+  });
   foot.append(why);
-  const ct = cite(f.says.citation, host); if (ct) foot.append(ct);
+  const ct = cite(f.says.citation, host);
+  if (ct) foot.append(ct);
   // Back to what Marque said: "Change my answer", "Undo" on a choice the
   // person made, "Fix it after all" on an override. Each is a new line in the log.
-  if (settled(f)) foot.append(button('ghost', wasAsked(f) ? 'Change my answer' : 'Undo', () => host.onAct?.(f, 'changed', null)));
+  if (settled(f))
+    foot.append(button('ghost', wasAsked(f) ? 'Change my answer' : 'Undo', () => host.onAct?.(f, 'changed', null)));
   else if (f.overridden) foot.append(button('ghost', 'Fix it after all', () => host.onAct?.(f, 'changed', null)));
   // No Undo on a fix the person must own; an override is recorded, not hidden.
   // Only a fix Marque made or chose can be kept against: an available one isn't applied, a withheld one is none.
-  else if ((r === 'noticeable' || r === 'advisory') && ['applied', 'chosen_over'].includes(f.outcome?.kind)) foot.append(button('ghost', 'Keep as written', () => host.onAct?.(f, 'kept_as_written')));
+  else if (
+    (r === 'noticeable' || r === 'advisory') &&
+    (f.outcome?.kind === 'applied' || f.outcome?.kind === 'chosen_over')
+  )
+    foot.append(button('ghost', 'Keep as written', () => host.onAct?.(f, 'kept_as_written')));
   // Available: Marque has the fix and the person applies it (CONTRACT: available → apply); the host writes it.
   if (f.outcome?.kind === 'available' && f.outcome.result && !settled(f) && !f.overridden && !host.readOnly) {
     const acts = el('div', 'mq-acts');
@@ -312,24 +526,44 @@ export function card(f, host = {}) {
  *  needs a person, as for a finding. Otherwise a derived value nobody has
  *  written yet, or an artifact that isn't required, is Advisory; anything
  *  else (a non-canonical fix, a block the person filled in) is done. */
-const artRung = (a, moment) => a.needs_person !== 'none' ? rung(a, moment)
-  : a.applying ? 'quiet'
-  : a.state === 'present_not_canonical' ? (a.seen ? 'quiet' : 'noticeable')
-  : a.state === 'present_not_required' || (a.state === 'absent_but_required' && a.derived_value) ? 'advisory' : 'quiet';
+const artRung = (a: ArtifactView, moment?: Moment): Rung =>
+  a.needs_person !== 'none'
+    ? rung(a, moment)
+    : a.applying
+      ? 'quiet'
+      : a.state === 'present_not_canonical'
+        ? a.seen
+          ? 'quiet'
+          : 'noticeable'
+        : a.state === 'present_not_required' || (a.state === 'absent_but_required' && a.derived_value)
+          ? 'advisory'
+          : 'quiet';
 /** A required artifact that only blocks at finalize waits for it, like an absent mark. */
-const artWaits = (a, moment) => a.blocks === 'finalize' && !GATE.has(moment);
+const artWaits = (a: ArtifactView, moment?: Moment): boolean => a.blocks === 'finalize' && !GATE.has(moment);
 /** An artifact's stamp says what it is: missing and derived, there but not required, changed, or done. */
-const artStamp = (a, r, moment) => (r === 'blocking' ? ['attn', stampOf(a, r, moment)[1]]
-  : r === 'action' ? (artWaits(a, moment) ? ['quiet', 'At finalize'] : ['attn', 'Needs you'])
-  : a.applying ? ['quiet', 'To be written']
-  : a.state === 'present_not_required' ? ['act', 'Not required']
-  : a.state === 'absent_but_required' && a.derived_value ? ['act', 'Derived']
-  : a.state === 'present_not_canonical' ? ['quiet', 'Changed'] : ['quiet', 'Done']);
+const artStamp = (a: ArtifactView, r: Rung, moment?: Moment): Stamp =>
+  r === 'blocking'
+    ? ['attn', stampOf(a, r, moment)[1]]
+    : r === 'action'
+      ? artWaits(a, moment)
+        ? ['quiet', 'At finalize']
+        : ['attn', 'Needs you']
+      : a.applying
+        ? ['quiet', 'To be written']
+        : a.state === 'present_not_required'
+          ? ['act', 'Not required']
+          : a.state === 'absent_but_required' && a.derived_value
+            ? ['act', 'Derived']
+            : a.state === 'present_not_canonical'
+              ? ['quiet', 'Changed']
+              : ['quiet', 'Done'];
 
-export function row(f, host = {}) {
-  const isArtifact = !!f.kind;
-  const r = isArtifact ? artRung(f, host.moment) : rung(f, host.moment);
-  const li = el('div', 'mq-row-item'); li.dataset.finding = f.id; li.tabIndex = 0; li.setAttribute('role', 'button');
+export function row(f: Subject, host: Host = {}): HTMLDivElement {
+  const r = isArtifact(f) ? artRung(f, host.moment) : rung(f, host.moment);
+  const li = el('div', 'mq-row-item');
+  li.dataset.finding = f.id;
+  li.tabIndex = 0;
+  li.setAttribute('role', 'button');
   if (!host.narrow) li.setAttribute('aria-expanded', 'false');
   li.append(el('span', 'where', where(f)));
   const what = el('div', 'what', f.asks ? f.asks.text : f.says.text);
@@ -337,40 +571,66 @@ export function row(f, host = {}) {
   if (m) what.append(mark(m, { form: 'folded', size: 'xs' }));
   li.append(what);
   const end = el('div', 'end');
-  const [tone, word] = isArtifact ? artStamp(f, r, host.moment) : stampOf(f, r, host.moment);
+  const [tone, word] = isArtifact(f) ? artStamp(f, r, host.moment) : stampOf(f, r, host.moment);
   end.append(el('span', `mq-stamp sm ${tone}`, word));
   li.append(end);
-  const toggle = (open) => {
+  const toggle = (open: boolean): void => {
     const next = li.nextElementSibling;
     if (next?.classList.contains('mq-row-detail')) next.remove();
-    li.classList.toggle('open', open); li.setAttribute('aria-expanded', String(open));
+    li.classList.toggle('open', open);
+    li.setAttribute('aria-expanded', String(open));
     if (!open) return;
     // One card open at a time.
-    li.closest('.mq-pane')?.querySelectorAll('.mq-row-item.open').forEach((o) => { if (o !== li) { o.nextElementSibling?.remove(); o.classList.remove('open'); o.setAttribute('aria-expanded', 'false'); } });
-    const d = el('div', 'mq-row-detail'); d.append(isArtifact ? artifact(f, host) : card(f, host));
+    li.closest('.mq-pane')
+      ?.querySelectorAll('.mq-row-item.open')
+      .forEach((o) => {
+        if (o !== li) {
+          o.nextElementSibling?.remove();
+          o.classList.remove('open');
+          o.setAttribute('aria-expanded', 'false');
+        }
+      });
+    const d = el('div', 'mq-row-detail');
+    d.append(isArtifact(f) ? artifact(f, host) : card(f, host));
     if (host.vocab) relabel(d, host.vocab);
     // Escape from inside the card closes it and goes back to its row.
     // A token's open tooltip takes the first Escape.
     d.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape' || e.defaultPrevented || e.target.getAttribute?.('aria-describedby')?.startsWith('mq-tip')) return;
-      e.preventDefault(); toggle(false); host.onOpen?.(null); li.focus();
+      if (
+        e.key !== 'Escape' ||
+        e.defaultPrevented ||
+        (e.target instanceof Element && e.target.getAttribute('aria-describedby')?.startsWith('mq-tip'))
+      )
+        return;
+      e.preventDefault();
+      toggle(false);
+      host.onOpen?.(null);
+      li.focus();
     });
     li.after(d);
   };
   const click = () => {
     // Under the width floor there is no room for a card: the host is told, and shows it its own way.
-    if (host.narrow) { host.onOpen?.(f); host.onJump?.(f); return; }
+    if (host.narrow) {
+      host.onOpen?.(f);
+      host.onJump?.(f);
+      return;
+    }
     const open = !li.classList.contains('open');
-    toggle(open); host.onOpen?.(open ? f : null);
+    toggle(open);
+    host.onOpen?.(open ? f : null);
     if (open) host.onJump?.(f);
   };
   li.addEventListener('click', click);
   li.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
-    e.preventDefault(); click();
+    e.preventDefault();
+    click();
     // Opened from the keyboard: on to the question, its chosen or first reading, else the field.
-    const d = li.classList.contains('open') && li.nextElementSibling;
-    (d?.querySelector('input[type=radio]:checked') || d?.querySelector('input, button'))?.focus();
+    const d = li.classList.contains('open') ? li.nextElementSibling : null;
+    (
+      d?.querySelector<HTMLElement>('input[type=radio]:checked') || d?.querySelector<HTMLElement>('input, button')
+    )?.focus();
   });
   if (host.open === f.id && !host.narrow) queueMicrotask(() => toggle(true));
   return li;
@@ -379,8 +639,8 @@ export function row(f, host = {}) {
 /* ── the pane's sections, shared by the pane, the status and the head ── */
 /** Four sections, always in this order; document order within each, never
  *  severity (docs/COMPONENTS.md, Findings pane). */
-export function sections(doc, moment = 'editing') {
-  const g = { must: [], can: [], later: [], done: [] };
+export function sections(doc: Doc, moment: Moment = 'editing'): Sections {
+  const g: Sections = { must: [], can: [], later: [], done: [] };
   for (const f of doc.findings) {
     if (f.outcome?.kind === 'covered_by') continue; // one span, one card: it lives in its owner's
     const r = rung(f, moment);
@@ -388,7 +648,11 @@ export function sections(doc, moment = 'editing') {
     // "Not my call" routes the question; it stays Action required for whoever gets it.
     // Deferred, Advisory or Action required, it waits for finalize, where it blocks.
     // At the gate the moment it waited for has come, so one that never blocks is back in its section.
-    else if (waits(f, moment) || ((r === 'action' || r === 'advisory') && f.deferred === 'deferred' && !GATE.has(moment))) g.later.push(f);
+    else if (
+      waits(f, moment) ||
+      ((r === 'action' || r === 'advisory') && f.deferred === 'deferred' && !GATE.has(moment))
+    )
+      g.later.push(f);
     else if (r === 'action') g.must.push(f);
     else if (r === 'advisory') g.can.push(f);
     else g.done.push(f);
@@ -396,108 +660,171 @@ export function sections(doc, moment = 'editing') {
   for (const a of doc.document.artifacts) {
     if (a.state === 'present' || a.state === 'absent_not_required') continue; // receipt entries, not cards
     const r = artRung(a, moment);
-    (r === 'blocking' ? g.must : r === 'action' ? (artWaits(a, moment) ? g.later : g.must) : r === 'advisory' ? g.can : g.done).push(a);
+    (r === 'blocking'
+      ? g.must
+      : r === 'action'
+        ? artWaits(a, moment)
+          ? g.later
+          : g.must
+        : r === 'advisory'
+          ? g.can
+          : g.done
+    ).push(a);
   }
   return g;
 }
 
 /* ── C7 · document status ────────────────────────────────────────────── */
 /** A required artifact Marque derived and nobody has written: it goes in as the document goes out. */
-const due = (a) => a.state === 'absent_but_required' && a.derived_value && a.fixability === 'fixable';
+const due = (a: ArtifactView): boolean =>
+  a.state === 'absent_but_required' && !!a.derived_value && a.fixability === 'fixable';
 /** Read-only, nothing can be written, so a due artifact holds the document up. */
-const unwritable = (doc, host) => (host.readOnly ? doc.document.artifacts.filter(due).length : 0);
-const ready = (doc, host) => doc.document.ready && !unwritable(doc, host);
+const unwritable = (doc: Doc, host: Host): number => (host.readOnly ? doc.document.artifacts.filter(due).length : 0);
+const ready = (doc: Doc, host: Host): boolean => doc.document.ready && !unwritable(doc, host);
 /** What the gate lists: blockers and the writes still waiting, once each. A required
  *  finding that never blocks needs the person but holds nothing up. */
-const holding = (doc, host = {}) => [...new Set([...doc.document.blocking, ...(doc.document.pending || []),
-  ...(host.readOnly ? doc.document.artifacts.filter(due).map((a) => a.id) : [])])];
-const held = (doc, host) => holding(doc, host).length;
+const holding = (doc: Doc, host: Host = {}): string[] => [
+  ...new Set([
+    ...doc.document.blocking,
+    ...(doc.document.pending || []),
+    ...(host.readOnly ? doc.document.artifacts.filter(due).map((a) => a.id) : []),
+  ]),
+];
+const held = (doc: Doc, host: Host): number => holding(doc, host).length;
 
-export function status(doc, host = {}) {
+export function status(doc: Doc | null, host: Host = {}): HTMLDivElement {
   const s = el('div', 'mq-status');
   s.setAttribute('role', 'status');
   s.append(el('span', 'mq-label', 'This document'));
   s.append(el('span', 'sep'));
   // The strip exists before Marque has run, so the host's layout never jumps.
   if (!doc || (host.engine && host.engine !== 'ok')) {
-    s.append(el('span', 'mq-ui', '—'), el('span', 'mq-stamp quiet', { checking: 'Checking', failed: 'Stopped' }[host.engine] || 'Not checked'));
+    s.append(el('span', 'mq-ui', '—'), el('span', 'mq-stamp quiet', ENGINE[host.engine ?? ''] || 'Not checked'));
     return s;
   }
   const banner = doc.document.artifacts.find((a) => a.kind === 'front_marking');
-  if (banner?.derived_value) s.append(placed(mark(banner.derived_value, { size: 'lg' })));
+  if (banner && isMarking(banner.derived_value)) s.append(placed(mark(banner.derived_value, { size: 'lg' })));
 
   const g = sections(doc, host.moment);
   const overrides = doc.findings.filter((f) => f.overridden).length;
-  const words = (t) => el('span', 'mq-small', t);
+  const words = (t: string): HTMLSpanElement => el('span', 'mq-small', t);
   const stuck = unwritable(doc, host);
   if (ready(doc, host) && !g.must.length) {
     // Plain, not celebratory: the Ready stamp is outlined because there is nothing to act on.
     s.append(el('span', 'mq-stamp', 'Ready'));
-    if (overrides) s.append(el('span', 'mq-stamp', `${overrides} reported`), words(overrides === 1 ? 'one marking kept as written' : `${overrides} markings kept as written`));
+    if (overrides)
+      s.append(
+        el('span', 'mq-stamp', `${overrides} reported`),
+        words(overrides === 1 ? 'one marking kept as written' : `${overrides} markings kept as written`),
+      );
     else if (changes(g.done)) s.append(words(`${plural(changes(g.done), 'change', 'changes')} made quietly`));
   } else if (!g.must.length && doc.document.pending?.length) {
     // Everything is answered; the host hasn't written it yet.
-    s.append(el('span', 'mq-stamp', 'Not ready'), words(`${plural(doc.document.pending.length, 'answer', 'answers')} waiting to be written into the document`));
+    s.append(
+      el('span', 'mq-stamp', 'Not ready'),
+      words(`${plural(doc.document.pending.length, 'answer', 'answers')} waiting to be written into the document`),
+    );
   } else if (!g.must.length && stuck) {
-    s.append(el('span', 'mq-stamp', 'Not ready'), words(`${plural(stuck, 'thing', 'things')} can't be written while the document is read-only`));
+    s.append(
+      el('span', 'mq-stamp', 'Not ready'),
+      words(`${plural(stuck, 'thing', 'things')} can't be written while the document is read-only`),
+    );
   } else if (GATE.has(host.moment) && held(doc, host)) {
     s.classList.add('must');
     const n = held(doc, host);
-    s.append(el('span', 'mq-stamp attn', 'Blocked'), words(`${plural(n, 'thing has', 'things have')} to be settled before it can go out`));
+    s.append(
+      el('span', 'mq-stamp attn', 'Blocked'),
+      words(`${plural(n, 'thing has', 'things have')} to be settled before it can go out`),
+    );
   } else {
-    if (g.must.length) { s.classList.add('must'); s.append(el('span', 'mq-stamp attn', `${g.must.length} needs you`)); }
-    else s.append(el('span', 'mq-stamp', 'Not ready'));
+    if (g.must.length) {
+      s.classList.add('must');
+      s.append(el('span', 'mq-stamp attn', `${g.must.length} needs you`));
+    } else s.append(el('span', 'mq-stamp', 'Not ready'));
     if (g.later.length) s.append(words(`${g.must.length ? 'and ' : ''}${g.later.length} before you finalize`));
   }
   return s;
 }
 
 /* ── C6 · the pane ───────────────────────────────────────────────────── */
-const TITLES = { must: 'Needs you', can: 'Worth a look', later: 'Before you finalize', done: 'Done quietly' };
+const ENGINE: Record<string, string> = { checking: 'Checking', failed: 'Stopped' };
+const TITLES: Record<keyof Sections, string> = {
+  must: 'Needs you',
+  can: 'Worth a look',
+  later: 'Before you finalize',
+  done: 'Done quietly',
+};
 
-function engineState(host) {
+function engineState(host: Host): HTMLDivElement {
   const box = el('div', `mq-engine ${host.engine === 'failed' ? 'err' : ''}`.trim());
   const body = el('div', 'mq-txt');
   if (host.engine === 'checking') {
     // No spinner: a sentence.
-    body.append(el('div', 'mq-h', 'Checking the document…'), el('p', 'mq-p', 'Usually under a second. The pane fills in as results arrive.'));
+    body.append(
+      el('div', 'mq-h', 'Checking the document…'),
+      el('p', 'mq-p', 'Usually under a second. The pane fills in as results arrive.'),
+    );
   } else if (host.engine === 'failed') {
     // Fail-closed: no partial results, because none were produced.
-    body.append(el('div', 'mq-h', 'Marque stopped before checking anything.'),
-      el('p', 'mq-p', 'A component failed its integrity check, so nothing was read or changed. The document is as you left it.'));
+    body.append(
+      el('div', 'mq-h', 'Marque stopped before checking anything.'),
+      el(
+        'p',
+        'mq-p',
+        'A component failed its integrity check, so nothing was read or changed. The document is as you left it.',
+      ),
+    );
     const acts = el('div', 'mq-acts');
-    acts.append(button('ghost', 'Try again', () => host.onRetry?.()), button('ghost', 'Copy the report for your administrator', () => host.onReport?.()));
+    acts.append(
+      button('ghost', 'Try again', () => host.onRetry?.()),
+      button('ghost', 'Copy the report for your administrator', () => host.onReport?.()),
+    );
     body.append(acts);
   } else {
-    body.append(el('div', 'mq-h', "The document hasn't been checked."),
-      el('p', 'mq-p', "Marque isn't reachable from this pane. Markings on the page are as written."));
-    const acts = el('div', 'mq-acts'); acts.append(button('ghost', 'Retry', () => host.onRetry?.())); body.append(acts);
+    body.append(
+      el('div', 'mq-h', "The document hasn't been checked."),
+      el('p', 'mq-p', "Marque isn't reachable from this pane. Markings on the page are as written."),
+    );
+    const acts = el('div', 'mq-acts');
+    acts.append(button('ghost', 'Retry', () => host.onRetry?.()));
+    body.append(acts);
   }
   box.append(body);
   return box;
 }
 
-export function pane(doc, host = {}) {
+export function pane(doc: Doc | null, host: Host = {}): HTMLDivElement {
   const p = el('div', 'mq-pane');
   const head = el('div', 'mq-pane-head');
-  const brand = el('div', 'mq-brand'); brand.append('MAR', el('b', null, 'QUE')); head.append(brand);
+  const brand = el('div', 'mq-brand');
+  brand.append('MAR', el('b', null, 'QUE'));
+  head.append(brand);
   p.append(head);
 
   const down = host.engine && host.engine !== 'ok';
   // Still checking with results in: they show as they arrive, under the checking notice.
   const partial = host.engine === 'checking' && !!doc;
-  if (!partial && (down || !doc)) {
-    head.append(el('span', `mq-stamp ${host.engine === 'failed' ? '' : 'quiet'}`.trim(),
-      { checking: 'Checking', failed: 'Stopped' }[host.engine] || 'Not checked'));
+  if (!doc || (!partial && down)) {
+    head.append(
+      el(
+        'span',
+        `mq-stamp ${host.engine === 'failed' ? '' : 'quiet'}`.trim(),
+        ENGINE[host.engine ?? ''] || 'Not checked',
+      ),
+    );
     p.append(status(null, host), engineState(host));
     return p;
   }
 
   const g = sections(doc, host.moment);
   const atGate = GATE.has(host.moment);
-  head.append(partial ? el('span', 'mq-stamp quiet', 'Checking')
-    : g.must.length ? el('span', 'mq-stamp attn', atGate && held(doc, host) ? 'Blocked' : `${g.must.length} needs you`)
-    : el('span', 'mq-stamp', ready(doc, host) ? 'Ready' : 'Not ready'));
+  head.append(
+    partial
+      ? el('span', 'mq-stamp quiet', 'Checking')
+      : g.must.length
+        ? el('span', 'mq-stamp attn', atGate && held(doc, host) ? 'Blocked' : `${g.must.length} needs you`)
+        : el('span', 'mq-stamp', ready(doc, host) ? 'Ready' : 'Not ready'),
+  );
   p.append(status(doc, host));
   if (partial) p.append(engineState(host));
 
@@ -506,22 +833,30 @@ export function pane(doc, host = {}) {
     const waiting = doc.document.pending?.length || 0; // acts the host hasn't written, not Marque's own fixes
     const ro = el('div', 'mq-engine');
     const body = el('div', 'mq-txt');
-    body.append(el('div', 'mq-h', 'This document is read-only.'),
-      el('p', 'mq-p', `Marque can show what it found but can't change the document. ${waiting ? `${plural(waiting, 'answer is', 'answers are')} waiting; answers` : 'Answers'} you give are kept for when it can be edited.`));
-    ro.append(body); p.append(ro);
+    body.append(
+      el('div', 'mq-h', 'This document is read-only.'),
+      el(
+        'p',
+        'mq-p',
+        `Marque can show what it found but can't change the document. ${waiting ? `${plural(waiting, 'answer is', 'answers are')} waiting; answers` : 'Answers'} you give are kept for when it can be edited.`,
+      ),
+    );
+    ro.append(body);
+    p.append(ro);
   }
 
   if (!g.must.length && !g.can.length && !g.later.length) {
     p.append(el('div', 'mq-empty', 'Nothing needs you.'));
   }
 
-  for (const k of ['must', 'can', 'later', 'done']) {
+  for (const k of ['must', 'can', 'later', 'done'] as const) {
     const list = g[k];
     if (!list.length) continue;
     const sec = el('section', `mq-section ${k}`);
     const sh = el('div', 'mq-section-head');
     const id = `mq-sec-${k}-${++uid}`;
-    const title = el('span', 'mq-label', TITLES[k]); title.id = id;
+    const title = el('span', 'mq-label', TITLES[k]);
+    title.id = id;
     sh.append(title, el('span', 'mq-count-pill', String(list.length)));
     sec.setAttribute('aria-labelledby', id);
     sec.append(sh);
@@ -533,8 +868,17 @@ export function pane(doc, host = {}) {
       const sum = el('summary', 'mq-row-item');
       // Not everything here changed the document: a withheld note or a canonical artifact is done, not a change.
       const n = changes(list);
-      sum.append(el('span', 'where', ''), el('div', 'what', `${n === list.length ? plural(n, 'change', 'changes') : `${list.length} done${n ? `, ${n} changed` : ''}`} · show`));
-      const end = el('div', 'end'); end.append(el('span', 'mq-stamp sm quiet', n ? 'Changed' : 'Done')); sum.append(end);
+      sum.append(
+        el('span', 'where', ''),
+        el(
+          'div',
+          'what',
+          `${n === list.length ? plural(n, 'change', 'changes') : `${list.length} done${n ? `, ${n} changed` : ''}`} · show`,
+        ),
+      );
+      const end = el('div', 'end');
+      end.append(el('span', 'mq-stamp sm quiet', n ? 'Changed' : 'Done'));
+      sum.append(end);
       det.append(sum);
       list.forEach((f) => det.append(row(f, host)));
       rows.append(det);
@@ -544,13 +888,17 @@ export function pane(doc, host = {}) {
   }
 
   const foot = el('div', 'mq-pane-foot');
-  foot.append(button('ghost', 'Check before sending', () => host.onGate?.()), button('ghost', 'Look up a code', (e) => host.onLookup?.(e.currentTarget)), button('ghost', 'Receipt', () => host.onReceipt?.()));
+  foot.append(
+    button('ghost', 'Check before sending', () => host.onGate?.()),
+    button('ghost', 'Look up a code', (e) => host.onLookup?.(e.currentTarget as HTMLElement)),
+    button('ghost', 'Receipt', () => host.onReceipt?.()),
+  );
   p.append(foot);
   return p;
 }
 
 /* ── C9 · artifact card (banner, CAB) ────────────────────────────────── */
-export function artifact(a, host = {}) {
+export function artifact(a: ArtifactView, host: Host = {}): HTMLElement {
   const r = artRung(a, host.moment);
   const must = r === 'blocking' || r === 'action';
   const atGate = must && !artWaits(a, host.moment); // gold now, not at finalize
@@ -564,7 +912,11 @@ export function artifact(a, host = {}) {
   c.append(el('p', 'mq-p', a.says.text));
   if (a.derived_value) {
     // Typed notice content isn't a marking: its words are the host's to show. Either way it can be applied.
-    c.append(isMarking(a.derived_value) ? placed(mark(a.derived_value, { size: 'lg', state: 'derived' })) : el('p', 'mq-p', 'Marque has a notice to add here.'));
+    c.append(
+      isMarking(a.derived_value)
+        ? placed(mark(a.derived_value, { size: 'lg', state: 'derived' }))
+        : el('p', 'mq-p', 'Marque has a notice to add here.'),
+    );
     if (a.placement) c.append(el('span', 'mq-place', `Placed: ${a.placement.replace(/_/g, ' ')}`));
     // Generated, not applied: the person can apply it; the host writes it (docs/COMPONENTS.md, C9).
     const fixes = a.state === 'absent_but_required' || a.state === 'present_not_canonical';
@@ -580,61 +932,114 @@ export function artifact(a, host = {}) {
     const acts = el('div', 'mq-acts');
     acts.append(button('act', 'Remove it', () => host.onAct?.(a, 'answered', { remove: true })));
     c.append(acts);
-  } else if (a.state === 'present_not_required' && a.applying) c.append(el('p', 'mq-p', 'Waiting to be removed from the document.'));
+  } else if (a.state === 'present_not_required' && a.applying)
+    c.append(el('p', 'mq-p', 'Waiting to be removed from the document.'));
   if (a.fields) {
     const dl = el('div', 'mq-cab');
     // A field a person fills: labelled by its key, committed on Enter or Fill in.
-    const entry = (k, fld, key) => {
+    const entry = (k: string, fld: ArtifactField, key: HTMLElement): HTMLSpanElement => {
       const v = el('span', 'v blank mq-field');
-      const inp = el('input', 'mono'); inp.type = 'text'; inp.id = `${a.id}-${k}-${++uid}`; inp.dataset.draft = `${a.id}:${k}`; inp.dataset.asked = canon(fld); // and this field as given
-      key.id = `${inp.id}-k`; inp.setAttribute('aria-labelledby', key.id);
-      inp.placeholder = fld.format || ''; inp.defaultValue = fld.value || '';
-      const err = el('span', 'err'); err.id = `${inp.id}-err`; err.setAttribute('role', 'alert'); inp.setAttribute('aria-describedby', err.id);
+      const inp = el('input', 'mono');
+      inp.type = 'text';
+      inp.id = `${a.id}-${k}-${++uid}`;
+      inp.dataset.draft = `${a.id}:${k}`;
+      inp.dataset.asked = canon(fld); // and this field as given
+      key.id = `${inp.id}-k`;
+      inp.setAttribute('aria-labelledby', key.id);
+      inp.placeholder = fld.format || '';
+      inp.defaultValue = fld.value || '';
+      const err = el('span', 'err');
+      err.id = `${inp.id}-err`;
+      err.setAttribute('role', 'alert');
+      inp.setAttribute('aria-describedby', err.id);
       const fill = () => {
         const t = inp.value.trim();
         if (!t || t === fld.value) return;
         // A declared format is checked before the value is recorded; the field stays open until it fits.
-        if (!fits(fld.format, t)) { v.classList.add('bad'); err.textContent = `That doesn’t fit this field. Use: ${fld.format.split('|').map((s) => s.trim()).join(', or ')}.`; inp.focus(); return; }
+        if (!fits(fld.format, t)) {
+          v.classList.add('bad');
+          err.textContent = `That doesn’t fit this field. Use: ${(fld.format ?? '')
+            .split('|')
+            .map((s) => s.trim())
+            .join(', or ')}.`;
+          inp.focus();
+          return;
+        }
         host.onAct?.(a, 'answered', { fields: { [k]: t } });
       };
-      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); fill(); } });
+      inp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          fill();
+        }
+      });
       v.append(inp);
       if (fld.hint) v.append(el('span', 'hint', fld.hint));
       v.append(button('ghost', 'Fill in', fill), err);
       return v;
     };
     for (const [k, fld] of Object.entries(a.fields)) {
-      const key = el('span', 'k', k.replace(/_/g, ' ').replace(/^\w/, (ch) => ch.toUpperCase()));
+      const key = el(
+        'span',
+        'k',
+        k.replace(/_/g, ' ').replace(/^\w/, (ch) => ch.toUpperCase()),
+      );
       dl.append(key);
-      if (fld.state === 'blank') { dl.append(entry(k, fld, key)); continue; }
+      if (fld.state === 'blank') {
+        dl.append(entry(k, fld, key));
+        continue;
+      }
       const has = fld.state === 'known' || fld.state === 'derived';
-      const v = el('span', `v ${has ? 'derived' : ''}`.trim(),
-        has ? fld.value : fld.state === 'waiting' ? `Waits on ${fld.waits_on.replace(/_/g, ' ')}` : fld.format || '');
+      const v = el(
+        'span',
+        `v ${has ? 'derived' : ''}`.trim(),
+        has
+          ? (fld.value ?? '')
+          : fld.state === 'waiting'
+            ? `Waits on ${(fld.waits_on ?? '').replace(/_/g, ' ')}`
+            : fld.format || '',
+      );
       if (fld.hint) v.title = fld.hint;
       // A filled field stays correctable: a typo, or Classified By when someone else made the call.
       // Read-only too: the correction waits with the other answers.
       if (has) {
-        const change = button('ghost', 'Change', () => { const n = entry(k, fld, key); v.replaceWith(n); const i = n.querySelector('input'); i.dataset.opened = '1'; i.focus(); });
-        change.dataset.change = `${a.id}:${k}`; change.dataset.asked = canon(fld);
+        const change = button('ghost', 'Change', () => {
+          const n = entry(k, fld, key);
+          v.replaceWith(n);
+          const i = n.querySelector('input')!;
+          i.dataset.opened = '1';
+          i.focus();
+        });
+        change.dataset.change = `${a.id}:${k}`;
+        change.dataset.asked = canon(fld);
         v.append(' ', change);
       }
       dl.append(v);
     }
     c.append(dl);
-    if (a.applying && !a.derived_value && a.state !== 'present_not_required') c.append(el('p', 'mq-p', 'Waiting to be written into the document.'));
+    if (a.applying && !a.derived_value && a.state !== 'present_not_required')
+      c.append(el('p', 'mq-p', 'Waiting to be written into the document.'));
   }
   if (a.if_taken) {
     const dep = el('div', 'mq-dep');
     for (const [fid, alt] of Object.entries(a.if_taken)) {
-      dep.append(el('span', null, `If ¶${fid.match(/p(\d+)/)?.[1] ?? '?'}'s alternative is taken:`), placed(mark(alt, { size: 'sm' })));
+      dep.append(
+        el('span', null, `If ¶${fid.match(/p(\d+)/)?.[1] ?? '?'}'s alternative is taken:`),
+        placed(mark(alt, { size: 'sm' })),
+      );
     }
     c.append(dep);
   }
   const foot = el('div', 'mq-foot');
-  const why = el('a', 'mq-why', a.derivation ? 'How Marque got here' : 'Why?'); why.href = '#';
-  why.addEventListener('click', (e) => { e.preventDefault(); host.onHelp?.({ kind: a.derivation ? 'derivation' : 'why', artifact: a, anchor: why }); });
+  const why = el('a', 'mq-why', a.derivation ? 'How Marque got here' : 'Why?');
+  why.href = '#';
+  why.addEventListener('click', (e) => {
+    e.preventDefault();
+    host.onHelp?.({ kind: a.derivation ? 'derivation' : 'why', artifact: a, anchor: why });
+  });
   foot.append(why);
-  const ct = cite(a.says.citation, host); if (ct) foot.append(ct);
+  const ct = cite(a.says.citation, host);
+  if (ct) foot.append(ct);
   c.append(foot);
   return c;
 }
@@ -643,12 +1048,14 @@ export function artifact(a, host = {}) {
 /** The Needs-you section with defer removed, in the pane's own words, with
  *  the answers inline. The host calls it at its real moment; pass that moment
  *  as host.moment ('finalize' when it isn't one of the gate moments). */
-export function gate(doc, host = {}) {
-  const h = GATE.has(host.moment) ? host : { ...host, moment: 'finalize' };
+export function gate(doc: Doc, host: Host = {}): HTMLDivElement {
+  const h: Host = GATE.has(host.moment) ? host : { ...host, moment: 'finalize' };
   const ids = doc.document.blocking;
   const g = el('div', 'mq-gate');
-  g.setAttribute('role', 'region'); g.setAttribute('aria-label', 'Before this can go out');
-  if (host.vocab) queueMicrotask(() => relabel(g, host.vocab)); // once its cards are in
+  g.setAttribute('role', 'region');
+  g.setAttribute('aria-label', 'Before this can go out');
+  const vocab = host.vocab;
+  if (vocab) queueMicrotask(() => relabel(g, vocab)); // once its cards are in
   if (!ids.length) {
     // Still the last look before it goes out: what will be written, and what the person answered.
     const n = doc.document.pending?.length;
@@ -659,37 +1066,57 @@ export function gate(doc, host = {}) {
     // Overrides too: the last look says which markings will be reported as kept.
     const answered = doc.findings.filter((f) => pend.has(f.id) || decision(f)?.value != null || f.overridden);
     const stuck = unwritable(doc, host);
-    g.append(el('h3', 'mq-q', n ? `Waiting for ${plural(n, 'answer', 'answers')} to be written into the document.`
-      : stuck ? `Not ready. The document is read-only, so ${plural(stuck, 'thing', 'things')} can't be written into it.`
-      : will.length ? `Ready. ${plural(will.length, 'thing', 'things')} will be applied as it goes out.` : 'Ready to finalize.'));
+    g.append(
+      el(
+        'h3',
+        'mq-q',
+        n
+          ? `Waiting for ${plural(n, 'answer', 'answers')} to be written into the document.`
+          : stuck
+            ? `Not ready. The document is read-only, so ${plural(stuck, 'thing', 'things')} can't be written into it.`
+            : will.length
+              ? `Ready. ${plural(will.length, 'thing', 'things')} will be applied as it goes out.`
+              : 'Ready to finalize.',
+      ),
+    );
     will.forEach((a) => g.append(artifact(a, h)));
     answered.forEach((f) => g.append(card(f, h)));
     return g;
   }
   // An answer still waiting to be written holds it up too, and so, read-only, does a required artifact nobody can write.
   const all = holding(doc, host);
-  g.append(el('h3', 'mq-q', all.length === 1 ? 'One thing before this can go out.' : `${all.length} things before this can go out.`));
+  g.append(
+    el(
+      'h3',
+      'mq-q',
+      all.length === 1 ? 'One thing before this can go out.' : `${all.length} things before this can go out.`,
+    ),
+  );
   for (const id of all) {
     const f = doc.findings.find((x) => x.id === id);
     const a = f ? null : doc.document.artifacts.find((x) => x.id === id);
-    if (f) g.append(card(f, h)); else if (a) g.append(artifact(a, h));
+    if (f) g.append(card(f, h));
+    else if (a) g.append(artifact(a, h));
   }
   return g;
 }
 
 /* ── C11 · derivation panel ──────────────────────────────────────────── */
-export function derivation(a, doc, host = {}) {
+export function derivation(a: ArtifactView, doc: Doc, host: Host = {}): HTMLDivElement {
   const d = el('div', 'mq-deriv');
   (a.derivation || []).forEach((step, i) => {
-    const s = el('div', 'mq-step'); s.append(el('span', 'n', String(i + 1)));
+    const s = el('div', 'mq-step');
+    s.append(el('span', 'n', String(i + 1)));
     const body = el('div', 'body');
     const rule = el('div', 'rule');
     rule.append(el('span', 'mq-label', step.axis), el('span', 'mq-ui', step.output));
     body.append(rule);
     const from = step.inputs.map((id) => where(doc.findings.find((f) => f.id === id) || {})).join(', ');
     body.append(el('p', 'mq-p', `From ${from}.`));
-    const ct = cite(step.citation, host); if (ct) body.append(ct);
-    s.append(body); d.append(s);
+    const ct = cite(step.citation, host);
+    if (ct) body.append(ct);
+    s.append(body);
+    d.append(s);
   });
   return d;
 }
@@ -698,44 +1125,94 @@ export function derivation(a, doc, host = {}) {
 /** What the engine will attest for this session. Content-ignorant by
  *  construction: markings, rule ids, spans, decisions — never body text.
  *  Every act the person took is listed, including each changed answer. */
-export function receipt(doc, session = {}) {
+export function receipt(doc: Doc, session: Session = {}): HTMLDivElement {
   const r = el('div', 'mq-receipt');
   const hd = el('div', 'hd');
-  hd.append(el('span', null, `MARQUE · ${session.schema || 'audit'}`), el('span', 'who', session.classifier_id || 'classifier id not set'));
+  hd.append(
+    el('span', null, `MARQUE · ${session.schema || 'audit'}`),
+    el('span', 'who', session.classifier_id || 'classifier id not set'),
+  );
   r.append(hd);
   // Each act with what was said and when, so a changed answer keeps the one it replaced.
   // A reading by its words and its marking: two readings can write the same marking.
-  const said = (v) => (v?.reading ? `${v.reading.result ? masked(v.reading.result) : ''} (${v.reading.reading})`.trim() : null) ?? v?.free
-    ?? (v?.fields ? Object.entries(v.fields).map(([k, t]) => `${k.replace(/_/g, ' ')} ${t}`).join(', ') : '');
+  const said = (v: ActValue | null): string =>
+    (v?.reading ? `${v.reading.result ? masked(v.reading.result) : ''} (${v.reading.reading})`.trim() : null) ??
+    v?.free ??
+    (v?.fields
+      ? Object.entries(v.fields)
+          .map(([k, t]) => `${k.replace(/_/g, ' ')} ${t}`)
+          .join(', ')
+      : '');
   // Typed notice content by its identity, so the receipt says which version was approved.
-  const content = (c) => { try { return Object.entries(JSON.parse(c)).map(([k, v]) => `${k.replace(/_/g, ' ')} ${v}`).join(', '); } catch { return c; } };
+  const content = (c: string): string => {
+    try {
+      return Object.entries(JSON.parse(c) as Record<string, unknown>)
+        .map(([k, v]) => `${k.replace(/_/g, ' ')} ${String(v)}`)
+        .join(', ');
+    } catch {
+      return c;
+    }
+  };
   // A snapshot's markings as drawn, masks and all: a concealed code never prints as text.
-  const result = (a) => (a?.result_marking ?? a?.result ? masked(a.result_marking ?? a.result) : '');
-  const written = (a) => (a.marking ?? a.as_written ? masked(a.marking ?? a.as_written) : '');
-  const op = (e) => (e.act === 'changed' && e.value == null ? 'back to Marque\u2019s result'
-    : e.act === 'kept_as_written' ? (result(e.about) ? `instead of ${result(e.about)}` : '')
-    : e.value?.apply ? `apply${result(e.about) ? ` ${result(e.about)}` : e.about?.content ? ` ${content(e.about.content)}` : ''}` : e.value?.remove ? 'remove' : said(e.value));
+  const result = (a: Partial<Snapshot> | undefined): string => {
+    const m = a?.result_marking ?? a?.result;
+    return m ? masked(m) : '';
+  };
+  const written = (a: Partial<Snapshot>): string => {
+    const m = a.marking ?? a.as_written;
+    return m ? masked(m) : '';
+  };
+  const op = (e: LogEntry): string =>
+    e.act === 'changed' && e.value == null
+      ? 'back to Marque\u2019s result'
+      : e.act === 'kept_as_written'
+        ? result(e.about)
+          ? `instead of ${result(e.about)}`
+          : ''
+        : e.value?.apply
+          ? `apply${result(e.about) ? ` ${result(e.about)}` : e.about?.content ? ` ${content(e.about.content)}` : ''}`
+          : e.value?.remove
+            ? 'remove'
+            : said(e.value);
   // An act taken on another rule or marking under this id says which, from its own snapshot.
-  const about = (e, x) => {
+  const about = (e: LogEntry, x: Receiptable): string => {
     const rule = x.rule ? `${x.rule.scheme}:${x.rule.predicate}` : x.kind;
     if (!e.about) return '';
     // Taken at another paragraph or page under this id: the receipt says where it was.
     const was = 'anchor' in e.about ? where({ ...x, anchor: e.about.anchor }) : null;
     const at = was && was !== where(x) ? `at ${was}` : '';
     const asked = written(e.about);
-    if (e.about.rule && e.about.rule !== rule) return [`on ${e.about.rule}${asked ? ` ${asked}` : ''}`, at].filter(Boolean).join(' ');
-    return [asked && face(e.about.marking ?? e.about.as_written) !== face(x.marking?.as_written ?? null) ? `asked of ${asked}` : '', at].filter(Boolean).join(' ');
+    if (e.about.rule && e.about.rule !== rule)
+      return [`on ${e.about.rule}${asked ? ` ${asked}` : ''}`, at].filter(Boolean).join(' ');
+    return [
+      asked && face(e.about.marking ?? e.about.as_written) !== face(x.marking?.as_written ?? null)
+        ? `asked of ${asked}`
+        : '',
+      at,
+    ]
+      .filter(Boolean)
+      .join(' ');
   };
-  const acts = (x) => (x.history || []).map((e) => [e.act.replace(/_/g, ' '), op(e), about(e, x), e.at].filter(Boolean).join(' ')).join(' → ');
+  const acts = (x: Receiptable): string =>
+    (x.history || [])
+      .map((e) => [e.act.replace(/_/g, ' '), op(e), about(e, x), e.at].filter(Boolean).join(' '))
+      .join(' → ');
   for (const f of doc.findings) {
     const ln = el('div', 'ln');
     ln.append(el('span', 't', where(f)));
     const b = el('div', 'b');
     const did = acts(f);
-    b.append(el('span', null, `${f.rule.scheme}:${f.rule.predicate} · ${f.outcome.kind.replace(/_/g, ' ')}${did ? ` · ${did}` : ''}`));
+    b.append(
+      el(
+        'span',
+        null,
+        `${f.rule.scheme}:${f.rule.predicate} · ${f.outcome.kind.replace(/_/g, ' ')}${did ? ` · ${did}` : ''}`,
+      ),
+    );
     if (f.marking?.as_written) b.append(placed(mark(f.marking.as_written, { size: 'xs' })));
     if (f.outcome?.result) b.append(placed(mark(f.outcome.result, { size: 'xs', state: 'changed' })));
-    ln.append(b); r.append(ln);
+    ln.append(b);
+    r.append(ln);
   }
   // Every artifact, card or not: present and absent-not-required ones live only here.
   for (const a of doc.document.artifacts) {
@@ -750,17 +1227,24 @@ export function receipt(doc, session = {}) {
   // Acts on findings a later lint withdrew stay in the audit.
   for (const x of doc.document.withdrawn || []) {
     const ln = el('div', 'ln');
-    const a = x.about || {};
+    const a: Partial<Snapshot> = x.about || {};
     ln.append(el('span', 't', a.anchor || a.kind ? where(a) : '—'));
     const b = el('div', 'b');
     b.append(el('span', null, `${a.rule ? `${a.rule} · ` : ''}no longer reported · ${acts(x)}`));
     // From the act's own marking where it has one: its masks stay masks.
-    if (a.marking || a.as_written) b.append(placed(mark(a.marking || { text: a.as_written }, { size: 'xs' })));
+    if (a.marking || a.as_written) b.append(placed(mark(a.marking || { text: a.as_written ?? '' }, { size: 'xs' })));
     ln.append(b);
     r.append(ln);
   }
   const ft = el('div', 'ft');
-  ft.append(el('span', null, `${doc.findings.length} findings · ${doc.document.blocking.length} open${doc.document.pending?.length ? ` · ${doc.document.pending.length} waiting to be written` : ''}`), el('span', 'mq-hash', session.session_root || 'session root: computed by the engine at seal'));
+  ft.append(
+    el(
+      'span',
+      null,
+      `${doc.findings.length} findings · ${doc.document.blocking.length} open${doc.document.pending?.length ? ` · ${doc.document.pending.length} waiting to be written` : ''}`,
+    ),
+    el('span', 'mq-hash', session.session_root || 'session root: computed by the engine at seal'),
+  );
   r.append(ft);
   return r;
 }
@@ -785,11 +1269,24 @@ export function receipt(doc, session = {}) {
  * not ready, until the host re-lints and passes the new `doc`. A new Action
  * required is announced in a polite live region; Quiet changes are not.
  */
-export function mount(root, { doc = null, state = empty(), moment = 'editing', engine = 'ok', readOnly = false, ...host } = {}) {
-  const cur = { doc, state, moment, engine, readOnly, open: null, seq: null };
+export function mount(
+  root: HTMLElement,
+  { doc = null, state = empty(), moment = 'editing', engine = 'ok', readOnly = false, ...host }: MountOptions = {},
+): Mounted {
+  const cur: {
+    doc: Doc | null;
+    state: State;
+    moment: Moment;
+    engine: EngineState;
+    readOnly: boolean;
+    open: string | null;
+    seq: number | null;
+  } = { doc, state, moment, engine, readOnly, open: null, seq: null };
   // Findings already there at mount aren't news; the first ones to arrive later are.
-  let said = doc ? null : new Set(), unseen = false;
-  const live = el('div', 'mq-sr'); live.setAttribute('aria-live', 'polite');
+  let said: Set<string> | null = doc ? null : new Set(),
+    unseen = false;
+  const live = el('div', 'mq-sr');
+  live.setAttribute('aria-live', 'polite');
   const body = el('div');
   // The kit root carries the tokens; one above it (with its theme) wins, so only add it when there is none.
   const added = !root.closest('.mq');
@@ -797,13 +1294,18 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   // A theme set above on something that isn't a kit root: the root this mount made follows it, since
   // its own .mq light defaults would otherwise win over what it inherits. Kept in step as it changes.
   // A theme the host sets on the root later is the host's: mirroring stops and never removes it.
-  let mirrors = added && !root.hasAttribute('data-mq-theme'), mine = null;
+  let mirrors = added && !root.hasAttribute('data-mq-theme'),
+    mine: string | null = null;
   const follow = () => {
     if (!mirrors) return;
-    if (root.getAttribute('data-mq-theme') !== mine) { mirrors = false; return; }
+    if (root.getAttribute('data-mq-theme') !== mine) {
+      mirrors = false;
+      return;
+    }
     const t = root.parentElement?.closest('[data-mq-theme]')?.getAttribute('data-mq-theme') ?? null;
     if (t === mine) return;
-    if (t) root.setAttribute('data-mq-theme', t); else root.removeAttribute('data-mq-theme');
+    if (t) root.setAttribute('data-mq-theme', t);
+    else root.removeAttribute('data-mq-theme');
     mine = t;
   };
   follow();
@@ -817,89 +1319,148 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
   host.onTheme?.(theme);
   // A marking stacked or not at one width is measured again at another.
   let width = 0;
-  const sized = typeof ResizeObserver !== 'undefined' && new ResizeObserver(() => {
-    if (root.clientWidth === width) return;
-    width = root.clientWidth;
-    root.querySelectorAll('.mq-mark').forEach(resettle);
-  });
+  const sized =
+    typeof ResizeObserver !== 'undefined' &&
+    new ResizeObserver(() => {
+      if (root.clientWidth === width) return;
+      width = root.clientWidth;
+      root.querySelectorAll<HTMLElement>('.mq-mark').forEach((m) => resettle(m));
+    });
   if (sized) sized.observe(root);
-  const unwatch = typeof MutationObserver !== 'undefined' ? watch(root, (r) => {
-    follow(); // a change above: if it moved the root's theme, that change checks again
-    const was = !!theme?.narrow;
-    theme = r; narrowed(); host.onTheme?.(r);
-    if (!!r?.narrow !== was) draw();
-  }) : () => {};
+  const unwatch =
+    typeof MutationObserver !== 'undefined'
+      ? watch(root, (r) => {
+          follow(); // a change above: if it moved the root's theme, that change checks again
+          const was = !!theme?.narrow;
+          theme = r;
+          narrowed();
+          host.onTheme?.(r);
+          if (!!r?.narrow !== was) draw();
+        })
+      : () => {};
   const untips = host.vocab ? tips(body, host.vocab, host) : () => {};
 
-  const h = {
+  const h: Host = {
     ...host,
-    get moment() { return cur.moment; },
-    get engine() { return cur.engine; },
-    get readOnly() { return cur.readOnly; },
-    get open() { return cur.open; },
-    get narrow() { return !!theme?.narrow; },
-    onOpen(f) {
+    get moment() {
+      return cur.moment;
+    },
+    get engine() {
+      return cur.engine;
+    },
+    get readOnly() {
+      return cur.readOnly;
+    },
+    get open() {
+      return cur.open;
+    },
+    get narrow() {
+      return !!theme?.narrow;
+    },
+    onOpen(f: Subject | null) {
       cur.open = f?.id ?? null;
       // Opening it is seeing it. Recorded now and drawn when the row closes, so rows never move under the pointer.
       if (f) {
         const s = see(cur.state, f);
         // Narrow, there's no card to close, so the row is drawn as seen now.
-        if (s !== cur.state) { cur.state = s; host.onChange?.(s, null); if (theme?.narrow) queueMicrotask(() => draw()); else unseen = true; }
-      } else if (unseen) { unseen = false; queueMicrotask(() => draw()); }
+        if (s !== cur.state) {
+          cur.state = s;
+          host.onChange?.(s, null);
+          if (theme?.narrow) queueMicrotask(() => draw());
+          else unseen = true;
+        }
+      } else if (unseen) {
+        unseen = false;
+        queueMicrotask(() => draw());
+      }
       host.onOpen?.(f);
     },
-    onAct(f, act, value = null) {
+    onAct(f: Subject, act: Act, value: ActValue | null = null) {
       cur.state = record(cur.state, f.id, act, value, undefined, snapshot(f));
       // The card stays open where the finding now lives, and keeps focus if it had it.
       const inPane = body.contains(document.activeElement);
       cur.open = f.id;
       // A host that re-lints at once redraws inside onChange; this finding's draft went with the act.
       acting = f.id;
-      try { host.onChange?.(cur.state, { id: f.id, act, value }); } finally { acting = null; }
+      try {
+        host.onChange?.(cur.state, { id: f.id, act, value });
+      } finally {
+        acting = null;
+      }
       draw(inPane ? f.id : null, { fresh: true });
     },
   };
 
   /** A redraw replaces the pane; put focus back on the same finding's card,
    *  or its row when the card is closed, so a keyboard user isn't sent to the top. */
-  function refocus(id) {
+  function refocus(id: string | null | undefined): void {
     if (!id) return;
     queueMicrotask(() => {
       const sel = `[data-finding="${CSS.escape(id)}"], [data-artifact="${CSS.escape(id)}"]`;
-      const target = body.querySelector(`.mq-row-detail :is(${sel})`) || body.querySelector(`.mq-row-item:is(${sel})`);
+      const target =
+        body.querySelector<HTMLElement>(`.mq-row-detail :is(${sel})`) ||
+        body.querySelector<HTMLElement>(`.mq-row-item:is(${sel})`);
       if (!target) return;
       if (!target.hasAttribute('tabindex')) target.tabIndex = -1;
       target.focus();
     });
   }
 
-  const focusedId = () => {
-    const n = body.contains(document.activeElement) && document.activeElement.closest('[data-finding], [data-artifact]');
-    return n ? n.dataset.finding ?? n.dataset.artifact : null;
+  const focusedId = (): string | null => {
+    const a = document.activeElement;
+    const n = a && body.contains(a) ? a.closest<HTMLElement>('[data-finding], [data-artifact]') : null;
+    return n ? (n.dataset.finding ?? n.dataset.artifact ?? null) : null;
   };
 
   /** What the person has picked or typed and not yet sent, by a key that survives a redraw. */
-  let acting = null, gen = 0; // the finding being acted on (its draft is spent); which draw is current
-  const drafts = () => [...body.querySelectorAll('[data-draft]')]
-    .filter((x) => !acting || !x.dataset.draft.startsWith(`${acting}:`))
-    // An opened correction counts as soon as it's open, typed in or not.
-    .filter((x) => (x.type === 'radio' ? x.checked : x.dataset.opened || (x.value.trim() && x.value !== x.defaultValue)))
-    .map((x) => ({ key: x.dataset.draft, asked: x.dataset.asked, value: x.type === 'radio' ? x.dataset.reading : x.value, radio: x.type === 'radio', focused: x === document.activeElement }));
-  function restore(list) {
-    const find = (d) => [...body.querySelectorAll('[data-draft]')].find((x) => x.dataset.draft === d.key && x.dataset.asked === d.asked && (d.radio ? x.type === 'radio' && x.dataset.reading === d.value : x.type !== 'radio'));
+  let acting: string | null = null,
+    gen = 0; // the finding being acted on (its draft is spent); which draw is current
+  const drafts = (): Draft[] =>
+    [...body.querySelectorAll<HTMLInputElement>('[data-draft]')]
+      .filter((x) => !acting || !x.dataset.draft?.startsWith(`${acting}:`))
+      // An opened correction counts as soon as it's open, typed in or not.
+      .filter((x) =>
+        x.type === 'radio' ? x.checked : x.dataset.opened || (x.value.trim() && x.value !== x.defaultValue),
+      )
+      .map((x) => ({
+        key: x.dataset.draft ?? '',
+        asked: x.dataset.asked,
+        value: x.type === 'radio' ? x.dataset.reading : x.value,
+        radio: x.type === 'radio',
+        focused: x === document.activeElement,
+      }));
+  function restore(list: Draft[]): void {
+    const find = (d: Draft) =>
+      [...body.querySelectorAll<HTMLInputElement>('[data-draft]')].find(
+        (x) =>
+          x.dataset.draft === d.key &&
+          x.dataset.asked === d.asked &&
+          (d.radio ? x.type === 'radio' && x.dataset.reading === d.value : x.type !== 'radio'),
+      );
     for (const d of list) {
       let n = find(d);
       // A correction under way to a filled field: open it again for the person.
-      if (!n && !d.radio) { [...body.querySelectorAll('[data-change]')].find((x) => x.dataset.change === d.key && x.dataset.asked === d.asked)?.click(); n = find(d); }
+      if (!n && !d.radio) {
+        [...body.querySelectorAll<HTMLElement>('[data-change]')]
+          .find((x) => x.dataset.change === d.key && x.dataset.asked === d.asked)
+          ?.click();
+        n = find(d);
+      }
       if (!n) continue;
-      if (d.radio) { n.checked = true; n.dispatchEvent(new Event('change')); } else { n.value = d.value; n.dispatchEvent(new Event('input')); }
+      if (d.radio) {
+        n.checked = true;
+        n.dispatchEvent(new Event('change'));
+      } else {
+        n.value = d.value ?? '';
+        n.dispatchEvent(new Event('input'));
+      }
       if (d.focused) n.focus();
     }
   }
 
   // `fresh`: the person just acted, so what they had in the form went with it.
   let dead = false; // destroyed: a draw queued before it (onOpen, a resize) draws nothing
-  function draw(focusId, { fresh = false } = {}) {
+  function draw(focusId?: string | null, { fresh = false }: { fresh?: boolean } = {}): void {
     if (dead) return;
     const kept = fresh ? [] : drafts();
     const v = cur.doc && docView(cur.doc, cur.state);
@@ -908,8 +1469,13 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     if (v && (ok || cur.engine === 'checking')) {
       const now = sections(v, cur.moment).must;
       // Keyed by the question too: one asked again under the same id is news.
-      const key = (f) => `${f.id} ${canon(f.asks ?? null)}`;
-      if (said && ok) say = now.filter((f) => !said.has(key(f))).map((f) => `${spokenWhere(f)} needs you.`).join(' ');
+      const key = (f: Subject): string => `${f.id} ${canon(f.asks ?? null)}`;
+      const before = said;
+      if (before && ok)
+        say = now
+          .filter((f) => !before.has(key(f)))
+          .map((f) => `${spokenWhere(f)} needs you.`)
+          .join(' ');
       // While checking, only the first results set the baseline; what arrives after is told once it's done.
       if (ok || !said) said = new Set(now.map(key));
     }
@@ -925,33 +1491,61 @@ export function mount(root, { doc = null, state = empty(), moment = 'editing', e
     // After the open card is back (a microtask) and focus with it.
     // Only into this draw: a later one collects its own.
     const mine = ++gen;
-    if (kept.length) queueMicrotask(() => queueMicrotask(() => { if (gen === mine) restore(kept); }));
+    if (kept.length)
+      queueMicrotask(() =>
+        queueMicrotask(() => {
+          if (gen === mine) restore(kept);
+        }),
+      );
   }
   draw();
 
   return {
-    get theme() { return theme; }, // the gate's report: { checked, rejected: [{ token, measured, floor, fallback }] }
+    get theme() {
+      return theme;
+    }, // the gate's report: { checked, rejected: [{ token, measured, floor, fallback }] }
     /** Take the pane down: its theme watchers go, and so does what it drew. */
-    destroy() { dead = true; closeWithin(root); unwatch(); if (sized) sized.disconnect(); untips(); release(root); root.replaceChildren(); root.classList.remove('mq-narrow', 'mq-mount'); if (added) root.classList.remove('mq'); if (mirrors && mine) root.removeAttribute('data-mq-theme'); },
-    update({ linted: upTo, seq, ...next }) {
+    destroy() {
+      dead = true;
+      closeWithin(root);
+      unwatch();
+      if (sized) sized.disconnect();
+      untips();
+      release(root);
+      root.replaceChildren();
+      root.classList.remove('mq-narrow', 'mq-mount');
+      if (added) root.classList.remove('mq');
+      if (mirrors && mine) root.removeAttribute('data-mq-theme');
+    },
+    update({ linted: upTo, seq, ...next }: Update) {
       // A lint that began before the one already shown is stale: keep the newer document.
       // `seq` orders lints that began at the same point in the log. A stale lint's
       // failure is as stale as its document: neither replaces the newer one.
       const lint = 'doc' in next || 'engine' in next;
       // One request may send several updates (partial results, then done): an equal `seq` is the same lint.
-      if (lint && ((upTo != null && upTo < (cur.state.linted ?? 0)) || (seq != null && cur.seq != null && seq < cur.seq))) { delete next.doc; delete next.engine; }
-      else if (lint && seq != null) cur.seq = seq;
+      if (
+        lint &&
+        ((upTo != null && upTo < (cur.state.linted ?? 0)) || (seq != null && cur.seq != null && seq < cur.seq))
+      ) {
+        delete next.doc;
+        delete next.engine;
+      } else if (lint && seq != null) cur.seq = seq;
       Object.assign(cur, next);
       // A new lint is the host saying it applied what the person answered: everything
       // up to `upTo`, the log length when the host started that lint (default: all of it).
       if (next.doc) {
         const s = linted(cur.state, upTo);
-        if (s.linted !== cur.state.linted) { cur.state = s; host.onChange?.(s, null); }
+        if (s.linted !== cur.state.linted) {
+          cur.state = s;
+          host.onChange?.(s, null);
+        }
       }
       draw();
     },
     view: () => cur.doc && docView(cur.doc, cur.state),
-    get state() { return cur.state; },
+    get state() {
+      return cur.state;
+    },
     host: h,
   };
 }

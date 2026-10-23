@@ -13,7 +13,7 @@ Until these land, the kit renders from a hand-written oracle in the contract's s
 | Issue | Ask | Why the kit needs it |
 |---|---|---|
 | [#2633](https://github.com/knitli/marque-dev/issues/2633) | Tracking issue for the set | Order and shared context. Suggested order: stable ids → layered markings → `asks` → readings → `depends_on` → person's acts → trace shape → artifacts → fallback → Live mode. |
-| [#2634](https://github.com/knitli/marque-dev/issues/2634) | Markings as layered tokens with typed mask regions | So a marking never breaks inside a token and the unidentified parts are regions, not characters. `src/marking.js` derives layers from the string until then. |
+| [#2634](https://github.com/knitli/marque-dev/issues/2634) | Markings as layered tokens with typed mask regions | So a marking never breaks inside a token and the unidentified parts are regions, not characters. `src/marking.ts` derives layers from the string until then. |
 | [#2635](https://github.com/knitli/marque-dev/issues/2635) | One `asks` field for everything that needs a person | The decision prompt renders one shape. A free answer is always allowed. |
 | [#2636](https://github.com/knitli/marque-dev/issues/2636) | Readings carry their rendered marking and the layer they change | The diff form tints the layer that differs; the kit can't compute that from a string. |
 | [#2637](https://github.com/knitli/marque-dev/issues/2637) | `depends_on[]` only when readings differ in roll-up; `document.ready` / `blocking[]` | "If ¶5's alternative is taken, the banner becomes…" is only worth showing when it's true. |
