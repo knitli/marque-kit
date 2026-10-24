@@ -2,7 +2,7 @@
   "name": "@marque/kit-core",
   "version": "0.1.0",
   "private": true,
-  "description": "The kit's logic with no DOM: the contract as types and the state log. Runs where a page can't, such as Outlook's send handler.",
+  "description": "The kit's logic with no DOM: the contract as types, the state log, and the rungs. Runs where a page can't, such as Outlook's send handler.",
   "license": "SEE LICENSE IN LICENSE.md",
   "author": "Knitli Inc.",
   "repository": {
@@ -16,6 +16,11 @@
   ],
   "type": "module",
   "exports": {
+    "./attention": {
+      "source": "./src/attention.ts",
+      "types": "./dist/attention.d.ts",
+      "default": "./dist/attention.js"
+    },
     "./state": {
       "source": "./src/state.ts",
       "types": "./dist/state.d.ts",

@@ -10,13 +10,13 @@ Guidance for working in this repo. The kit is the human-facing half of Marque; t
 
 ## What this is
 
-A UI kit for hosts that show Marque findings to a person: a web page, a Word or Outlook task pane, Marque's own surfaces. TypeScript and plain CSS, no framework, no runtime dependencies; `vp pack` builds each package's `dist/` (DECISIONS #20). A pnpm workspace (DECISIONS #22): `packages/core` (`@marque/kit-core`) is the logic with no DOM, the contract in types (`packages/core/src/types.ts`) and the state log; `packages/kit` (`@marque/kit`) builds the DOM and ships the CSS; `packages/web`, `packages/word` and `packages/outlook` will draw the inline marks in each host; `apps/office-addin` will be the Office add-in. The last four are placeholders. `docs/` is the design it implements; `fixtures/` is the memo every example uses; `demo/` renders it.
+A UI kit for hosts that show Marque findings to a person: a web page, a Word or Outlook task pane, Marque's own surfaces. TypeScript and plain CSS, no framework, no runtime dependencies; `vp pack` builds each package's `dist/` (DECISIONS #20). A pnpm workspace (DECISIONS #22): `packages/core` (`@marque/kit-core`) is the logic with no DOM: the contract in types (`packages/core/src/types.ts`), the state log, and the rungs and sections (`attention.ts`); `packages/kit` (`@marque/kit`) builds the DOM and ships the CSS; `packages/web`, `packages/word` and `packages/outlook` will draw the inline marks in each host; `apps/office-addin` will be the Office add-in. The last four are placeholders. `docs/` is the design it implements; `fixtures/` is the memo every example uses; `demo/` renders it.
 
 ## Fixed, by decision (docs/DECISIONS.md)
 
 These are not style preferences. Each has a dated maintainer decision behind it; change the decision first, then the code.
 
-- **Five rungs, computed in the kit.** `rung()` in `packages/kit/src/render.ts` is the published derivation ([docs/DERIVATION.md](docs/DERIVATION.md)): `needs_person` × `blocks` × host moment. The engine never emits a rung; severity never sets one.
+- **Five rungs, computed in the kit.** `rung()` in `packages/core/src/attention.ts` is the published derivation ([docs/DERIVATION.md](docs/DERIVATION.md)): `needs_person` × `blocks` × host moment. The engine never emits a rung; severity never sets one.
 - **Gold = must act. Blue = can act.** Nothing else is gold. Gold appears on Action required and Blocking only.
 - **Shape carries meaning, color rides along.** Thin underline = changed; 2px dotted act-ink = can act; 3px double attn-ink = must act; dashed = absent. On cards: `.mq-card.can-act / .must-act / .absent`. A greyscale print and forced-colors mode still read.
 - **Question first.** When a finding asks, the question is the card's heading; the marking is context; `says.text` explains; `Why?` and the citation sit in the footer.

@@ -21,18 +21,20 @@ packages/core/       @marque/kit-core: the logic with no DOM, so it runs anywher
   src/types.ts         the contract as types: findings, artifacts, the state log, the vocabulary, the host
   src/state.ts         the kit's half of the ladder: what the person did (answered, changed, kept as written,
                        deferred, declined), keyed by finding id, append-only, plain JSON the host persists
-  test/                the fixtures held to the types
+  src/attention.ts     rung(), sections(), markClass(): which of the five rungs a finding sits on, and the pane's
+                       four sections; what Outlook's send gate decides with
+  test/                the fixtures held to the types; the rung table and the state layer, against the memo
 packages/kit/        @marque/kit: the DOM and the CSS
   src/theme.css        the theme layer: --mq-* tokens (light default, dark, auto), how a marking fits,
                        the four shapes that carry meaning, control states, print, forced colors
   src/kit.css          the components, built only on theme.css
   src/marking.ts       the marking primitive: layers, tokens, four forms, never breaks inside a token
-  src/render.ts        finding JSON → DOM: rung(), markClass(), card(), row(), pane(), status(), artifact(), gate(),
-                       derivation(), receipt(), and mount(): the pane wired to the kit's state, the one call a host needs
+  src/render.ts        finding JSON → DOM: card(), row(), pane(), status(), artifact(), gate(), derivation(),
+                       receipt(), and mount(): the pane wired to the kit's state, the one call a host needs
   src/help.ts          help in three tiers (tooltip, Why?, the manual section) and the vocabulary lookup;
                        writes no help text of its own, it renders the engine's
   src/theme.ts         the theme gate at mount: contrast and size floors, falling back to shipped values
-  test/                the parser, the rung table, the state layer, lookup and citation landing under plain node
+  test/                the parser, the theme gate, lookup and citation landing under plain node
   test/dom/            the decided rules as they reach the DOM (card, gate, receipt), under vp test and happy-dom
 packages/web/        @marque/kit-web: inline marks on a page's own text (placeholder)
 packages/word/       @marque/kit-word: inline marks as content controls, selection-follow, the Purview label (placeholder)
