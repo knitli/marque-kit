@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Knitli Inc.
+//
+// SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+
 amends "package://github.com/jdx/hk/releases/download/v2.8.1/hk@2.8.1#/Config.pkl"
 
 import "package://github.com/jdx/hk/releases/download/v2.8.1/hk@2.8.1#/Builtins.pkl"
@@ -17,7 +21,12 @@ local linters = new Mapping {
   ["check_symlinks"] = Builtins.check_symlinks
   ["destroyed_symlinks"] = Builtins.destroyed_symlinks
   ["detect_private_key"] = Builtins.detect_private_key
-  ["fix_smart_quotes"] = Builtins.fix_smart_quotes
+  // Not on code: a curly apostrophe inside a '…' literal becomes a quote that ends it, and the file no longer parses.
+  // Not on fixtures/: CAPCO is quoted there verbatim.
+  ["fix_smart_quotes"] = (Builtins.fix_smart_quotes) {
+    exclude =
+      List("fixtures/**", "**/*.ts", "**/*.mts", "**/*.js", "**/*.html", "**/*.css", "**/*.py")
+  }
   // ["knip"] = Builtins.knip
   ["mise"] = Builtins.mise
   ["pkl"] = Builtins.pkl
@@ -25,7 +34,8 @@ local linters = new Mapping {
   ["shellcheck"] = Builtins.shellcheck
   ["shfmt"] = Builtins.shfmt
   ["trailing_whitespace"] = Builtins.trailing_whitespace
-  ["typos"] = Builtins.typos
+  // Not on fixtures/: ISO country codes there read as misspelled words.
+  ["typos"] = (Builtins.typos) { exclude = List("fixtures/**") }
   //  ["yq"] = Builtins.yq
 }
 

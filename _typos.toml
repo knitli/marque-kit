@@ -1,13 +1,14 @@
 # SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
-# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
 
 #:schema https://raw.githubusercontent.com/crate-ci/typos/master/config.schema.json
 #:tombi schema.strict = false
 
 [files]
 
-extend-exclude = []
+# CAPCO quoted verbatim and ISO country codes are not typos.
+extend-exclude = ["fixtures/"]
 
 [default]
 binary = false

@@ -96,7 +96,7 @@
   },
   {
    "code": "BGD",
-   "name": "People's Republic of Bangladesh"
+   "name": "People’s Republic of Bangladesh"
   },
   {
    "code": "BGR",
@@ -159,7 +159,7 @@
    "name": "Republic of Botswana"
   },
   {
-   "code": "CALF",
+   "code": "CAF",
    "name": "Central African Republic"
   },
   {
@@ -180,11 +180,11 @@
   },
   {
    "code": "CHN",
-   "name": "People's Republic of China"
+   "name": "People’s Republic of China"
   },
   {
    "code": "CIV",
-   "name": "Republic of Côte d'Ivoire"
+   "name": "Republic of Côte d’Ivoire"
   },
   {
    "code": "CMR",
@@ -272,7 +272,7 @@
   },
   {
    "code": "DZA",
-   "name": "People's Democratic Republic of Algeria"
+   "name": "People’s Democratic Republic of Algeria"
   },
   {
    "code": "ECU",
@@ -512,7 +512,7 @@
   },
   {
    "code": "LAO",
-   "name": "Lao People's Democratic Republic"
+   "name": "Lao People’s Democratic Republic"
   },
   {
    "code": "LBN",
@@ -539,7 +539,7 @@
    "name": "Democratic Socialist Republic of Sri Lanka"
   },
   {
-   "code": "ALSO",
+   "code": "LSO",
    "name": "Kingdom of Lesotho"
   },
   {
@@ -651,7 +651,7 @@
    "name": "Department of Mayotte"
   },
   {
-   "code": "NAME",
+   "code": "NAM",
    "name": "Republic of Namibia"
   },
   {
@@ -740,7 +740,7 @@
   },
   {
    "code": "PRK",
-   "name": "Democratic People's Republic of Korea"
+   "name": "Democratic People’s Republic of Korea"
   },
   {
    "code": "PRT",
@@ -815,7 +815,7 @@
    "name": "Republic of San Marino"
   },
   {
-   "code": "SOME",
+   "code": "SOM",
    "name": "Federal Republic of Somalia"
   },
   {
@@ -835,7 +835,7 @@
    "name": "Democratic Republic of Sao Tome and Principe"
   },
   {
-   "code": "SURE",
+   "code": "SUR",
    "name": "Republic of Suriname"
   },
   {
@@ -903,7 +903,7 @@
    "name": "Kingdom of Tonga"
   },
   {
-   "code": "TO",
+   "code": "TTO",
    "name": "Republic of Trinidad and Tobago"
   },
   {
@@ -1264,7 +1264,7 @@
     "CMR",
     "CAN",
     "CPV",
-    "CALF",
+    "CAF",
     "CHL",
     "CHN",
     "COL",
@@ -1321,7 +1321,7 @@
     "LAO",
     "LVA",
     "LBN",
-    "ALSO",
+    "LSO",
     "LBR",
     "LBY",
     "LIE",
@@ -1388,7 +1388,7 @@
     "ESP",
     "LKA",
     "SDN",
-    "SURE",
+    "SUR",
     "SWE",
     "CHE",
     "TJK",
@@ -1396,7 +1396,7 @@
     "TLS",
     "TGO",
     "TON",
-    "TO",
+    "TTO",
     "TUN",
     "TUR",
     "TKM",
@@ -1555,7 +1555,7 @@
     "CMR",
     "CAN",
     "CPV",
-    "CALF",
+    "CAF",
     "TCD",
     "CHL",
     "CHN",
@@ -1617,7 +1617,7 @@
     "LAO",
     "LVA",
     "LBN",
-    "ALSO",
+    "LSO",
     "LBR",
     "LBY",
     "LIE",
@@ -1640,7 +1640,7 @@
     "MAR",
     "MOZ",
     "MMR",
-    "NAME",
+    "NAM",
     "NRU",
     "NPL",
     "NLD",
@@ -1682,12 +1682,12 @@
     "SVK",
     "SVN",
     "SLB",
-    "SOME",
+    "SOM",
     "ZAF",
     "ESP",
     "LKA",
     "SDN",
-    "SURE",
+    "SUR",
     "SWE",
     "CHE",
     "SYR",
@@ -1696,7 +1696,7 @@
     "TLS",
     "TGO",
     "TON",
-    "TO",
+    "TTO",
     "TUN",
     "TUR",
     "TKM",
@@ -2775,8 +2775,8 @@
    "sponsor": "DNI",
    "policy_basis": "US Code Title 50, Chapter 36"
   },
-  "AND": {
-   "code": "AND",
+  "ND": {
+   "code": "ND",
    "short": "This control is used only on messages of the highest sensitivity between the President, the Secretary of State, and Chief of Mission. No further dissemination is allowed to any other than the original addressee(s) without the approval of the Executive Secretary.",
    "long": null,
    "citation": "§H.9 p174",
