@@ -23,6 +23,11 @@ const config: UserConfig = defineConfig({
     ignorePatterns: ['dist/**'],
     options: { typeAware: true, typeCheck: true },
   },
+  // DOM tests only (test/dom/); the rest run in node as written (node --test).
+  test: {
+    include: ['test/dom/**/*.test.ts'],
+    environment: 'happy-dom',
+  },
   pack: {
     entry: ['src/render.ts', 'src/marking.ts', 'src/state.ts', 'src/help.ts', 'src/theme.ts', 'src/types.ts'],
     format: ['esm'],
