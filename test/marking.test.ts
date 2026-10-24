@@ -39,7 +39,7 @@ for (const [text, L, T] of cases) {
 const codes =
   'AUS, AUT, BEL, BGR, CAN, CHE, CZE, DEU, DNK, ESP, EST, FIN, FRA, GBR, GRC, HRV, HUN, IRL, ISL, ITA, LTU, LUX, LVA, NLD';
 const long = `(S//REL TO USA, ${codes})`;
-const toks = tokens(layers(long)[1]);
+const toks = tokens(layers(long)[1]!);
 assert.equal(toks.filter((t) => /^[A-Z]{3},? ?\)?$/.test(t)).length, 25, '25 codes');
 assert.equal(layers(long).join(''), long, 'round-trips');
 assert.equal(spoken('(S//REL TO USA, GBR)'), 'S, REL TO, U-S-A, G-B-R');

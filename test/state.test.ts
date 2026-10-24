@@ -399,7 +399,7 @@ assert.equal(
   const { derived_from, ...rest }: Record<string, ArtifactField> = cab.fields!;
   assert.equal(view({ ...cab, fields: rest }, s).stale, true);
   assert.equal(
-    view({ ...cab, fields: { ...cab.fields!, derived_from: { ...derived_from, hint: 'a source list' } } }, s).stale,
+    view({ ...cab, fields: { ...cab.fields!, derived_from: { ...derived_from!, hint: 'a source list' } } }, s).stale,
     true,
   );
 }
@@ -445,8 +445,8 @@ assert.equal(
   const v = view(cab, s);
   v.history![0]!.value!.fields!.derived_from = 'changed';
   v.person!.act = 'declined';
-  assert.equal(s.log[0].value!.fields!.derived_from, 'Multiple Sources');
-  assert.equal(s.log[0].act, 'answered');
+  assert.equal(s.log[0]!.value!.fields!.derived_from, 'Multiple Sources');
+  assert.equal(s.log[0]!.act, 'answered');
 }
 // A block filled in to the last field waits to be written; one still open doesn't yet.
 {
@@ -529,7 +529,7 @@ assert.equal(
   const reading = structuredClone(f(P3).outcome.readings![0]!);
   const s = record(empty(), P3, 'answered', { reading, index: 0 });
   reading.reading = 'edited in place';
-  assert.notEqual(s.log[0].value!.reading!.reading, 'edited in place');
+  assert.notEqual(s.log[0]!.value!.reading!.reading, 'edited in place');
 }
 
 // "Fix it after all" on a written override stays pending: the host has the fix to apply.
