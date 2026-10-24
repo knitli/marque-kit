@@ -39,7 +39,7 @@ packages/kit/        @marque/kit: the DOM and the CSS
 packages/web/        @marque/kit-web: inline marks on a page's own text (placeholder)
 packages/word/       @marque/kit-word: inline marks as content controls, selection-follow, the Purview label (placeholder)
 packages/outlook/    @marque/kit-outlook: marks in the compose body, classification headers, the send gate (placeholder)
-apps/office-addin/   the Word and Outlook add-in: manifest, task pane, Office.js ↔ WASM engine ↔ kit (placeholder)
+apps/office-addin/   the Word and Outlook add-in: manifest, task pane, Office.js ↔ WASM engine ↔ kit; so far the Word pane on the memo
 fixtures/memo.txt            a six-paragraph memo with five things wrong
 fixtures/memo.findings.json  what Marque should say about it, in the contract's shape
 fixtures/memo.vocab.json     the engine's vocab and help JSON (ISMCAT + help_anchors.toml), for tiers 1–2 and lookup
@@ -66,6 +66,7 @@ import { mount } from '@marque/kit';
 const p = mount(el, { doc, state, vocab, moment: 'editing', onChange: (state, act) => save(state), onHelp, onJump });
 p.update({ doc });              // after a re-lint; async hosts add { linted: n, seq }
 p.update({ moment: 'finalize' }); // the host's moment; the kit never guesses it
+p.update({ open: id });         // an Office host's cursor in a marking: its card opens, focus stays put
 p.destroy();                    // when the pane goes away
 ```
 

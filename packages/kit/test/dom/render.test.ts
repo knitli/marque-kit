@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vite-plus/test';
 import { render as mark, masked } from '../../src/marking.ts';
-import { artifact, card, gate, pane, receipt, rung } from '../../src/render.ts';
+import { artifact, card, gate, mount, pane, receipt, rung } from '../../src/render.ts';
 import { why } from '../../src/help.ts';
 import { docView, empty, record, snapshot } from '@marque/kit-core/state';
 import type { Doc, FindingView, Moment } from '@marque/kit-core/types';
@@ -34,6 +34,34 @@ describe('question first', () => {
     const said = [...c.querySelectorAll('p.mq-p')].find((p) => p.textContent === x.says.text);
     expect(said).toBeTruthy();
     expect(h!.compareDocumentPosition(said!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+describe('the pane follows the cursor (DECISIONS #8)', () => {
+  test('update({ open }) opens that card and leaves focus in the document; null closes it', async () => {
+    // happy-dom lays nothing out: give the pane and its parent room for a card (the kit's floor is 240px).
+    const box = document.createElement('div'),
+      root = document.createElement('div');
+    for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
+    box.append(root);
+    document.body.append(box);
+    const outside = Object.assign(document.createElement('input'), { id: 'word' });
+    document.body.append(outside);
+    outside.focus();
+    const opened: (string | null)[] = [];
+    const p = mount(root, { doc: memo, onOpen: (x) => opened.push(x?.id ?? null) });
+    const row = () => root.querySelector(`.mq-row-item[data-finding="${P3}"]`);
+    p.update({ open: P3 });
+    await new Promise((r) => setTimeout(r));
+    expect(row()?.classList.contains('open')).toBe(true);
+    expect(document.activeElement).toBe(outside);
+    p.update({ open: null });
+    await new Promise((r) => setTimeout(r));
+    expect(row()?.classList.contains('open')).toBe(false);
+    expect(opened).toEqual([P3, null]);
+    p.destroy();
+    box.remove();
+    outside.remove();
   });
 });
 

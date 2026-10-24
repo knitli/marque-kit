@@ -6,6 +6,22 @@
   "license": "SEE LICENSE IN LICENSE.md",
   "author": "Knitli Inc.",
   "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "vp build",
+    "test": "node --conditions=source --test 'test/*.test.ts'"
+  },
+  "dependencies": {
+    "@marque/kit": "workspace:*",
+    "@marque/kit-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/office-js": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
   "engines": {
     "node": "^26"
   }

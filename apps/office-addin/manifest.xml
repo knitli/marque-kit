@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+
+SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+-->
+<!-- The development manifest: Word, a task pane served by `pnpm dev` at https://localhost:3000. -->
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+  <Id>27097e39-06e5-4caf-8259-fa66e7165328</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Knitli Inc.</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Marque" />
+  <Description DefaultValue="Checks the classification markings in a document and shows what needs you." />
+  <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-64.png" />
+  <SupportUrl DefaultValue="https://github.com/knitli/marque-kit" />
+  <Hosts>
+    <Host Name="Document" />
+  </Hosts>
+  <Requirements>
+    <Sets DefaultMinVersion="1.3">
+      <!-- 1.3: Range.compareLocationWith and getRange('Start'), which cursor-follow and jump use. -->
+      <Set Name="WordApi" MinVersion="1.3" />
+    </Sets>
+  </Requirements>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://localhost:3000/taskpane.html" />
+  </DefaultSettings>
+  <Permissions>ReadWriteDocument</Permissions>
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Document">
+        <DesktopFormFactor>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="Marque.Group">
+                <Label resid="Marque.Group.Label" />
+                <Icon>
+                  <bt:Image size="16" resid="Marque.Icon16" />
+                  <bt:Image size="32" resid="Marque.Icon32" />
+                  <bt:Image size="80" resid="Marque.Icon80" />
+                </Icon>
+                <Control xsi:type="Button" id="Marque.Open">
+                  <Label resid="Marque.Open.Label" />
+                  <Supertip>
+                    <Title resid="Marque.Open.Label" />
+                    <Description resid="Marque.Open.Tip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Marque.Icon16" />
+                    <bt:Image size="32" resid="Marque.Icon32" />
+                    <bt:Image size="80" resid="Marque.Icon80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>Marque.Pane</TaskpaneId>
+                    <SourceLocation resid="Marque.Pane.Url" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Marque.Icon16" DefaultValue="https://localhost:3000/assets/icon-16.png" />
+        <bt:Image id="Marque.Icon32" DefaultValue="https://localhost:3000/assets/icon-32.png" />
+        <bt:Image id="Marque.Icon80" DefaultValue="https://localhost:3000/assets/icon-80.png" />
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Marque.Pane.Url" DefaultValue="https://localhost:3000/taskpane.html" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="Marque.Group.Label" DefaultValue="Marque" />
+        <bt:String id="Marque.Open.Label" DefaultValue="Markings" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="Marque.Open.Tip" DefaultValue="Open the Marque pane: what's marked, what changed, and what needs you." />
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

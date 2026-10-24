@@ -36,8 +36,14 @@
       "types": "./dist/theme.d.ts",
       "default": "./dist/theme.js"
     },
-    "./theme.css": "./dist/theme.css",
-    "./kit.css": "./dist/kit.css"
+    "./theme.css": {
+      "source": "./src/theme.css",
+      "default": "./dist/theme.css"
+    },
+    "./kit.css": {
+      "source": "./src/kit.css",
+      "default": "./dist/kit.css"
+    }
   },
   "scripts": {
     "build": "vp pack",
