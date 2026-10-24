@@ -11,6 +11,7 @@
     "strict": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": false,
     // Source runs as written: node strips the types for the tests, Vite serves it to the demo, tsdown builds dist/.
     "allowImportingTsExtensions": true,

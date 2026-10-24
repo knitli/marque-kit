@@ -93,8 +93,8 @@ const lum = (c: RGBA): number => {
 };
 /** WCAG contrast of two opaque colours. */
 export const ratio = (a: RGBA, b: RGBA): number => {
-  const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
-  return (x + 0.05) / (y + 0.05);
+  const [x, y] = [lum(a), lum(b)];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 };
 
 // theme.css's token blocks; a host's own `.mq { … }` is not one of them.
