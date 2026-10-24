@@ -18,6 +18,8 @@
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true,
     "resolveJsonModule": true,
+    // Workspace packages resolve to their source (the "source" export condition), not dist/.
+    "customConditions": ["source"],
     "isolatedModules": true,
     // Every export says its own type, so declarations are emitted file by file (Oxc, in vp pack).
     "isolatedDeclarations": true,
@@ -25,5 +27,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["src", "test", "vite.config.ts"]
+  "include": ["packages/*/src", "packages/*/test", "vite.config.ts", "packages/*/vite.config.ts"]
 }

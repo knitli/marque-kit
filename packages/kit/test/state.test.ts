@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { rung, sections } from '../src/render.ts';
-import { empty, record, see, linted, snapshot, view, docView, ACTS } from '../src/state.ts';
+import { empty, record, see, linted, snapshot, view, docView, ACTS } from '@marque/kit-core/state';
 import type {
   Act,
   ArtifactField,
@@ -21,7 +21,7 @@ import type {
   Moment,
   NeedsPerson,
   Rung,
-} from '../src/types.ts';
+} from '@marque/kit-core/types';
 
 /* Table 2, row by row. */
 const T: [NeedsPerson, Blocks, Moment, Rung][] = [
@@ -51,7 +51,7 @@ assert.equal(rung({ ...comma, seen: true }), 'quiet');
 assert.equal(rung({ ...comma, outcome: { result: { text: '(S//REL TO  USA FVEY)' } } }), 'quiet');
 
 /* The memo. */
-const doc = JSON.parse(readFileSync(new URL('../fixtures/memo.findings.json', import.meta.url), 'utf8')) as Doc;
+const doc = JSON.parse(readFileSync(new URL('../../../fixtures/memo.findings.json', import.meta.url), 'utf8')) as Doc;
 const id = (x: { id: string }): string => x.id;
 const P3 = 'f-p3-ownership',
   P4 = 'f-p4-portion-mark-absent',

@@ -1,64 +1,26 @@
 {
-  "name": "@marque/kit",
-  "version": "0.1.0",
+  "name": "@marque/workspace",
+  "version": "0.0.0",
   "private": true,
-  "description": "Marque UI kit: the finding card, decision prompt, pane, inline marks and the theme layer. TypeScript and plain CSS; no framework, no runtime dependencies.",
+  "description": "Marque's UI kit and its host flavors: core logic, the DOM kit, and the web, Word and Outlook adapters.",
   "license": "SEE LICENSE IN LICENSE.md",
   "author": "Knitli Inc.",
   "repository": {
     "type": "git",
     "url": "https://github.com/knitli/marque-kit.git"
   },
-  "files": [
-    "dist",
-    "src",
-    "docs",
-    "fixtures",
-    "LICENSE.md",
-    "README.md"
-  ],
   "type": "module",
-  "exports": {
-    ".": {
-      "types": "./dist/render.d.ts",
-      "default": "./dist/render.js"
-    },
-    "./marking": {
-      "types": "./dist/marking.d.ts",
-      "default": "./dist/marking.js"
-    },
-    "./state": {
-      "types": "./dist/state.d.ts",
-      "default": "./dist/state.js"
-    },
-    "./help": {
-      "types": "./dist/help.d.ts",
-      "default": "./dist/help.js"
-    },
-    "./theme": {
-      "types": "./dist/theme.d.ts",
-      "default": "./dist/theme.js"
-    },
-    "./types": {
-      "types": "./dist/types.d.ts",
-      "default": "./dist/types.js"
-    },
-    "./theme.css": "./dist/theme.css",
-    "./kit.css": "./dist/kit.css"
-  },
   "scripts": {
     "demo": "vp dev",
     "dev": "vp dev",
-    "build": "vp pack",
-    "test": "node --test 'test/*.test.ts' && vp test",
+    "build": "vp run -r build",
+    "test": "vp run -r test",
     "check": "vp check",
     "fix": "vp check --fix",
-    "fmt": "vp fmt --write",
-    "prepack": "vp pack"
+    "fmt": "vp fmt --write"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "happy-dom": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"

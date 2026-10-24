@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = fileURLToPath(new URL('..', import.meta.url));
+const root = fileURLToPath(new URL('../../..', import.meta.url));
 const tsc = join(dirname(createRequire(import.meta.url).resolve('typescript/package.json')), 'bin/tsc');
 const FIXTURES = { 'memo.findings.json': 'Doc', 'memo.vocab.json': 'Vocab', 'memo.manual.json': 'Manual' } as const;
 
@@ -42,7 +42,7 @@ const check = (sources: Record<string, string>): string => {
 };
 
 const source = (type: string, json: string): string =>
-  `import type { ${type} } from ${JSON.stringify(join(root, 'src/types.ts'))};\n` +
+  `import type { ${type} } from ${JSON.stringify(join(root, 'packages/core/src/types.ts'))};\n` +
   `export const fixture = (${json}) satisfies ${type};\n`;
 
 const sources = Object.fromEntries(

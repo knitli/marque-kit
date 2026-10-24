@@ -6,7 +6,7 @@
 // `node test/marking.test.js`
 import assert from 'node:assert/strict';
 import { layers, tokens, parse, spoken, masked } from '../src/marking.ts';
-import type { Marking } from '../src/types.ts';
+import type { Marking } from '@marque/kit-core/types';
 
 const cases: [text: string, layers: string[], tokens: string[][]][] = [
   ['(U)', ['(U)'], [['(U)']]],

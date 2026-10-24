@@ -1,0 +1,44 @@
+{
+  "name": "@marque/kit-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The kit's logic with no DOM: the contract as types and the state log. Runs where a page can't, such as Outlook's send handler.",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "author": "Knitli Inc.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/knitli/marque-kit.git",
+    "directory": "packages/core"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./state": {
+      "source": "./src/state.ts",
+      "types": "./dist/state.d.ts",
+      "default": "./dist/state.js"
+    },
+    "./types": {
+      "source": "./src/types.ts",
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
+    }
+  },
+  "scripts": {
+    "build": "vp pack",
+    "test": "node --conditions=source --test 'test/*.test.ts'",
+    "prepack": "vp pack"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": "^26"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@marque/kit-word",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Word adapter: inline marks as content controls and underline styles, selection-follow, and the document's Purview label.",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "author": "Knitli Inc.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/knitli/marque-kit.git",
+    "directory": "packages/word"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts"
+    }
+  },
+  "engines": {
+    "node": "^26"
+  }
+}

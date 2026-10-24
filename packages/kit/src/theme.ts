@@ -14,7 +14,7 @@
 
 // [foreground, background, floor]; a tint is laid over the surface first. test/theme.test.js
 // checks this against what kit.css and theme.css paint: a pairing is measured here or excused there.
-import type { Rejected, ThemeReport } from './types.ts';
+import type { Rejected, ThemeReport } from '@marque/kit-core/types';
 
 /** An sRGB colour with alpha: [r, g, b, a], channels 0–255, alpha 0–1. */
 export type RGBA = [number, number, number, number];

@@ -10,11 +10,13 @@ import { describe, expect, test } from 'vite-plus/test';
 import { render as mark, masked } from '../../src/marking.ts';
 import { artifact, card, gate, pane, receipt, rung } from '../../src/render.ts';
 import { why } from '../../src/help.ts';
-import { docView, empty, record, snapshot } from '../../src/state.ts';
-import type { Doc, FindingView, Moment } from '../../src/types.ts';
+import { docView, empty, record, snapshot } from '@marque/kit-core/state';
+import type { Doc, FindingView, Moment } from '@marque/kit-core/types';
 
 // By path: under happy-dom, URL is the page's, and won't open a file.
-const memo = JSON.parse(readFileSync(join(import.meta.dirname, '../../fixtures/memo.findings.json'), 'utf8')) as Doc;
+const memo = JSON.parse(
+  readFileSync(join(import.meta.dirname, '../../../../fixtures/memo.findings.json'), 'utf8'),
+) as Doc;
 const P2 = 'f-p2-rel-to-separator',
   P3 = 'f-p3-ownership',
   P4 = 'f-p4-portion-mark-absent',

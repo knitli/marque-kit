@@ -6,8 +6,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Marque kit — demo</title>
-    <link rel="stylesheet" href="../src/theme.css" />
-    <link rel="stylesheet" href="../src/kit.css" />
+    <link rel="stylesheet" href="../packages/kit/src/theme.css" />
+    <link rel="stylesheet" href="../packages/kit/src/kit.css" />
     <style>
       /* Demo scaffolding only. Nothing below is part of the kit. */
       html,
@@ -118,10 +118,10 @@
     </div>
 
     <script type="module">
-      import { render as mark, settle } from '../src/marking.ts';
-      import { mount, gate, receipt, derivation, markClass } from '../src/render.ts';
-      import { why, explain, passage, lookup, float, tips } from '../src/help.ts';
-      import { docView } from '../src/state.ts';
+      import { render as mark, settle } from '../packages/kit/src/marking.ts';
+      import { mount, gate, receipt, derivation, markClass } from '../packages/kit/src/render.ts';
+      import { why, explain, passage, lookup, float, tips } from '../packages/kit/src/help.ts';
+      import { docView } from '../packages/core/src/state.ts';
 
       const $ = (s) => document.querySelector(s);
       const doc = await (await fetch('../fixtures/memo.findings.json')).json();
@@ -132,7 +132,7 @@
       const dec = new TextDecoder();
 
       /* The host: what the kit never decides. The kit keeps the person's acts
-   (src/state.ts) and hands each one here; a real host persists the state,
+   (packages/core/src/state.ts) and hands each one here; a real host persists the state,
    applies the edit, re-lints and calls p.update({ doc }). There is no engine
    here, so the stand-in re-lint is the kit's own overlay on the fixture. */
       const strip = ({ person, history, applying, ...x }) =>
@@ -254,7 +254,7 @@
         root.querySelectorAll('.mq-mark').forEach(settle);
       }
 
-      /* Help is the kit's (src/help.ts); where it opens is the host's. Tier 2 is a
+      /* Help is the kit's (packages/kit/src/help.ts); where it opens is the host's. Tier 2 is a
    popover by its anchor, tier 3 a window beside the pane; neither is modal. */
       let tier2 = null;
       function help(req) {

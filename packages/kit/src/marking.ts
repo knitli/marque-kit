@@ -21,7 +21,7 @@
  * No framework. Produces DOM nodes; works in any host that has a document.
  */
 
-import type { Layer, Marking, MarkingLike, Mask, Token, Vocab } from './types.ts';
+import type { Layer, Marking, MarkingLike, Mask, Token, Vocab } from '@marque/kit-core/types';
 
 /** Options for render(). */
 export interface RenderOptions {
