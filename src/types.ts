@@ -347,6 +347,9 @@ export interface Vocab {
 
 /** The cited sections of the manual, sliced at build. */
 export interface Manual {
+  schema?: string;
+  note?: string;
+  source?: string;
   sections: { section: string; title: string; pages: [number, number]; text: string }[];
 }
 
