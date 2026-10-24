@@ -53,3 +53,32 @@ export function paragraphAt(paragraphs: string[], offset: number): number {
   }
   return -1;
 }
+
+/** What a host does with the fixes Marque wrote (applied, or the safe reading chosen over the
+ *  author's): it writes them. The text after, and each span of the text before moved to where it
+ *  now falls. A span that was rewritten covers what was written in its place. */
+export function written(
+  text: string,
+  fixes: { span: [number, number]; result: string }[],
+): { text: string; at: (span: [number, number]) => [number, number] } {
+  const enc = new TextEncoder();
+  const src = enc.encode(text);
+  const edits = [...fixes].sort((a, b) => a.span[0] - b.span[0]);
+  const out: number[] = [];
+  let from = 0;
+  for (const e of edits) {
+    out.push(...src.subarray(from, e.span[0]), ...enc.encode(e.result));
+    from = e.span[1];
+  }
+  out.push(...src.subarray(from));
+  const shift = (offset: number): number =>
+    edits.reduce((d, e) => (e.span[1] <= offset ? d + enc.encode(e.result).length - (e.span[1] - e.span[0]) : d), 0);
+  return {
+    text: new TextDecoder().decode(new Uint8Array(out)),
+    at: ([s, e]) => {
+      const fix = edits.find((x) => x.span[0] === s && x.span[1] === e);
+      const start = s + shift(s);
+      return [start, fix ? start + enc.encode(fix.result).length : e + shift(e)];
+    },
+  };
+}

@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { Doc } from '@marque/kit-core/types';
-import { locate, paragraphAt } from '../src/locate.ts';
+import { locate, paragraphAt, written } from '../src/locate.ts';
 
 const read = (f: string): string => readFileSync(new URL(`../../../fixtures/${f}`, import.meta.url), 'utf8');
 const doc = JSON.parse(read('memo.findings.json')) as Doc;
@@ -33,4 +33,21 @@ assert.equal(locate(['ab', 'cd'], [1, 4]), null);
 assert.equal(locate(['é'], [1, 2]), null);
 // An empty span is a place with nothing written: where a missing mark goes.
 assert.deepEqual(locate(['ab', 'cd'], [3, 3]), { paragraph: 1, text: '', nth: 0 });
+// What the host writes: Marque's fixes in place, and every span moved to match.
+const fixes = doc.findings.flatMap((f) =>
+  f.anchor?.span && f.outcome?.result && (f.outcome.kind === 'applied' || f.outcome.kind === 'chosen_over')
+    ? [{ span: f.anchor.span, result: f.outcome.result.text }]
+    : [],
+);
+assert.equal(fixes.length, 3, '¶2 and ¶6 fixed, ¶5 the safe reading');
+const after = written(read('memo.txt'), fixes);
+const ps = after.text.replace(/\n$/, '').split('\n');
+for (const f of doc.findings) {
+  if (!f.anchor?.span) continue;
+  const at = locate(ps, after.at(f.anchor.span));
+  assert.ok(at, `${f.id}: still lands after the fixes`);
+  const want = fixes.some((x) => x.span === f.anchor?.span) ? f.outcome?.result?.text : f.marking?.as_written?.text;
+  if (want) assert.equal(at.text, want, `${f.id}: what the document now says there`);
+}
+assert.ok(after.text.includes('(S//REL TO USA, FVEY)') && !after.text.includes('USA,  GBR'), 'the fixes are in');
 console.log('locate: ok');

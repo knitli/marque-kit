@@ -16,7 +16,7 @@ The add-in a Word or Outlook user installs. It is an app, not a library: it ship
 
 The first slice, in Word only and with no engine: the kit's pane on the sample memo's findings (`fixtures/`).
 
-- **Insert the sample memo.** The fixture's spans are offsets into `memo.txt`, so they mean something only in a document that is the memo. Until it is, the pane says so and offers to put it in.
+- **Insert the sample memo.** The fixture's spans are offsets into `memo.txt`, so they mean something only in a document that is the memo. Until it is, the pane says so and offers to put it in, with the fixes Marque wrote (¶2, ¶5, ¶6) written in, as a host would: the pane never says "Changed" about text the document doesn't have. `written()` moves each span to match.
 - **Jump.** Opening a row selects its marking in the document; for the missing portion mark, the start of ¶4.
 - **Cursor-follow** (DECISIONS #8). The cursor landing in a paragraph with a finding opens that finding's card, through the kit's `update({ open })`.
 

@@ -23,9 +23,11 @@ import type { Doc, Subject, Vocab } from '@marque/kit-core/types';
 import findingsUrl from '../../../fixtures/memo.findings.json?url';
 import vocabUrl from '../../../fixtures/memo.vocab.json?url';
 import memo from '../../../fixtures/memo.txt?raw';
-import { locate, paragraphAt } from './locate.ts';
+import { locate, paragraphAt, written } from './locate.ts';
 
-const lines = memo.replace(/\n$/, '').split('\n');
+/** The memo as a host would have it: with the fixes Marque wrote (applied, or the safe reading
+ *  chosen over the author's) written in, and each finding's span moved to match. Set at ready. */
+let memoDoc: { lines: string[]; at: (span: [number, number]) => [number, number] } = { lines: [], at: (s) => s };
 
 /** The document's paragraphs as text: what the engine will read, joined by "\n". */
 const paragraphs = (): Promise<string[]> =>
@@ -36,14 +38,14 @@ const paragraphs = (): Promise<string[]> =>
   });
 
 /** The fixture's spans are offsets into memo.txt: they mean something only in a document that is the memo. */
-const isMemo = (ps: string[]): boolean => ps.join('\n') === lines.join('\n');
+const isMemo = (ps: string[]): boolean => ps.join('\n') === memoDoc.lines.join('\n');
 
-/** Replace the document with the memo, a paragraph per line, as memo.txt has it. */
+/** Replace the document with the memo, Marque's fixes written in, a paragraph per line. */
 const insertMemo = (): Promise<void> =>
   Word.run(async (ctx) => {
     const body = ctx.document.body;
     body.clear();
-    const [first = '', ...rest] = lines;
+    const [first = '', ...rest] = memoDoc.lines;
     body.paragraphs.getFirst().insertText(first, 'Replace');
     for (const l of rest) body.insertParagraph(l, 'End');
     await ctx.sync();
@@ -58,7 +60,8 @@ const jump = (f: Subject): Promise<void> =>
     await ctx.sync();
     const texts = ps.items.map((p) => p.text);
     if (!isMemo(texts)) return;
-    const at = locate(texts, f.anchor?.kind === 'portion' ? [span[0], span[0]] : span);
+    const [start, end] = memoDoc.at(span);
+    const at = locate(texts, f.anchor?.kind === 'portion' ? [start, start] : [start, end]);
     const p = at && ps.items[at.paragraph];
     if (!at || !p) return;
     if (!at.text) {
@@ -93,6 +96,15 @@ const selected = (): Promise<{ index: number; texts: string[] }> =>
 void Office.onReady(async (info) => {
   if (info.host !== Office.HostType.Word) return;
   const doc = (await (await fetch(findingsUrl)).json()) as Doc;
+  const fixed = written(
+    memo,
+    doc.findings.flatMap((f) =>
+      f.anchor?.span && f.outcome?.result && (f.outcome.kind === 'applied' || f.outcome.kind === 'chosen_over')
+        ? [{ span: f.anchor.span, result: f.outcome.result.text }]
+        : [],
+    ),
+  );
+  memoDoc = { lines: fixed.text.replace(/\n$/, '').split('\n'), at: fixed.at };
   const vocab = (await (await fetch(vocabUrl)).json()) as Vocab;
   const all = (): Subject[] => [...doc.findings, ...doc.document.artifacts];
 
@@ -118,7 +130,7 @@ void Office.onReady(async (info) => {
   const follow = async (): Promise<void> => {
     const { index, texts } = await selected();
     if (!show(isMemo(texts))) return;
-    const f = all().find((x) => x.anchor?.span && paragraphAt(texts, x.anchor.span[0]) === index);
+    const f = all().find((x) => x.anchor?.span && paragraphAt(texts, memoDoc.at(x.anchor.span)[0]) === index);
     if (f && f.id !== pane.host.open) pane.update({ open: f.id });
   };
 
