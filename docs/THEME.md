@@ -7,7 +7,7 @@ SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
 
 # The theme layer
 
-Tokens, the switch, fit, shapes, states, long markings, and the contrast audit. The source of truth for values is `src/theme.css` (v0.4); this file is the rationale and the rules. Light is the default theme (decided 16 Oct 2026).
+Tokens, the switch, fit, shapes, states, long markings, and the contrast audit. The source of truth for values is `packages/kit/src/theme.css` (v0.4); this file is the rationale and the rules. Light is the default theme (decided 16 Oct 2026).
 
 _Extracted from the Marque UI kit design canvas (boards: Theme, ThemeTokens, Fit, ThemeStates, LongMarkings, Contrast), 21 Oct 2026. The canvas is the visual record; this file is the text the kit is built to. Edit here from now on._
 

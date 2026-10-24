@@ -1,0 +1,12 @@
+{
+  "name": "@marque/office-addin",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Office add-in for Word and Outlook: manifest, task pane, and the glue between Office.js, Marque's WASM engine and the kit.",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "author": "Knitli Inc.",
+  "type": "module",
+  "engines": {
+    "node": "^26"
+  }
+}

@@ -10,13 +10,13 @@ Guidance for working in this repo. The kit is the human-facing half of Marque; t
 
 ## What this is
 
-A UI kit for hosts that show Marque findings to a person: a web page, a Word or Outlook task pane, Marque's own surfaces. TypeScript and plain CSS, no framework, no runtime dependencies; `vp pack` builds `dist/` (DECISIONS #20). `src/` is the kit; `src/types.ts` is the contract in types; `docs/` is the design it implements; `fixtures/` is the memo every example uses; `demo/` renders it.
+A UI kit for hosts that show Marque findings to a person: a web page, a Word or Outlook task pane, Marque's own surfaces. TypeScript and plain CSS, no framework, no runtime dependencies; `vp pack` builds each package's `dist/` (DECISIONS #20). A pnpm workspace (DECISIONS #22): `packages/core` (`@marque/kit-core`) is the logic with no DOM, the contract in types (`packages/core/src/types.ts`) and the state log; `packages/kit` (`@marque/kit`) builds the DOM and ships the CSS; `packages/web`, `packages/word` and `packages/outlook` will draw the inline marks in each host; `apps/office-addin` will be the Office add-in. The last four are placeholders. `docs/` is the design it implements; `fixtures/` is the memo every example uses; `demo/` renders it.
 
 ## Fixed, by decision (docs/DECISIONS.md)
 
 These are not style preferences. Each has a dated maintainer decision behind it; change the decision first, then the code.
 
-- **Five rungs, computed in the kit.** `rung()` in `src/render.ts` is the published derivation ([docs/DERIVATION.md](docs/DERIVATION.md)): `needs_person` × `blocks` × host moment. The engine never emits a rung; severity never sets one.
+- **Five rungs, computed in the kit.** `rung()` in `packages/kit/src/render.ts` is the published derivation ([docs/DERIVATION.md](docs/DERIVATION.md)): `needs_person` × `blocks` × host moment. The engine never emits a rung; severity never sets one.
 - **Gold = must act. Blue = can act.** Nothing else is gold. Gold appears on Action required and Blocking only.
 - **Shape carries meaning, colour rides along.** Thin underline = changed; 2px dotted act-ink = can act; 3px double attn-ink = must act; dashed = absent. On cards: `.mq-card.can-act / .must-act / .absent`. A greyscale print and forced-colours mode still read.
 - **Question first.** When a finding asks, the question is the card's heading; the marking is context; `says.text` explains; `Why?` and the citation sit in the footer.
@@ -27,7 +27,7 @@ These are not style preferences. Each has a dated maintainer decision behind it;
 - **Theme is free; behaviour is fixed.** Hosts may set `--mq-*` tokens. They may not change the rungs, the shapes' meanings, the fit rules, the free answer, "not my call", or the override record.
 - **Judge the text, never the person.** Messages say what the marking is and what Marque did. Never "you forgot".
 
-## Markings (src/marking.ts, docs/THEME.md "Fit" and "Long markings")
+## Markings (packages/kit/src/marking.ts, docs/THEME.md "Fit" and "Long markings")
 
 - A marking is `.mq-mark > .mq-l (layer) > .mq-i (token)`; all three `nowrap`; `<wbr>` between layers and between tokens. Break order: between layers (`//`) → after a list comma → between tokens → before `/`. **Never inside a token**: `REL TO`, `TOP SECRET`, `SI-G`, `DISPLAY ONLY`.
 - If it had to wrap, `settle()` adds `.stacked`: one layer per line, hanging indent .65em. CSS alone wraps greedily and orphans `GBR)`.
@@ -60,7 +60,7 @@ Every example in the docs and the demo uses the same six paragraphs. Keep it tha
 
 Banner derived: `SECRET//FGI AUS GBR//NOFORN`, or `…//REL TO USA, GBR` if ¶5's alternative is taken. CAB: Classified By known from identity; Derived From blank; Declassify On waits on Derived From.
 
-`fixtures/memo.findings.json` is a hand-written oracle in the contract's shape. Rule predicate ids in it are illustrative until wired to the engine's catalog; spans are byte offsets into `memo.txt`. When the engine emits this shape, the file becomes a parity test. `test/fixtures.test.ts` holds it, and the vocab and manual fixtures, to `src/types.ts`: a slot the types don't name fails, so a new field goes in the types first.
+`fixtures/memo.findings.json` is a hand-written oracle in the contract's shape. Rule predicate ids in it are illustrative until wired to the engine's catalog; spans are byte offsets into `memo.txt`. When the engine emits this shape, the file becomes a parity test. `packages/core/test/fixtures.test.ts` holds it, and the vocab and manual fixtures, to `packages/core/src/types.ts`: a slot the types don't name fails, so a new field goes in the types first.
 
 ## Never
 
@@ -72,12 +72,13 @@ Banner derived: `SECRET//FGI AUS GBR//NOFORN`, or `…//REL TO USA, GBR` if ¶5'
 - Never hide an override.
 - Never fabricate or copy a citation without re-verifying it at the new site.
 - Never add a framework, a second build step, or a runtime dependency without a decision in docs/DECISIONS.md.
-- Never type a contract slot as `any`, or widen one to quiet the checker. A shape the engine emits goes in `src/types.ts` first.
+- Never touch the DOM at runtime in `packages/core`: Outlook's send handler may run it without one. DOM types are fine; `document`, `window` and element constructors are not.
+- Never type a contract slot as `any`, or widen one to quiet the checker. A shape the engine emits goes in `packages/core/src/types.ts` first.
 
 ## Working here
 
-- `pnpm check` (format, lint, typecheck) and `pnpm test` (node runs `test/*.test.ts` as written; `vp test` runs `test/dom/` under happy-dom, DECISIONS #21) before a commit. A rule that shows in the DOM gets a test in `test/dom/render.test.ts`. `pnpm fix` formats. `pnpm build` writes `dist/`. `pnpm demo` to look. Markdown and the two extracted fixtures aren't formatted: a renumbered list changes what a doc says. CI (`.github/workflows/ci.yml`) runs check, test and build on every PR and push to `main`.
-- Check contrast when a token changes: the pairs and floors are `PAIRS` and `SIZES` in `src/theme.ts`. AA 4.5 on text pairs, 3.0 on lines and focus. `test/theme.test.ts` fails when `kit.css` or `theme.css` paints a pairing that isn't measured there or excused in the test with a reason; a new colour use means deciding which.
+- `pnpm check` (format, lint, typecheck) and `pnpm test` (in each package, node runs `test/*.test.ts` as written; in the kit, `vp test` runs `test/dom/` under happy-dom, DECISIONS #21) before a commit. A rule that shows in the DOM gets a test in `packages/kit/test/dom/render.test.ts`. `pnpm fix` formats. `pnpm build` writes each package's `dist/`. Workspace packages import each other by name; the `source` export condition points them at `src/`, so tests, typecheck and the demo run on source. `pnpm demo` to look. Markdown and the two extracted fixtures aren't formatted: a renumbered list changes what a doc says. CI (`.github/workflows/ci.yml`) runs check, test and build on every PR and push to `main`.
+- Check contrast when a token changes: the pairs and floors are `PAIRS` and `SIZES` in `packages/kit/src/theme.ts`. AA 4.5 on text pairs, 3.0 on lines and focus. `packages/kit/test/theme.test.ts` fails when `kit.css` or `theme.css` paints a pairing that isn't measured there or excused in the test with a reason; a new colour use means deciding which.
 - The docs under `docs/` were extracted from the canvas on 21 Oct 2026 and are now the source. Edit them here; the canvas is history.
 - Engine gaps go to marque-dev as issues, labelled `ui-kit` (+ `engine`, `audit`, `office`, `capco/ism` as they apply), and get a row in `docs/ENGINE-ASKS.md`. The Linear triage agent assigns cluster and lineage.
 - Commits and PRs end with the attribution lines the session provides.

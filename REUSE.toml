@@ -7,6 +7,6 @@ version = 1
 # Files that can't carry a header: JSON has no comments, lockfiles are generated,
 # and memo.txt is the document every span in the fixtures is a byte offset into.
 [[annotations]]
-path = ["package.json", "pnpm-lock.yaml", "mise.lock", "fixtures/memo.txt", "fixtures/*.json"]
+path = ["**/package.json", "pnpm-lock.yaml", "mise.lock", "fixtures/memo.txt", "fixtures/*.json"]
 SPDX-FileCopyrightText = "2026 Knitli Inc."
 SPDX-License-Identifier = "LicenseRef-MarqueCommercialLicense"

@@ -24,8 +24,18 @@
  */
 
 import { render as mark, el, button } from './marking.ts';
-import { answered } from './state.ts';
-import type { Citation, FindingView, HelpEntry, Host, Manual, Rung, Tetragraph, Trigraph, Vocab } from './types.ts';
+import { answered } from '@marque/kit-core/state';
+import type {
+  Citation,
+  FindingView,
+  HelpEntry,
+  Host,
+  Manual,
+  Rung,
+  Tetragraph,
+  Trigraph,
+  Vocab,
+} from '@marque/kit-core/types';
 
 /** What the vocabulary knows about a code. */
 export type Entry =

@@ -3,13 +3,18 @@
 // SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
 
 import type { UserConfig } from 'vite';
+import { defaultClientConditions } from 'vite';
 import { defineConfig } from 'vite-plus';
 
+// The workspace root: format and lint for every package, and the demo's dev server.
+// Each package's own vite.config.ts builds and tests it.
 const config: UserConfig = defineConfig({
+  // Workspace packages resolve to their TypeScript source (the "source" export condition), not dist/.
+  resolve: { conditions: ['source', ...defaultClientConditions] },
   fmt: {
     // memo.vocab.json and memo.manual.json are written by fixtures/extract.py, as it writes them.
     ignorePatterns: [
-      'dist/**',
+      '**/dist/**',
       'pnpm-lock.yaml',
       'fixtures/memo.vocab.json',
       'fixtures/memo.manual.json',
@@ -20,23 +25,8 @@ const config: UserConfig = defineConfig({
     printWidth: 120,
   },
   lint: {
-    ignorePatterns: ['dist/**'],
+    ignorePatterns: ['**/dist/**'],
     options: { typeAware: true, typeCheck: true },
-  },
-  // DOM tests only (test/dom/); the rest run in node as written (node --test).
-  test: {
-    include: ['test/dom/**/*.test.ts'],
-    environment: 'happy-dom',
-  },
-  pack: {
-    entry: ['src/render.ts', 'src/marking.ts', 'src/state.ts', 'src/help.ts', 'src/theme.ts', 'src/types.ts'],
-    format: ['esm'],
-    platform: 'browser',
-    target: 'es2023',
-    dts: true,
-    sourcemap: true,
-    // The stylesheets ship as written, beside the modules.
-    copy: ['src/theme.css', 'src/kit.css'],
   },
 });
 

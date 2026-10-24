@@ -33,7 +33,19 @@
  */
 
 import { render as mark, settle, resettle, relabel, masked, el, button } from './marking.ts';
-import { empty, record, see, linted, snapshot, docView, decision, answered, canon, face, isArtifact } from './state.ts';
+import {
+  empty,
+  record,
+  see,
+  linted,
+  snapshot,
+  docView,
+  decision,
+  answered,
+  canon,
+  face,
+  isArtifact,
+} from '@marque/kit-core/state';
 import { cite, hasTip, tips, closeWithin } from './help.ts';
 import { check, watch, release } from './theme.ts';
 import type {
@@ -59,7 +71,7 @@ import type {
   State,
   Subject,
   ThemeReport,
-} from './types.ts';
+} from '@marque/kit-core/types';
 
 /** What rung() reads: the two inputs Marque emits, and whether a visible change was seen. */
 export interface Attention {

@@ -8,9 +8,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { entry, answer, citation, hasTip, type Answer } from '../src/help.ts';
-import type { Citation, Doc, Manual, Vocab } from '../src/types.ts';
+import type { Citation, Doc, Manual, Vocab } from '@marque/kit-core/types';
 
-const load = <T>(f: string): T => JSON.parse(readFileSync(new URL(`../fixtures/${f}`, import.meta.url), 'utf8')) as T;
+const load = <T>(f: string): T =>
+  JSON.parse(readFileSync(new URL(`../../../fixtures/${f}`, import.meta.url), 'utf8')) as T;
 const vocab = load<Vocab>('memo.vocab.json'),
   manual = load<Manual>('memo.manual.json'),
   memo = load<Doc>('memo.findings.json');

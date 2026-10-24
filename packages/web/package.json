@@ -1,0 +1,22 @@
+{
+  "name": "@marque/kit-web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The web adapter for inline marks: the four shapes on a page's own text.",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "author": "Knitli Inc.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/knitli/marque-kit.git",
+    "directory": "packages/web"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts"
+    }
+  },
+  "engines": {
+    "node": "^26"
+  }
+}
