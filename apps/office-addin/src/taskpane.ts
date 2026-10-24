@@ -98,27 +98,31 @@ void Office.onReady(async (info) => {
 
   const pane = mount(document.querySelector<HTMLElement>('#pane')!, { doc, vocab, onJump: (f) => void jump(f) });
 
+  // Spans mean something only in the memo itself: while the document isn't the memo, say so and offer it.
+  // Kept in step on every selection change (typing is one) from the text cursor-follow reads anyway.
+  const sample = document.querySelector<HTMLElement>('#sample')!;
+  const show = (memo: boolean): boolean => {
+    sample.hidden = memo;
+    return memo;
+  };
+  sample.append(
+    el('p', 'mq-p', 'These are the sample memo’s findings. Put the memo in this document to follow them here.'),
+    button('act', 'Insert the sample memo', () => {
+      void insertMemo()
+        .then(paragraphs)
+        .then((ps) => show(isMemo(ps)));
+    }),
+  );
+
   // Cursor-follow: the card for the paragraph the cursor is in comes up. Leaving it keeps the card open.
   const follow = async (): Promise<void> => {
     const { index, texts } = await selected();
-    if (!isMemo(texts)) return;
+    if (!show(isMemo(texts))) return;
     const f = all().find((x) => x.anchor?.span && paragraphAt(texts, x.anchor.span[0]) === index);
     if (f && f.id !== pane.host.open) pane.update({ open: f.id });
   };
 
-  // Spans mean something only in the memo itself: until the document is the memo, say so and offer it.
-  const sample = document.querySelector<HTMLElement>('#sample')!;
-  const check = async (): Promise<void> => {
-    sample.hidden = isMemo(await paragraphs());
-    if (sample.hidden) return;
-    sample.replaceChildren(
-      el('p', 'mq-p', 'These are the sample memo’s findings. Put the memo in this document to follow them here.'),
-      button('act', 'Insert the sample memo', () => {
-        void insertMemo().then(check);
-      }),
-    );
-  };
-  await check();
+  show(isMemo(await paragraphs()));
   Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, () => {
     void follow();
   });
