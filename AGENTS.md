@@ -60,7 +60,7 @@ Every example in the docs and the demo uses the same six paragraphs. Keep it tha
 
 Banner derived: `SECRET//FGI AUS GBR//NOFORN`, or `…//REL TO USA, GBR` if ¶5's alternative is taken. CAB: Classified By known from identity; Derived From blank; Declassify On waits on Derived From.
 
-`fixtures/memo.findings.json` is a hand-written oracle in the contract's shape. Rule predicate ids in it are illustrative until wired to the engine's catalog; spans are byte offsets into `memo.txt`. When the engine emits this shape, the file becomes a parity test.
+`fixtures/memo.findings.json` is a hand-written oracle in the contract's shape. Rule predicate ids in it are illustrative until wired to the engine's catalog; spans are byte offsets into `memo.txt`. When the engine emits this shape, the file becomes a parity test. `test/fixtures.test.ts` holds it, and the vocab and manual fixtures, to `src/types.ts`: a slot the types don't name fails, so a new field goes in the types first.
 
 ## Never
 
