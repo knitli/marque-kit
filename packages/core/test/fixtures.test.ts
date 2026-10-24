@@ -51,7 +51,7 @@ const sources = Object.fromEntries(
     source(type, readFileSync(join(root, 'fixtures', file), 'utf8')),
   ]),
 );
-assert.equal(check(sources), '', "fixture is in the contract's shape");
+assert.equal(check(sources), '', "every fixture is in the contract's shape");
 
 // The check bites: a value outside a union, and a slot the types don't name, both fail.
 const memo = readFileSync(join(root, 'fixtures/memo.findings.json'), 'utf8');

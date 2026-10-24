@@ -7,7 +7,8 @@
 
 [files]
 
-extend-exclude = []
+# CAPCO quoted verbatim and ISO country codes are not typos.
+extend-exclude = ["fixtures/"]
 
 [default]
 binary = false
