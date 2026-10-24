@@ -269,18 +269,27 @@ export function check(root: HTMLElement | null | undefined): ThemeReport | null 
   // Forced colours: the user's system palette is in force, and it isn't the host's to fail or ours to replace.
   const forced = matchMedia('(forced-colors: active)').matches;
   // A fallback can break a pair that passed before it, so the pairs run again until nothing moves.
+  // The pane paints the ground from root's own tokens, over whatever is above it: measured once,
+  // and again only after a fallback, which may have moved the ground or the surface.
+  const base = (under: RGBA = backdrop(root)) => {
+    const page = over(read('ground'), under);
+    return { under, page, surface: over(read('surface'), page) };
+  };
+  let lay = base();
   for (let pass = 0, moved = !forced; moved && pass < PAIRS.length; pass++) {
     moved = false;
     for (const [fg, bg, floor] of PAIRS) {
-      // The pane paints the ground from root's own tokens, over whatever is above it.
-      const page = over(read('ground'), backdrop(root));
-      const surface = over(read('surface'), page);
+      const { page, surface } = lay;
       const back = bg === 'ground' ? page : bg === 'surface' ? surface : over(read(bg), surface); // each layer composited once
       const m = ratio(over(read(fg), back), back);
       if (m >= floor) continue;
       // The host's token gives way; if both are the host's, both do.
       const own = [fg, bg].filter(host);
-      for (const t of own.length ? own : [fg]) if (fall(t, m, floor)) moved = true;
+      let fell = false;
+      for (const t of own.length ? own : [fg]) if (fall(t, m, floor)) fell = true;
+      if (!fell) continue;
+      moved = true;
+      lay = base(lay.under); // the backdrop is above the root: a pin on the root can't move it
     }
   }
   for (const [t, floor] of SIZES) {

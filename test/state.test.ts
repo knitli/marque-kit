@@ -336,6 +336,30 @@ assert.equal(
   assert.deepEqual(d.document.pending, []);
   assert.equal(d.findings.find((x) => x.id === P2)!.overridden, undefined);
 }
+// An override doesn't answer a question asked of the finding since: it's open, and it blocks again.
+{
+  const p2 = f(P2);
+  const s = record(empty(), P2, 'kept_as_written', null, undefined, snapshot(p2));
+  const asked: FindingView = {
+    ...p2,
+    asks: { kind: 'confirm', text: 'Is FVEY meant here?', free_answer: true },
+    needs_person: 'required',
+    blocks: 'finalize',
+  };
+  const d = docView(
+    {
+      ...doc,
+      findings: doc.findings.map((x) => (x.id === P2 ? asked : x)),
+      document: { ...doc.document, blocking: [...doc.document.blocking, P2] },
+    },
+    s,
+  );
+  const v = d.findings.find((x) => x.id === P2)!;
+  assert.equal(v.overridden, undefined);
+  assert.equal(v.stale, true);
+  assert.ok(d.document.blocking.includes(P2), 'a new question is never answered by an old override');
+  assert.equal(d.document.ready, false);
+}
 // A take-back of a written answer on a finding that has since changed restores nothing and isn't pending.
 {
   let s = record(

@@ -167,7 +167,8 @@ function conceal(m: Marking): Marking {
   return { ...m, text, layers, masks };
 }
 
-function el<K extends keyof HTMLElementTagNameMap>(
+/** An element with its class and text: the kit's one way to make one (render and help use it too). */
+export function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   cls?: string | null,
   text?: string | null,
@@ -176,6 +177,13 @@ function el<K extends keyof HTMLElementTagNameMap>(
   if (cls) n.className = cls;
   if (text != null) n.textContent = text;
   return n;
+}
+/** A kit button: never a form submit. */
+export function button(cls: string, text: string, onClick: (e: MouseEvent) => void): HTMLButtonElement {
+  const b = el('button', `mq-btn ${cls}`, text);
+  b.type = 'button';
+  b.addEventListener('click', onClick);
+  return b;
 }
 
 /**
@@ -256,7 +264,8 @@ export function render(marking: MarkingLike, o: RenderOptions = {}): HTMLSpanEle
     root.appendChild(L);
   });
   // masks: typed regions from the engine (knitli/marque-dev#2634)
-  for (const mask of m.masks) root.querySelectorAll('.mq-l')[mask.layer ?? -1]?.appendChild(maskEl(mask));
+  // One given by neither span nor layer is drawn at the end, where spoken() says it.
+  for (const mask of m.masks) root.querySelectorAll('.mq-l')[layerOf(m, mask)]?.appendChild(maskEl(mask));
   return root;
 }
 
@@ -269,12 +278,14 @@ export function masked(marking: MarkingLike): string {
       (l, i) =>
         l.tokens.map((t) => (t.mask ? glyphs(t.mask) : t.t)).join('') +
         m.masks
-          .filter((k) => k.layer === i)
+          .filter((k) => layerOf(m, k) === i)
           .map(glyphs)
           .join(''),
     )
     .join('');
 }
+/** The layer a mask without a span is drawn at the end of: its own, else the last. */
+const layerOf = (m: Marking, mask: Mask): number => mask.layer ?? m.layers.length - 1;
 const glyphs = (mask: Mask): string => (mask.kind === 'concealed' ? '█' : '_').repeat(mask.len ?? 0);
 function maskEl(mask: Mask): HTMLSpanElement {
   const s = el('span', mask.kind === 'concealed' ? 'mq-conceal' : 'mq-mask', glyphs(mask));
