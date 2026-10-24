@@ -6,8 +6,8 @@
  * Render — finding JSON (docs/CONTRACT.md) → the kit's DOM.
  *
  * One function per component, in build order (docs/COMPONENTS.md):
- *   rung(f, moment) — which of the five rungs a finding sits on (docs/DERIVATION.md)
- *   markClass(f, m) — C8, the shape class an inline-mark adapter puts on a span
+ *   rung, markClass, sections — re-exported from @marque/kit-core/attention,
+ *                     which has no DOM (docs/DERIVATION.md; C8's shape class)
  *   card(f, host)   — C3, the finding card; C4 (the asks renderer) lives inside it
  *   row(f, host, d) — C6, the pane's collapsed list item
  *   pane(doc, host) — C6–C7, the whole pane plus the document status line
@@ -46,6 +46,7 @@ import {
   face,
   isArtifact,
 } from '@marque/kit-core/state';
+import { GATE, rung, waits, artRung, artWaits, sections, type Sections } from '@marque/kit-core/attention';
 import { cite, hasTip, tips, closeWithin } from './help.ts';
 import { check, watch, release } from './theme.ts';
 import type {
@@ -54,17 +55,14 @@ import type {
   Anchor,
   ArtifactField,
   ArtifactView,
-  Blocks,
   Doc,
   EngineState,
   Finding,
   FindingView,
   Host,
   LogEntry,
-  MarkingInput,
   MarkingLike,
   Moment,
-  NeedsPerson,
   Rule,
   Rung,
   Snapshot,
@@ -73,21 +71,10 @@ import type {
   ThemeReport,
 } from '@marque/kit-core/types';
 
-/** What rung() reads: the two inputs Marque emits, and whether a visible change was seen. */
-export interface Attention {
-  needs_person: NeedsPerson;
-  blocks: Blocks;
-  seen?: boolean | undefined;
-  marking?: Finding['marking'] | undefined;
-  outcome?: { result?: MarkingInput | null | undefined } | undefined;
-}
-/** The pane's four sections, in order. */
-export interface Sections {
-  must: Subject[];
-  can: Subject[];
-  later: Subject[];
-  done: Subject[];
-}
+// The rung, the inline mark's class and the sections live in core; hosts still find them here.
+export { rung, markClass, sections } from '@marque/kit-core/attention';
+export type { Attention, Sections } from '@marque/kit-core/attention';
+
 /** A stamp: its tone class and its word. */
 type Stamp = [tone: string, word: string];
 /** A line on the receipt: a finding, an artifact, or acts on one the lint withdrew. */
@@ -189,39 +176,10 @@ const isMarking = (v: unknown): v is MarkingLike =>
   typeof v === 'string' || typeof (v as { text?: unknown } | null | undefined)?.text === 'string';
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
-/* ── 1b · rung ───────────────────────────────────────────────────────── */
-/** Moments at which an open "finalize" finding stops the operation. The host
- *  names its moment; Marque never knows it (docs/DERIVATION.md, Table 2). */
-const GATE = new Set<Moment | undefined>(['finalize', 'send']);
-
-/**
- * needs_person × blocks × host moment → rung. The kit computes this
- * (decided 16 Oct); the engine emits only the two inputs.
- */
-export function rung(f: Attention, moment: Moment = 'editing'): Rung {
-  const atGate = GATE.has(moment);
-  if (f.needs_person !== 'none' && f.blocks === 'now') return 'blocking';
-  if (f.needs_person === 'required') return atGate && f.blocks !== 'never' ? 'blocking' : 'action';
-  if (f.needs_person === 'optional') return atGate && f.blocks === 'finalize' ? 'blocking' : 'advisory';
-  // Nothing for a person to do. Noticeable while a visible change is unseen;
-  // seen only quiets. Severity never sets a rung (docs/DERIVATION.md, table 2).
-  return visiblyChanged(f) && !f.seen ? 'noticeable' : 'quiet';
-}
-
-/** A change a person can see: the tokens differ, not just the whitespace
- *  between them (¶2's added comma, yes; ¶6's doubled space, no). */
 /** How many in `list` changed the document at all, whitespace included. */
 const changes = (list: Subject[]): number =>
   list.filter((f) => f.outcome?.result && f.marking?.as_written && f.outcome.result.text !== f.marking.as_written.text)
     .length;
-
-function visiblyChanged(f: Attention): boolean {
-  const was = f.marking?.as_written?.text,
-    now = f.outcome?.result?.text;
-  if (!was || !now) return false;
-  const norm = (t: string): string => t.replace(/\s+/g, ' ').trim();
-  return norm(was) !== norm(now);
-}
 
 const wasAsked = (f: Subject): boolean =>
   !!f.asked || !!f.history?.some((e) => e.act === 'answered' && !e.value?.apply); // an apply isn't an answer
@@ -239,11 +197,6 @@ const STAMP: Record<Rung, Stamp> = {
   action: ['attn', 'Needs you'],
   blocking: ['attn', 'Blocks finalize'],
 };
-/** An absent marking while the person is still writing is not a demand yet:
- *  dashed, "at finalize", filed under "Before you finalize". It becomes gold
- *  the moment they try to finalize. */
-const waits = (f: Subject, moment?: Moment): boolean =>
-  f.marking?.shape === 'absent' && f.needs_person !== 'none' && f.blocks === 'finalize' && !GATE.has(moment);
 const shapeOf = (f: Subject, r: Rung, moment?: Moment): string => (waits(f, moment) ? 'absent' : SHAPE[r]);
 function stampOf(f: Subject, r: Rung, moment?: Moment): Stamp {
   if (f.overridden) return ['quiet', 'Reported'];
@@ -254,22 +207,6 @@ function stampOf(f: Subject, r: Rung, moment?: Moment): Stamp {
     return ['quiet', f.deferred === 'declined' ? 'Not my call' : 'At finalize'];
   if (waits(f, moment)) return ['quiet', 'At finalize'];
   return STAMP[r];
-}
-
-/* ── C8 · inline mark ────────────────────────────────────────────────── */
-/** The shape class an adapter puts on the marking's span in the document:
- *  web overlay, ::highlight(), or Word's own underline (docs/MODEL.md, Hosts).
- *  Quiet has no mark. */
-export function markClass(f: FindingView, moment: Moment = 'editing'): string {
-  if (waits(f, moment)) return 'mq-absent';
-  const r = rung(f, moment);
-  return r === 'action' || r === 'blocking'
-    ? 'mq-must-act'
-    : r === 'advisory'
-      ? 'mq-can-act'
-      : r === 'noticeable'
-        ? 'mq-changed'
-        : '';
 }
 
 /* ── C4 · the asks renderer ──────────────────────────────────────────── */
@@ -512,24 +449,6 @@ export function card(f: FindingView, host: Host = {}): HTMLElement {
 }
 
 /* ── C6 · the collapsed row ──────────────────────────────────────────── */
-/** An artifact's rung (docs/COMPONENTS.md, Artifact card): Table 2 when it
- *  needs a person, as for a finding. Otherwise a derived value nobody has
- *  written yet, or an artifact that isn't required, is Advisory; anything
- *  else (a non-canonical fix, a block the person filled in) is done. */
-const artRung = (a: ArtifactView, moment?: Moment): Rung =>
-  a.needs_person !== 'none'
-    ? rung(a, moment)
-    : a.applying
-      ? 'quiet'
-      : a.state === 'present_not_canonical'
-        ? a.seen
-          ? 'quiet'
-          : 'noticeable'
-        : a.state === 'present_not_required' || (a.state === 'absent_but_required' && a.derived_value)
-          ? 'advisory'
-          : 'quiet';
-/** A required artifact that only blocks at finalize waits for it, like an absent mark. */
-const artWaits = (a: ArtifactView, moment?: Moment): boolean => a.blocks === 'finalize' && !GATE.has(moment);
 /** An artifact's stamp says what it is: missing and derived, there but not required, changed, or done. */
 const artStamp = (a: ArtifactView, r: Rung, moment?: Moment): Stamp =>
   r === 'blocking'
@@ -624,44 +543,6 @@ export function row(f: Subject, host: Host = {}, doc?: Doc | null): HTMLDivEleme
   });
   if (host.open === f.id && !host.narrow) queueMicrotask(() => toggle(true));
   return li;
-}
-
-/* ── the pane's sections, shared by the pane, the status and the head ── */
-/** Four sections, always in this order; document order within each, never
- *  severity (docs/COMPONENTS.md, Findings pane). */
-export function sections(doc: Doc, moment: Moment = 'editing'): Sections {
-  const g: Sections = { must: [], can: [], later: [], done: [] };
-  for (const f of doc.findings) {
-    if (f.outcome?.kind === 'covered_by') continue; // one span, one card: it lives in its owner's
-    const r = rung(f, moment);
-    if (r === 'blocking') g.must.push(f);
-    // "Not my call" routes the question; it stays Action required for whoever gets it.
-    // Deferred, Advisory or Action required, it waits for finalize, where it blocks.
-    // At the gate the moment it waited for has come, so one that never blocks is back in its section.
-    else if (
-      waits(f, moment) ||
-      ((r === 'action' || r === 'advisory') && f.deferred === 'deferred' && !GATE.has(moment))
-    )
-      g.later.push(f);
-    else if (r === 'action') g.must.push(f);
-    else if (r === 'advisory') g.can.push(f);
-    else g.done.push(f);
-  }
-  for (const a of doc.document.artifacts) {
-    if (a.state === 'present' || a.state === 'absent_not_required') continue; // receipt entries, not cards
-    const r = artRung(a, moment);
-    (r === 'blocking'
-      ? g.must
-      : r === 'action'
-        ? artWaits(a, moment)
-          ? g.later
-          : g.must
-        : r === 'advisory'
-          ? g.can
-          : g.done
-    ).push(a);
-  }
-  return g;
 }
 
 /* ── C7 · document status ────────────────────────────────────────────── */

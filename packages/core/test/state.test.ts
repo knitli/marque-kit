@@ -2,13 +2,13 @@
 //
 // SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
 
-// The rung function (docs/DERIVATION.md, Table 2) and the kit's state layer
-// (src/state.js), run against the memo under plain node (no DOM).
-// `node test/state.test.js`
+// The rung function (docs/DERIVATION.md, Table 2, src/attention.ts) and the kit's state layer
+// (src/state.ts), run against the memo under plain node (no DOM).
+// `node test/state.test.ts`
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { rung, sections } from '../src/render.ts';
-import { empty, record, see, linted, snapshot, view, docView, ACTS } from '@marque/kit-core/state';
+import { rung, sections } from '../src/attention.ts';
+import { empty, record, see, linted, snapshot, view, docView, ACTS } from '../src/state.ts';
 import type {
   Act,
   ArtifactField,
@@ -21,7 +21,7 @@ import type {
   Moment,
   NeedsPerson,
   Rung,
-} from '@marque/kit-core/types';
+} from '../src/types.ts';
 
 /* Table 2, row by row. */
 const T: [NeedsPerson, Blocks, Moment, Rung][] = [

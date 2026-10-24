@@ -27,6 +27,24 @@ const config: UserConfig = defineConfig({
   lint: {
     ignorePatterns: ['**/dist/**'],
     options: { typeAware: true, typeCheck: true },
+    overrides: [
+      {
+        // Core runs where there may be no page: Outlook's send handler. DOM types are fine; DOM values are not.
+        files: ['packages/core/**'],
+        rules: {
+          'no-restricted-globals': [
+            'error',
+            'document',
+            'window',
+            'navigator',
+            'getComputedStyle',
+            'customElements',
+            'ResizeObserver',
+            'MutationObserver',
+          ],
+        },
+      },
+    ],
   },
 });
 

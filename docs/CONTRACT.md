@@ -126,7 +126,7 @@ _K · U_
 
 ### F.1 · The host loop — how acts reach the document
 
-The kit records; the host writes; Marque re-lints. `packages/core/src/state.ts` and `mount()` in `packages/kit/src/render.ts` implement this; the tests in `packages/kit/test/state.test.ts` are its examples.
+The kit records; the host writes; Marque re-lints. `packages/core/src/state.ts` and `mount()` in `packages/kit/src/render.ts` implement this; the tests in `packages/core/test/state.test.ts` are its examples.
 
 **The state.** Plain JSON the host persists whole: `{ log, seen, linted }`.
 - `log` is append-only: `{ id, act, value, at, about }`. `act` is one of answered · changed · kept_as_written · deferred · declined (marque-dev#2643). A `changed` with a null value takes the last decision back to Marque's result. `about` is a snapshot of what the act was about: rule, place, the marking as written, Marque's outcome and question. Markings and Marque's words only, never body text.
