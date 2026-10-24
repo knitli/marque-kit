@@ -5,6 +5,7 @@
 // The fixtures against the contract in types. JSON.parse gives `unknown`, and a JSON import
 // widens 'span' to string, so each fixture is written out as a literal that `satisfies` its
 // type and the checker runs on it: a slot the types don't name, or a value outside a union, fails.
+// The files are .mts so they are ESM wherever the temp dir is, with or without a package.json above.
 // `node test/fixtures.test.ts`
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -28,7 +29,7 @@ const check = (sources: Record<string, string>): string => {
       JSON.stringify({
         extends: join(root, 'tsconfig.json'),
         compilerOptions: { types: [], isolatedDeclarations: false },
-        include: ['*.ts'],
+        include: ['*.mts'],
       }),
     );
     execFileSync(process.execPath, [tsc, '-p', dir], { encoding: 'utf8' });
@@ -46,7 +47,7 @@ const source = (type: string, json: string): string =>
 
 const sources = Object.fromEntries(
   Object.entries(FIXTURES).map(([file, type]) => [
-    file.replace('.json', '.ts'),
+    file.replace('.json', '.mts'),
     source(type, readFileSync(join(root, 'fixtures', file), 'utf8')),
   ]),
 );
@@ -54,7 +55,7 @@ assert.equal(check(sources), '', 'every fixture is in the contract’s shape');
 
 // The check bites: a value outside a union, and a slot the types don't name, both fail.
 const memo = readFileSync(join(root, 'fixtures/memo.findings.json'), 'utf8');
-const outside = check({ 'bad.ts': source('Doc', memo.replace('"kind": "span"', '"kind": "spam"')) });
+const outside = check({ 'bad.mts': source('Doc', memo.replace('"kind": "span"', '"kind": "spam"')) });
 assert.match(outside, /"spam"/);
-const unnamed = check({ 'bad.ts': source('Doc', memo.replace('"needs_person"', '"unlisted": 1, "needs_person"')) });
+const unnamed = check({ 'bad.mts': source('Doc', memo.replace('"needs_person"', '"unlisted": 1, "needs_person"')) });
 assert.match(unnamed, /unlisted/);
