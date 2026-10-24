@@ -11,7 +11,7 @@ SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
   xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
   xsi:type="TaskPaneApp">
   <Id>27097e39-06e5-4caf-8259-fa66e7165328</Id>
-  <Version>0.1.0.0</Version>
+  <Version>1.0.0.0</Version>
   <ProviderName>Knitli Inc.</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Marque" />
@@ -19,7 +19,6 @@ SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
   <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png" />
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-64.png" />
   <SupportUrl DefaultValue="https://github.com/knitli/marque-kit" />
-  <AppDomains />
   <Hosts>
     <Host Name="Document" />
   </Hosts>
