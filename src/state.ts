@@ -260,8 +260,7 @@ const schema = ({ state, value, source, from, ...fl }: ArtifactField): string =>
 const source = (fl: ArtifactField): string =>
   canon({ state: fl.state ?? null, value: fl.value ?? null, source: fl.source ?? null });
 
-const edited = (e: LogEntry | null | undefined): LogEntry | null =>
-  e?.act === 'answered' || e?.act === 'changed' ? e : null;
+const edited = (e: LogEntry | null | undefined): LogEntry | null => (edits(e) ? e : null);
 /** On a view (render and help share it): the person's decision on this finding: the act in force, or, once a lint has
  *  written it and nothing is asked again, the last one in the history. A stale
  *  view has no decision: the lint dropped the person's last one. Nor is a
@@ -282,6 +281,8 @@ const holds = (e: LogEntry | null, f: Subject): LogEntry | null => {
 export const decision = (f: Subject): LogEntry | null =>
   edited(f.person) ||
   (!f.stale && f.needs_person === 'none' && !f.asks ? holds(edited(f.history?.findLast((e) => edited(e))), f) : null);
+/** The person's own answer stands on this finding, live or already written. */
+export const answered = (f: Subject): boolean => decision(f)?.value != null;
 /** One finding or artifact as it stands with the person's acts on it. */
 export function view<T extends Subject>(f: T, state: State, took?: Set<string>): T {
   const v = overlay(f, state, took);
@@ -329,15 +330,9 @@ function overlay(f: Subject, state: State, took?: Set<string>): Subject {
       };
     }
     case 'kept_as_written':
-      // The person kept one marking against one fix; a different one under the same id is open again.
-      if (
-        e.about &&
-        ((e.about.rule ?? null) !== ruleOf(f) ||
-          !sameAsWritten(e.about, f) ||
-          !sameResult(e.about, f.outcome?.result) ||
-          ('anchor' in e.about && place(e.about.anchor) !== place(f.anchor)))
-      )
-        return { ...v, person: null, stale: true };
+      // The person kept one marking against one fix; a different one under the same id, or a question
+      // asked of it since, is open again.
+      if (moved(e, f)) return { ...v, person: null, stale: true };
       return {
         ...v,
         overridden: true,

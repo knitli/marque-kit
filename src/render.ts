@@ -9,10 +9,10 @@
  *   rung(f, moment) — which of the five rungs a finding sits on (docs/DERIVATION.md)
  *   markClass(f, m) — C8, the shape class an inline-mark adapter puts on a span
  *   card(f, host)   — C3, the finding card; C4 (the asks renderer) lives inside it
- *   row(f, host)    — C6, the pane's collapsed list item
+ *   row(f, host, d) — C6, the pane's collapsed list item
  *   pane(doc, host) — C6–C7, the whole pane plus the document status line
  *   status(doc, h)  — C7, the one-line document status
- *   artifact(a, h)  — C9, banner / CAB card
+ *   artifact(a,h,d) — C9, banner / CAB card
  *   gate(doc, host) — C10, the Needs-you section with defer removed
  *   derivation(a)   — C11, how Marque got here
  *   receipt(doc)    — C12, the audit receipt (what the engine will attest)
@@ -32,8 +32,8 @@
  * engine's document as-is.
  */
 
-import { render as mark, settle, resettle, relabel, masked } from './marking.ts';
-import { empty, record, see, linted, snapshot, docView, decision, canon, face, isArtifact } from './state.ts';
+import { render as mark, settle, resettle, relabel, masked, el, button } from './marking.ts';
+import { empty, record, see, linted, snapshot, docView, decision, answered, canon, face, isArtifact } from './state.ts';
 import { cite, hasTip, tips, closeWithin } from './help.ts';
 import { check, watch, release } from './theme.ts';
 import type {
@@ -132,22 +132,6 @@ export interface Mounted {
 }
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
-const el = <K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  cls?: string | null,
-  text?: string | null,
-): HTMLElementTagNameMap[K] => {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text != null) n.textContent = text;
-  return n;
-};
-const button = (cls: string, text: string, onClick: (e: MouseEvent) => void): HTMLButtonElement => {
-  const b = el('button', `mq-btn ${cls}`, text);
-  b.type = 'button';
-  b.addEventListener('click', onClick);
-  return b;
-};
 /** DOM ids per rendered copy: the gate and the pane can show the same finding at once. */
 let uid = 0;
 const placed = <T extends HTMLElement>(m: T): T => {
@@ -227,8 +211,6 @@ function visiblyChanged(f: Attention): boolean {
   return norm(was) !== norm(now);
 }
 
-const decided = decision;
-const settled = (f: Subject): boolean => decided(f)?.value != null;
 const wasAsked = (f: Subject): boolean =>
   !!f.asked || !!f.history?.some((e) => e.act === 'answered' && !e.value?.apply); // an apply isn't an answer
 const SHAPE: Record<Rung, string> = {
@@ -253,7 +235,7 @@ const waits = (f: Subject, moment?: Moment): boolean =>
 const shapeOf = (f: Subject, r: Rung, moment?: Moment): string => (waits(f, moment) ? 'absent' : SHAPE[r]);
 function stampOf(f: Subject, r: Rung, moment?: Moment): Stamp {
   if (f.overridden) return ['quiet', 'Reported'];
-  if (settled(f)) return ['quiet', wasAsked(f) ? 'Answered' : 'Changed'];
+  if (answered(f)) return ['quiet', wasAsked(f) ? 'Answered' : 'Changed'];
   if (r === 'blocking')
     return ['attn', f.blocks === 'now' ? 'Blocks now' : moment === 'send' ? 'Blocks sending' : 'Blocks finalize'];
   if ((r === 'action' || r === 'advisory') && f.deferred)
@@ -414,9 +396,9 @@ export function card(f: FindingView, host: Host = {}): HTMLElement {
     );
   }
 
-  if (settled(f)) {
+  if (answered(f)) {
     // The answer becomes the headline; changing it is first-class, not an override.
-    const v: ActValue = decided(f)?.value ?? {};
+    const v: ActValue = decision(f)?.value ?? {};
     c.append(el('h3', 'mq-q', v.reading?.reading || (wasAsked(f) && v.free ? `You wrote ${v.free}.` : 'Changed.')));
   } else if (f.overridden) {
     c.append(el('p', 'mq-p', 'Kept as written. Marque will report it.'));
@@ -428,17 +410,13 @@ export function card(f: FindingView, host: Host = {}): HTMLElement {
 
   // As written → result, when there is a result and it differs.
   // A pending choice shows the marking it asked the host to write.
-  if (f.marking?.as_written && !(f.outcome?.result && (f.outcome.kind !== 'choices' || settled(f))) && !f.overridden) {
+  const result = f.outcome?.result && (f.outcome.kind !== 'choices' || answered(f)) ? f.outcome.result : null;
+  if (f.marking?.as_written && !result && !f.overridden) {
     // Still to be decided: the marking it's about, as context for the readings below.
     const ctx = el('div', 'mq-was');
     ctx.append(el('span', null, 'As written'), placed(mark(f.marking.as_written, { size: 'sm', help })));
     c.append(ctx);
-  } else if (
-    f.marking?.as_written &&
-    f.outcome?.result &&
-    (f.outcome.kind !== 'choices' || settled(f)) &&
-    !f.overridden
-  ) {
+  } else if (f.marking?.as_written && result && !f.overridden) {
     const was = el('div', 'mq-was');
     was.append(
       el('span', null, 'Was'),
@@ -447,7 +425,7 @@ export function card(f: FindingView, host: Host = {}): HTMLElement {
     );
     was.append(
       placed(
-        mark(f.outcome.result, {
+        mark(result, {
           size: 'sm',
           help,
           state: r === 'noticeable' || r === 'quiet' ? 'changed' : undefined,
@@ -455,20 +433,20 @@ export function card(f: FindingView, host: Host = {}): HTMLElement {
       ),
     );
     c.append(was);
-  } else if (!f.marking?.as_written && settled(f) && f.outcome?.result) {
+  } else if (!f.marking?.as_written && answered(f) && f.outcome?.result) {
     const now = el('div', 'mq-was');
     now.append(el('span', null, 'Now'), placed(mark(f.outcome.result, { size: 'sm' })));
     c.append(now);
   }
 
   // A decision here moves an artifact (its depends_on): say so beside the decision, the gate included.
-  if (f.moves?.length && !settled(f) && !f.overridden) {
+  if (f.moves?.length && !answered(f) && !f.overridden) {
     const names = [...new Set(f.moves)].map((k) => `the ${(NAME[k] || k.replace(/_/g, ' ')).toLowerCase()}`);
     c.append(el('p', 'mq-p', `What you decide here changes ${names.join(' and ')}.`));
   }
 
   // The alternative the author also wrote (advisory): one action away.
-  if (f.outcome?.kind === 'chosen_over' && f.outcome.readings?.length && !f.overridden && !settled(f)) {
+  if (f.outcome?.kind === 'chosen_over' && f.outcome.readings?.length && !f.overridden && !answered(f)) {
     const alt = f.outcome.readings[0]!;
     const dep = el('div', 'mq-dep');
     dep.append(el('span', null, 'Or, as you also wrote:'));
@@ -501,7 +479,7 @@ export function card(f: FindingView, host: Host = {}): HTMLElement {
   if (ct) foot.append(ct);
   // Back to what Marque said: "Change my answer", "Undo" on a choice the
   // person made, "Fix it after all" on an override. Each is a new line in the log.
-  if (settled(f))
+  if (answered(f))
     foot.append(button('ghost', wasAsked(f) ? 'Change my answer' : 'Undo', () => host.onAct?.(f, 'changed', null)));
   else if (f.overridden) foot.append(button('ghost', 'Fix it after all', () => host.onAct?.(f, 'changed', null)));
   // No Undo on a fix the person must own; an override is recorded, not hidden.
@@ -512,7 +490,7 @@ export function card(f: FindingView, host: Host = {}): HTMLElement {
   )
     foot.append(button('ghost', 'Keep as written', () => host.onAct?.(f, 'kept_as_written')));
   // Available: Marque has the fix and the person applies it (CONTRACT: available → apply); the host writes it.
-  if (f.outcome?.kind === 'available' && f.outcome.result && !settled(f) && !f.overridden && !host.readOnly) {
+  if (f.outcome?.kind === 'available' && f.outcome.result && !answered(f) && !f.overridden && !host.readOnly) {
     const acts = el('div', 'mq-acts');
     acts.append(button('act', 'Apply', () => host.onAct?.(f, 'answered', { apply: true })));
     c.append(acts);
@@ -558,7 +536,7 @@ const artStamp = (a: ArtifactView, r: Rung, moment?: Moment): Stamp =>
               ? ['quiet', 'Changed']
               : ['quiet', 'Done'];
 
-export function row(f: Subject, host: Host = {}): HTMLDivElement {
+export function row(f: Subject, host: Host = {}, doc?: Doc | null): HTMLDivElement {
   const r = isArtifact(f) ? artRung(f, host.moment) : rung(f, host.moment);
   const li = el('div', 'mq-row-item');
   li.dataset.finding = f.id;
@@ -591,7 +569,7 @@ export function row(f: Subject, host: Host = {}): HTMLDivElement {
         }
       });
     const d = el('div', 'mq-row-detail');
-    d.append(isArtifact(f) ? artifact(f, host) : card(f, host));
+    d.append(isArtifact(f) ? artifact(f, host, doc) : card(f, host));
     if (host.vocab) relabel(d, host.vocab);
     // Escape from inside the card closes it and goes back to its row.
     // A token's open tooltip takes the first Escape.
@@ -880,9 +858,9 @@ export function pane(doc: Doc | null, host: Host = {}): HTMLDivElement {
       end.append(el('span', 'mq-stamp sm quiet', n ? 'Changed' : 'Done'));
       sum.append(end);
       det.append(sum);
-      list.forEach((f) => det.append(row(f, host)));
+      list.forEach((f) => det.append(row(f, host, doc)));
       rows.append(det);
-    } else list.forEach((f) => rows.append(row(f, host)));
+    } else list.forEach((f) => rows.append(row(f, host, doc)));
     sec.append(rows);
     p.append(sec);
   }
@@ -898,7 +876,7 @@ export function pane(doc: Doc | null, host: Host = {}): HTMLDivElement {
 }
 
 /* ── C9 · artifact card (banner, CAB) ────────────────────────────────── */
-export function artifact(a: ArtifactView, host: Host = {}): HTMLElement {
+export function artifact(a: ArtifactView, host: Host = {}, doc?: Doc | null): HTMLElement {
   const r = artRung(a, host.moment);
   const must = r === 'blocking' || r === 'action';
   const atGate = must && !artWaits(a, host.moment); // gold now, not at finalize
@@ -1024,7 +1002,8 @@ export function artifact(a: ArtifactView, host: Host = {}): HTMLElement {
     const dep = el('div', 'mq-dep');
     for (const [fid, alt] of Object.entries(a.if_taken)) {
       dep.append(
-        el('span', null, `If ¶${fid.match(/p(\d+)/)?.[1] ?? '?'}'s alternative is taken:`),
+        // Named by where the finding is, never by its id: an id is the engine's, not the person's.
+        el('span', null, `If ${alternative(doc?.findings.find((x) => x.id === fid))} is taken:`),
         placed(mark(alt, { size: 'sm' })),
       );
     }
@@ -1043,6 +1022,12 @@ export function artifact(a: ArtifactView, host: Host = {}): HTMLElement {
   c.append(foot);
   return c;
 }
+
+/** "¶5's alternative", or "the alternative" when the finding isn't in hand. */
+const alternative = (f: Placed | undefined): string => {
+  const at = f ? where(f) : '—';
+  return at === '—' ? 'the alternative' : `${at}'s alternative`;
+};
 
 /* ── C10 · finalize gate ─────────────────────────────────────────────── */
 /** The Needs-you section with defer removed, in the pane's own words, with
@@ -1064,7 +1049,7 @@ export function gate(doc: Doc, host: Host = {}): HTMLDivElement {
     const will = doc.document.artifacts.filter((a) => pend.has(a.id) || due(a));
     // What the person decided and still stands; one they took back is the receipt's to show.
     // Overrides too: the last look says which markings will be reported as kept.
-    const answered = doc.findings.filter((f) => pend.has(f.id) || decision(f)?.value != null || f.overridden);
+    const decided = doc.findings.filter((f) => pend.has(f.id) || answered(f) || f.overridden);
     const stuck = unwritable(doc, host);
     g.append(
       el(
@@ -1079,8 +1064,8 @@ export function gate(doc: Doc, host: Host = {}): HTMLDivElement {
               : 'Ready to finalize.',
       ),
     );
-    will.forEach((a) => g.append(artifact(a, h)));
-    answered.forEach((f) => g.append(card(f, h)));
+    will.forEach((a) => g.append(artifact(a, h, doc)));
+    decided.forEach((f) => g.append(card(f, h)));
     return g;
   }
   // An answer still waiting to be written holds it up too, and so, read-only, does a required artifact nobody can write.
@@ -1096,7 +1081,7 @@ export function gate(doc: Doc, host: Host = {}): HTMLDivElement {
     const f = doc.findings.find((x) => x.id === id);
     const a = f ? null : doc.document.artifacts.find((x) => x.id === id);
     if (f) g.append(card(f, h));
-    else if (a) g.append(artifact(a, h));
+    else if (a) g.append(artifact(a, h, doc));
   }
   return g;
 }
@@ -1241,7 +1226,7 @@ export function receipt(doc: Doc, session: Session = {}): HTMLDivElement {
     el(
       'span',
       null,
-      `${doc.findings.length} findings · ${doc.document.blocking.length} open${doc.document.pending?.length ? ` · ${doc.document.pending.length} waiting to be written` : ''}`,
+      `${plural(doc.findings.length, 'finding', 'findings')} · ${doc.document.blocking.length} open${doc.document.pending?.length ? ` · ${doc.document.pending.length} waiting to be written` : ''}`,
     ),
     el('span', 'mq-hash', session.session_root || 'session root: computed by the engine at seal'),
   );

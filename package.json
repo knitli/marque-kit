@@ -50,7 +50,7 @@
     "demo": "vp dev",
     "dev": "vp dev",
     "build": "vp pack",
-    "test": "node --test",
+    "test": "node --test 'test/*.test.ts' && vp test",
     "check": "vp check",
     "fix": "vp check --fix",
     "fmt": "vp fmt --write",
@@ -58,6 +58,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "happy-dom": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"

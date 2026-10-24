@@ -34,13 +34,14 @@ demo/index.html    the memo on the left, the pane on the right; answer ¶3 and w
 docs/              the design, extracted from the canvas: CONTRACT, DERIVATION, MODEL, THEME,
                    COMPONENTS, DECISIONS, ENGINE-ASKS
 test/              the parser, the rung table, the state layer, lookup and citation landing under plain node, which runs the .ts as written
+test/dom/          the decided rules as they reach the DOM (card, gate, receipt), under vp test and happy-dom
 ```
 
 ## Run it
 
 ```sh
 pnpm check        # format, lint and typecheck (vp check)
-pnpm test         # the parser, rung, state, theme and help tests (node ≥ 26 runs the .ts directly)
+pnpm test         # node ≥ 26 runs test/*.test.ts directly; vp test runs the DOM tests in test/dom/ (happy-dom)
 pnpm build        # dist/: the modules, their .d.ts, and the two stylesheets
 pnpm demo         # vp dev; open /demo/
 ```

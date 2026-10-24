@@ -23,8 +23,8 @@
  * Authored words and the manual's words are set apart everywhere (.mq-quote).
  */
 
-import { render as mark } from './marking.ts';
-import { decision } from './state.ts';
+import { render as mark, el, button } from './marking.ts';
+import { answered } from './state.ts';
 import type { Citation, FindingView, HelpEntry, Host, Manual, Rung, Tetragraph, Trigraph, Vocab } from './types.ts';
 
 /** What the vocabulary knows about a code. */
@@ -46,22 +46,6 @@ export type Answer =
   | ({ kind: 'trigraph' } & Trigraph & { member_of: Named[] })
   | { kind: 'miss'; query: string; nearest: string[]; by: 'name' | 'spelling' };
 
-const el = <K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  cls?: string | null,
-  text?: string | null,
-): HTMLElementTagNameMap[K] => {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text != null) n.textContent = text;
-  return n;
-};
-const button = (cls: string, text: string, onClick: (e: MouseEvent) => void): HTMLButtonElement => {
-  const b = el('button', `mq-btn ${cls}`, text);
-  b.type = 'button';
-  b.addEventListener('click', onClick);
-  return b;
-};
 const byCode =
   (code: string) =>
   (x: { code: string }): boolean =>
@@ -105,7 +89,9 @@ function quote(c: Citation, host: Host): HTMLDivElement {
   const q = el('div', 'mq-txt');
   const src = el('div', 'mq-src');
   src.append('The manual says · ', cite(c, host) ?? '');
-  q.append(src, el('blockquote', 'mq-quote', `“${c.short}”`));
+  q.append(src);
+  // A citation without the manual's words still cites; it never quotes nothing.
+  if (c.short) q.append(el('blockquote', 'mq-quote', `“${c.short}”`));
   return q;
 }
 
@@ -173,9 +159,6 @@ export function explain(code: string, vocab: Vocab, host: Host = {}): HTMLDivEle
     );
   return p;
 }
-
-/** The person's own answer stands on this finding, live or already written. */
-const answered = (f: FindingView): boolean => decision(f)?.value != null;
 
 /** Tier 2 for a finding: the rule in plain words, the manual's sentence, the
  *  citation with a way in, and only then what overriding costs, if it can be. */
