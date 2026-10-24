@@ -27,5 +27,13 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["packages/*/src", "packages/*/test", "vite.config.ts", "packages/*/vite.config.ts"]
+  "include": [
+    "packages/*/src",
+    "packages/*/test",
+    "apps/*/src",
+    "apps/*/test",
+    "vite.config.ts",
+    "packages/*/vite.config.ts",
+    "apps/*/vite.config.ts"
+  ]
 }

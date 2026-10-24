@@ -118,6 +118,9 @@ export interface Update {
   linted?: number | undefined;
   /** The host's request counter. */
   seq?: number | undefined;
+  /** Open this finding's or artifact's card, as if the person had: an Office host's cursor landing
+   *  in a marking (DECISIONS #8). null closes it. Focus stays where it is, in the document. */
+  open?: string | null | undefined;
 }
 /** A mounted pane. */
 export interface Mounted {
@@ -1395,7 +1398,7 @@ export function mount(
       if (added) root.classList.remove('mq');
       if (mirrors && mine) root.removeAttribute('data-mq-theme');
     },
-    update({ linted: upTo, seq, ...next }: Update) {
+    update({ linted: upTo, seq, open, ...next }: Update) {
       // A lint that began before the one already shown is stale: keep the newer document.
       // `seq` orders lints that began at the same point in the log. A stale lint's
       // failure is as stale as its document: neither replaces the newer one.
@@ -1409,6 +1412,10 @@ export function mount(
         delete next.engine;
       } else if (lint && seq != null) cur.seq = seq;
       Object.assign(cur, next);
+      if (open !== undefined) {
+        const v = cur.doc && docView(cur.doc, cur.state);
+        h.onOpen?.((open && v && [...v.findings, ...v.document.artifacts].find((x) => x.id === open)) || null);
+      }
       // A new lint is the host saying it applied what the person answered: everything
       // up to `upTo`, the log length when the host started that lint (default: all of it).
       if (next.doc) {
