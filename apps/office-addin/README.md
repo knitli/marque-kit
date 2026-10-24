@@ -32,6 +32,10 @@ Not yet: an engine; applying an answer to the document (an answer stays pending,
 3. Sideload `manifest.xml`. On a Mac, copy it into `~/Library/Containers/com.microsoft.Word/Data/Documents/wef/` (make the folder if it isn't there) and restart Word. On Windows or Word on the web, upload it from Home → Add-ins → My Add-ins → Upload My Add-in.
 4. In Word: Home → **Markings**.
 
+In dev, the pane's errors, and a note when the document isn't the memo, go to `apps/office-addin/.dev.log` (git-ignored): inside Word there's no console to read them from.
+
+Word drops the empty paragraphs it is given, so the memo's blank lines don't survive the insert. The pane matches the memo and the document on the paragraphs with text in them.
+
 `pnpm build` writes `dist/` for hosting; the manifest's URLs point at localhost until there is somewhere to host it.
 
 Open questions it will answer:

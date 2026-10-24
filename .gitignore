@@ -20,3 +20,5 @@ package.lock
 .serena/
 .vitest/
 claudedocs/
+# the Office pane logs here in dev (apps/office-addin/vite.config.ts)
+.dev.log

@@ -25,6 +25,15 @@ import vocabUrl from '../../../fixtures/memo.vocab.json?url';
 import memo from '../../../fixtures/memo.txt?raw';
 import { locate, paragraphAt, written } from './locate.ts';
 
+/** In dev, what the pane would say to a console it doesn't have goes to the dev server's .dev.log. */
+const log = (...what: unknown[]): void => {
+  if (import.meta.env.DEV) void fetch('/__log', { method: 'POST', body: JSON.stringify(what) }).catch(() => {});
+};
+if (import.meta.env.DEV) {
+  addEventListener('error', (e) => log('error', String(e.error ?? e.message)));
+  addEventListener('unhandledrejection', (e) => log('unhandled', String(e.reason)));
+}
+
 /** The memo as a host would have it: with the fixes Marque wrote (applied, or the safe reading
  *  chosen over the author's) written in, and each finding's span moved to match. Set at ready. */
 let memoDoc: { lines: string[]; at: (span: [number, number]) => [number, number] } = { lines: [], at: (s) => s };
@@ -37,8 +46,24 @@ const paragraphs = (): Promise<string[]> =>
     return ps.items.map((p) => p.text);
   });
 
+/** The paragraphs with text in them, by index. Word drops the empty paragraphs it is given (the memo's
+ *  blank lines), so the memo and the document are matched on these: the k-th in one is the k-th in the other. */
+const full = (ps: string[]): number[] => ps.flatMap((p, i) => (p.trim() ? [i] : []));
+/** A memo line's paragraph in the document, and a document paragraph's line in the memo; -1 for none. */
+const toWord = (texts: string[], line: number): number => full(texts)[full(memoDoc.lines).indexOf(line)] ?? -1;
+const toMemo = (texts: string[], index: number): number => full(memoDoc.lines)[full(texts).indexOf(index)] ?? -1;
+
 /** The fixture's spans are offsets into memo.txt: they mean something only in a document that is the memo. */
-const isMemo = (ps: string[]): boolean => ps.join('\n') === memoDoc.lines.join('\n');
+const isMemo = (ps: string[]): boolean => {
+  const got = full(ps).map((i) => ps[i]),
+    want = full(memoDoc.lines).map((i) => memoDoc.lines[i]);
+  const same = got.length === want.length && got.every((p, k) => p === want[k]);
+  if (!same) {
+    const k = got.findIndex((p, n) => p !== want[n]);
+    log('not the memo', { paragraphs: got.length, want: want.length, first: k, got: got[k], expected: want[k] });
+  }
+  return same;
+};
 
 /** Replace the document with the memo, Marque's fixes written in, a paragraph per line. */
 const insertMemo = (): Promise<void> =>
@@ -61,8 +86,8 @@ const jump = (f: Subject): Promise<void> =>
     const texts = ps.items.map((p) => p.text);
     if (!isMemo(texts)) return;
     const [start, end] = memoDoc.at(span);
-    const at = locate(texts, f.anchor?.kind === 'portion' ? [start, start] : [start, end]);
-    const p = at && ps.items[at.paragraph];
+    const at = locate(memoDoc.lines, f.anchor?.kind === 'portion' ? [start, start] : [start, end]);
+    const p = at && ps.items[toWord(texts, at.paragraph)];
     if (!at || !p) return;
     if (!at.text) {
       p.getRange('Start').select();
@@ -130,7 +155,8 @@ void Office.onReady(async (info) => {
   const follow = async (): Promise<void> => {
     const { index, texts } = await selected();
     if (!show(isMemo(texts))) return;
-    const f = all().find((x) => x.anchor?.span && paragraphAt(texts, memoDoc.at(x.anchor.span)[0]) === index);
+    const line = toMemo(texts, index);
+    const f = all().find((x) => x.anchor?.span && paragraphAt(memoDoc.lines, memoDoc.at(x.anchor.span)[0]) === line);
     if (f && f.id !== pane.host.open) pane.update({ open: f.id });
   };
 
