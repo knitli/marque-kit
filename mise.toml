@@ -8,6 +8,12 @@ pnpm = "12.14"
 viteplus = "latest"
 python = "3.13"
 
+[tools.'pypi:reuse']
+version = "latest"
+uvx = true
+extras = ["charset-normalizer"]
+python = "3.13"
+
 [settings]
 experimental = true
 lockfile = true
@@ -29,7 +35,10 @@ auto_sync = true
 run_auto_install = true
 
 [deps]
-pnpm = { auto = true, sources = ["package.json", "pnpm-lock.yaml"], run = "pnpm i -y" }
+pnpm = { auto = true, sources = [
+  "package.json",
+  "pnpm-lock.yaml",
+], run = "pnpm i -y" }
 
 [tasks]
 
