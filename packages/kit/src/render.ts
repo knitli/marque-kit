@@ -22,7 +22,7 @@
  *                     new questions and hands every act back to the host
  *
  * Everything reads only the --mq-* tokens through the kit's class names;
- * no colour, size or shape is set here. Plain DOM, no framework.
+ * no color, size or shape is set here. Plain DOM, no framework.
  *
  * `host` is the thing the kit never decides: { moment, engine, readOnly,
  * vocab, onAct, onHelp, onJump, onGate, onLookup, onReceipt, onRetry, onReport }. Every
@@ -926,7 +926,7 @@ export function artifact(a: ArtifactView, host: Host = {}, doc?: Doc | null): HT
     c.append(el('p', 'mq-p', 'Waiting to be removed from the document.'));
   if (a.fields) {
     const dl = el('div', 'mq-cab');
-    // A field a person fills: labelled by its key, committed on Enter or Fill in.
+    // A field a person fills: labeled by its key, committed on Enter or Fill in.
     const entry = (k: string, fld: ArtifactField, key: HTMLElement): HTMLSpanElement => {
       const v = el('span', 'v blank mq-field');
       const inp = el('input', 'mono');

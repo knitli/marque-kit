@@ -9,14 +9,14 @@
  * token falls back to the shipped value for the active theme. The pane
  * renders either way; it never renders unreadable.
  *
- * Shipped values are read from theme.css itself, so no colour lives here.
+ * Shipped values are read from theme.css itself, so no color lives here.
  */
 
 // [foreground, background, floor]; a tint is laid over the surface first. test/theme.test.js
 // checks this against what kit.css and theme.css paint: a pairing is measured here or excused there.
 import type { Rejected, ThemeReport } from '@marque/kit-core/types';
 
-/** An sRGB colour with alpha: [r, g, b, a], channels 0–255, alpha 0–1. */
+/** An sRGB color with alpha: [r, g, b, a], channels 0–255, alpha 0–1. */
 export type RGBA = [number, number, number, number];
 
 export const PAIRS: readonly (readonly [fg: string, bg: string, floor: number])[] = [
@@ -49,7 +49,7 @@ export const PAIRS: readonly (readonly [fg: string, bg: string, floor: number])[
   ['focus', 'surface-sunken', 3.0],
   ['focus', 'act-tint', 3.0],
   ['focus', 'attn-tint', 3.0], // a focus ring wherever a control can be
-  ['act-ink', 'attn-tint', 4.5], // a link-coloured marking with a highlighted layer
+  ['act-ink', 'attn-tint', 4.5], // a link-colored marking with a highlighted layer
 ];
 export const SIZES: readonly (readonly [token: string, floor: number])[] = [
   ['size-xs', 12],
@@ -60,7 +60,7 @@ const TOKENS = [...new Set([...PAIRS.flatMap(([f, b]) => [f, b]), ...SIZES.map((
 /** The narrowest pane a card fits (docs/THEME.md); under it the kit shows rows only. */
 export const FLOOR = 240;
 
-/** Any CSS colour → sRGB [r, g, b, a], by painting it: oklch(), lab() and color() aren't rgb numbers. */
+/** Any CSS color → sRGB [r, g, b, a], by painting it: oklch(), lab() and color() aren't rgb numbers. */
 function srgb(css: string): RGBA {
   if (/^rgba?\(/.test(css)) return rgba(css);
   const c = document.createElement('canvas');
@@ -91,7 +91,7 @@ const lum = (c: RGBA): number => {
   });
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
-/** WCAG contrast of two opaque colours. */
+/** WCAG contrast of two opaque colors. */
 export const ratio = (a: RGBA, b: RGBA): number => {
   const [x, y] = [lum(a), lum(b)];
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
@@ -266,7 +266,7 @@ export function check(root: HTMLElement | null | undefined): ThemeReport | null 
       rejected.push({ token, measured: Math.round(measured * 100) / 100, floor, fallback });
     return fallback;
   };
-  // Forced colours: the user's system palette is in force, and it isn't the host's to fail or ours to replace.
+  // Forced colors: the user's system palette is in force, and it isn't the host's to fail or ours to replace.
   const forced = matchMedia('(forced-colors: active)').matches;
   // A fallback can break a pair that passed before it, so the pairs run again until nothing moves.
   // The pane paints the ground from root's own tokens, over whatever is above it: measured once,
@@ -319,7 +319,7 @@ export function check(root: HTMLElement | null | undefined): ThemeReport | null 
 }
 
 /** Re-check whenever the theme can change: data-mq-theme anywhere above, the scheme `auto` follows,
- *  forced colours, or the pane crossing the width floor. */
+ *  forced colors, or the pane crossing the width floor. */
 export function watch(root: HTMLElement, onTheme: (report: ThemeReport | null) => void): () => void {
   // A root mounted detached is checked once it's in the document.
   let done = root.isConnected;

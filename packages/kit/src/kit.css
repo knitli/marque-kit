@@ -3,7 +3,7 @@
 /* Marque UI kit — components. v0.1, 2026-10-14.
    Composed components, built only on marque-theme.css (--mq-* tokens and the
    fixed primitives: .mq-mark, the four shapes, .mq-card, .mq-opt, .mq-btn,
-   .mq-pop/.mq-tip/.mq-window). Nothing here introduces a colour or a size
+   .mq-pop/.mq-tip/.mq-window). Nothing here introduces a color or a size
    that is not a token. Load after marque-theme.css.                        */
 
 /* ── Type roles ─────────────────────────────────────────────────────────── */

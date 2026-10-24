@@ -11,7 +11,7 @@
                    and never breaks inside a token; and the four forms a
                    long marking can take (full, folded, summary, diff).
      4. SHAPES   — the four shapes that carry meaning, on text and on cards.
-     5. STATES & SURROUNDINGS — controls, layers, print, forced colours,
+     5. STATES & SURROUNDINGS — controls, layers, print, forced colors,
                    reduced motion, and the contrast gate.
    Values are Knitli's (tokens.json, Oct 2026), vendored. The kit depends on
    Knitli's values, not on its component bundle. Where a value departs from
@@ -45,7 +45,7 @@
   --mq-act-tint: rgba(68, 100, 173, 0.1);
   --mq-act-hover: #33518f;
 
-  /* attn — gold. A person must look. The only colour that means that.
+  /* attn — gold. A person must look. The only color that means that.
      attn-ink is gold as text or a rule; on light it must darken to read.   */
   --mq-attn: #cda824;
   --mq-attn-ink: #836a0e;
@@ -309,7 +309,7 @@
 }
 .mq-fold:hover {
   text-decoration-style: solid;
-} /* hover changes the shape; act-hover is a fill, not a text colour */
+} /* hover changes the shape; act-hover is a fill, not a text color */
 .mq-count {
   font-family: var(--mq-font-body);
   font-size: var(--mq-size-xs);
@@ -404,8 +404,8 @@
 } /* under the floor: rows only, in the room the host gave */
 
 /* ═══ 4 · SHAPES ══════════════════════════════════════════════════════ */
-/* Colour rides along; the shape carries the meaning, so a colour-blind
-   reader, a greyscale print and forced-colours mode all still get it.      */
+/* Color rides along; the shape carries the meaning, so a color-blind
+   reader, a greyscale print and forced-colors mode all still get it.      */
 .mq-changed {
   text-decoration: underline;
   text-decoration-thickness: 1px;
@@ -556,7 +556,7 @@
   color: var(--mq-act-ink);
 }
 
-/* Links: act-ink, underlined, thicker on hover. Never colour alone.        */
+/* Links: act-ink, underlined, thicker on hover. Never color alone.        */
 .mq a,
 .mq-link {
   color: var(--mq-act-ink);
@@ -640,8 +640,8 @@
   }
 }
 
-/* Forced colours (Windows contrast themes). Fills go away; the shapes stay.
-   Gold has no system colour, so "must act" is carried by the double rule
+/* Forced colors (Windows contrast themes). Fills go away; the shapes stay.
+   Gold has no system color, so "must act" is carried by the double rule
    alone, and the stamp becomes outlined text — which is why the stamp also
    says NEEDS YOU in words.                                                   */
 @media (forced-colors: active) {
@@ -693,7 +693,7 @@
 }
 
 /* ── What the kit does at mount (mq.theme.check), stated here so the CSS
-   and the behaviour live together:
+   and the behavior live together:
    For each pair below it reads the computed values and measures contrast.
    A pair under its floor is logged, reported to the host as
    theme.rejected[{token, measured, floor}], and that token falls back to

@@ -18,13 +18,13 @@ These are not style preferences. Each has a dated maintainer decision behind it;
 
 - **Five rungs, computed in the kit.** `rung()` in `packages/kit/src/render.ts` is the published derivation ([docs/DERIVATION.md](docs/DERIVATION.md)): `needs_person` × `blocks` × host moment. The engine never emits a rung; severity never sets one.
 - **Gold = must act. Blue = can act.** Nothing else is gold. Gold appears on Action required and Blocking only.
-- **Shape carries meaning, colour rides along.** Thin underline = changed; 2px dotted act-ink = can act; 3px double attn-ink = must act; dashed = absent. On cards: `.mq-card.can-act / .must-act / .absent`. A greyscale print and forced-colours mode still read.
+- **Shape carries meaning, color rides along.** Thin underline = changed; 2px dotted act-ink = can act; 3px double attn-ink = must act; dashed = absent. On cards: `.mq-card.can-act / .must-act / .absent`. A greyscale print and forced-colors mode still read.
 - **Question first.** When a finding asks, the question is the card's heading; the marking is context; `says.text` explains; `Why?` and the citation sit in the footer.
 - **A free answer is always possible. "Not my call" is always there.** Every prompt has the typed field and the routing button, whatever the options.
 - **No Undo on a fix the person must own. An override is recorded.** "Keep as written" exists on Noticeable and Advisory; the audit reports the finding as-is.
 - **Advisory when the safe reading is one the author wrote; Action required when the safe form is one nobody wrote.** The NF/REL TO portion is Advisory (REL TO offered back). The JOINT fallback `(S//FGI AUS GBR//NF)` is a fallback, not a reading.
 - **Light is the default theme.** No attribute, or `data-mq-theme="light"`, on the kit root (`.mq`). `dark` and `auto` are opt-in. The theme attribute goes on the root, not on `<html>`.
-- **Theme is free; behaviour is fixed.** Hosts may set `--mq-*` tokens. They may not change the rungs, the shapes' meanings, the fit rules, the free answer, "not my call", or the override record.
+- **Theme is free; behavior is fixed.** Hosts may set `--mq-*` tokens. They may not change the rungs, the shapes' meanings, the fit rules, the free answer, "not my call", or the override record.
 - **Judge the text, never the person.** Messages say what the marking is and what Marque did. Never "you forgot".
 
 ## Markings (packages/kit/src/marking.ts, docs/THEME.md "Fit" and "Long markings")
@@ -64,8 +64,8 @@ Banner derived: `SECRET//FGI AUS GBR//NOFORN`, or `…//REL TO USA, GBR` if ¶5'
 
 ## Never
 
-- Never introduce a colour, size or shape outside `theme.css`. `kit.css` and `render.ts` read tokens and class names only.
-- Never put a colour-only signal anywhere; every state has a shape or a word.
+- Never introduce a color, size or shape outside `theme.css`. `kit.css` and `render.ts` read tokens and class names only.
+- Never put a color-only signal anywhere; every state has a shape or a word.
 - Never render a template label or an internal id to a person.
 - Never let a marking break inside a token, truncate, or shrink below 13px.
 - Never show a generated value as applied; the host applies.
@@ -78,8 +78,8 @@ Banner derived: `SECRET//FGI AUS GBR//NOFORN`, or `…//REL TO USA, GBR` if ¶5'
 ## Working here
 
 - `pnpm check` (format, lint, typecheck) and `pnpm test` (in each package, node runs `test/*.test.ts` as written; in the kit, `vp test` runs `test/dom/` under happy-dom, DECISIONS #21) before a commit. A rule that shows in the DOM gets a test in `packages/kit/test/dom/render.test.ts`. `pnpm fix` formats. `pnpm build` writes each package's `dist/`. Workspace packages import each other by name; the `source` export condition points them at `src/`, so tests, typecheck and the demo run on source. `pnpm demo` to look. Markdown and the two extracted fixtures aren't formatted: a renumbered list changes what a doc says. CI (`.github/workflows/ci.yml`) runs check, test and build on every PR and push to `main`.
-- Check contrast when a token changes: the pairs and floors are `PAIRS` and `SIZES` in `packages/kit/src/theme.ts`. AA 4.5 on text pairs, 3.0 on lines and focus. `packages/kit/test/theme.test.ts` fails when `kit.css` or `theme.css` paints a pairing that isn't measured there or excused in the test with a reason; a new colour use means deciding which.
+- Check contrast when a token changes: the pairs and floors are `PAIRS` and `SIZES` in `packages/kit/src/theme.ts`. AA 4.5 on text pairs, 3.0 on lines and focus. `packages/kit/test/theme.test.ts` fails when `kit.css` or `theme.css` paints a pairing that isn't measured there or excused in the test with a reason; a new color use means deciding which.
 - The docs under `docs/` were extracted from the canvas on 21 Oct 2026 and are now the source. Edit them here; the canvas is history.
-- Engine gaps go to marque-dev as issues, labelled `ui-kit` (+ `engine`, `audit`, `office`, `capco/ism` as they apply), and get a row in `docs/ENGINE-ASKS.md`. The Linear triage agent assigns cluster and lineage.
+- Engine gaps go to marque-dev as issues, labeled `ui-kit` (+ `engine`, `audit`, `office`, `capco/ism` as they apply), and get a row in `docs/ENGINE-ASKS.md`. The Linear triage agent assigns cluster and lineage.
 - Commits and PRs end with the attribution lines the session provides.
 - SPDX header on every file: `SPDX-FileCopyrightText: 2026 Knitli Inc.` / `SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense`. A file that can't carry a comment (JSON, lockfiles, `memo.txt`) goes in `REUSE.toml`. CI runs `reuse lint`.

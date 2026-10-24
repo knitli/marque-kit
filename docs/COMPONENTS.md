@@ -27,7 +27,7 @@ status
 1
 Theme layer
 light + dark, host overrides
-Two shipped themes (Reference light, Instrument dark) plus the host override surface: fonts, colours, radii. The meaning-carrying shapes — thin underline = changed, dotted = can act, double rule = must act, dashed = absent — are not overridable. Theme is set once per pane with data-theme.
+Two shipped themes (Reference light, Instrument dark) plus the host override surface: fonts, colors, radii. The meaning-carrying shapes — thin underline = changed, dotted = can act, double rule = must act, dashed = absent — are not overridable. Theme is set once per pane with data-theme.
 — (kit-side)
 tokens.css, both surfaces
 v0.3 · T1–T5
@@ -77,7 +77,7 @@ v1 · C6
 8
 Inline mark
 in the document itself
-The mark on the marking's span inside the editor: underline, dotted, double rule, dashed placeholder for a missing portion mark. One behaviour, several adapters — a web overlay where the host allows drawing, Word's own formatting plus selection-follow where it doesn't.
+The mark on the marking's span inside the editor: underline, dotted, double rule, dashed placeholder for a missing portion mark. One behavior, several adapters — a web overlay where the host allows drawing, Word's own formatting plus selection-follow where it doesn't.
 anchor · attention · artifact.state
 —
 v1 · C8
@@ -132,7 +132,7 @@ Which rules are on, severity overrides, aliases and macros — shown as what .ma
 config, rule catalog
 Field, DataTable
 —
-Cross-cutting, not components: keyboard focus order and live-region announcements for every rung change (a new Action required is announced; a Quiet change is not); reduced-motion; the colour-independent shapes above; copy rules from the message-clarity guide. Not in the kit: the apply/edit step and any format adapter — the kit renders decisions, the host applies them.
+Cross-cutting, not components: keyboard focus order and live-region announcements for every rung change (a new Action required is announced; a Quiet change is not); reduced-motion; the color-independent shapes above; copy rules from the message-clarity guide. Not in the kit: the apply/edit step and any format adapter — the kit renders decisions, the host applies them.
 
 
 ---
@@ -169,11 +169,11 @@ Props
 5masks — unidentified spans and concealed codes arrive from the engine as typed regions; the kit draws them, never decides them.
 6help — token ids resolved against the vocabulary for tier-1 tooltips and the spoken form.
 Two masks · light
-(TS//__________________//REL TO USA, KOR, _____)Unidentified. Marque could not read these bytes. It shows where they are and how long they are, as underscores — never the bytes. The recognised tokens around them are shown in full. Hover: "18 characters Marque couldn't identify."
+(TS//__________________//REL TO USA, KOR, _____)Unidentified. Marque could not read these bytes. It shows where they are and how long they are, as underscores — never the bytes. The recognized tokens around them are shown in full. Hover: "18 characters Marque couldn't identify."
 (//FGI ███ S//REL TO USA, GBR)Concealed. Marque read the owner code and must not show it: the source is concealed under the manual's FGI rules. Blocks, one per character, everywhere the marking appears — before-image, result, every reading. Only the presence of FGI is disclosed. Hover: "Source concealed."
 (//FGI S//REL TO USA, GBR)What Marque writes when the source must stay concealed: FGI with no code. That is a lawful marking, not a mask, so it is set plainly.
 Two masks · dark
-(TS//__________________//REL TO USA, KOR, _____)Unidentified. Marque could not read these bytes. It shows where they are and how long they are, as underscores — never the bytes. The recognised tokens around them are shown in full. Hover: "18 characters Marque couldn't identify."
+(TS//__________________//REL TO USA, KOR, _____)Unidentified. Marque could not read these bytes. It shows where they are and how long they are, as underscores — never the bytes. The recognized tokens around them are shown in full. Hover: "18 characters Marque couldn't identify."
 (//FGI ███ S//REL TO USA, GBR)Concealed. Marque read the owner code and must not show it: the source is concealed under the manual's FGI rules. Blocks, one per character, everywhere the marking appears — before-image, result, every reading. Only the presence of FGI is disclosed. Hover: "Source concealed."
 (//FGI S//REL TO USA, GBR)What Marque writes when the source must stay concealed: FGI with no code. That is a lawful marking, not a mask, so it is set plainly.
 Why two masks
@@ -197,7 +197,7 @@ Fixed, whatever the theme
 ·Mark font with a forced monospace fallback; 0.04em tracking; LTR; no filter, opacity or shadow.
 ·Breaks only between layers, list items and tokens; stacks one layer per line when it must wrap; one-character hanging indent.
 ·Never truncated, scrolled or shrunk below 13px, except the xs size in a collapsed row (12px) which is a pointer to the full form.
-·Colour never carries a state alone: derived and review have a border and tint; masks have a shape; help has a rule on hover.
+·Color never carries a state alone: derived and review have a border and tint; masks have a shape; help has a rule on hover.
 In context · light
 ¶2Comma added(S//REL TO USA, FVEY)CHANGED
 This documentSECRET//FGI AUS GBR//NOFORN
@@ -427,7 +427,7 @@ Waits on this:Declassify On
 Answer
 Ask me at finalize
 Why?CAPCO-2016 §E.1 p31
-The field is set in the mark font because the person is checking a value, not reading prose. Two shortcuts the host can honour: today's date, and pointing at the document (the host returns a selection; the kit parses it). The dependency names the artifact that waits.
+The field is set in the mark font because the person is checking a value, not reading prose. Two shortcuts the host can honor: today's date, and pointing at the document (the host returns a selection; the kit parses it). The dependency names the artifact that waits.
 
 A reading of a value · prompt: ambiguous date
 NEEDS YOUPage 1 · header
@@ -493,7 +493,7 @@ Waits on this:Declassify On
 Answer
 Ask me at finalize
 Why?CAPCO-2016 §E.1 p31
-The field is set in the mark font because the person is checking a value, not reading prose. Two shortcuts the host can honour: today's date, and pointing at the document (the host returns a selection; the kit parses it). The dependency names the artifact that waits.
+The field is set in the mark font because the person is checking a value, not reading prose. Two shortcuts the host can honor: today's date, and pointing at the document (the host returns a selection; the kit parses it). The dependency names the artifact that waits.
 
 A reading of a value · prompt: ambiguous date
 NEEDS YOUPage 1 · header
@@ -678,7 +678,7 @@ Placement by host
 ·Web form. Tooltip anchored to the token; popover anchored to Why?; the window opens beside the pane, or over the page if there is no room, draggable.
 ·Word / Outlook. No drawing over the document: tier 1 is the selection-follow panel; tier 2 is the popover inside the pane; tier 3 opens as a separate Office dialog window, which the person can keep open.
 ·Batch review. Tier 1 and 2 as on the web; tier 3 as a side panel, since there is room.
-Behaviour
+Behavior
 ·Hover opens after 300ms; focus opens at once. Escape closes the innermost open thing and returns focus to where it came from.
 ·Popover max width 460px; it never covers the marking it explains. Window min width 520px; it never covers the pane.
 ·Never modal. A person reading the manual is still working; the document, the pane and the gate all keep working underneath.
@@ -878,7 +878,7 @@ The smallest form: three lines in a ribbon group. Stamp, then the banner at xs. 
 ---
 
 ## Inline mark — in the document itself
-Component 8. The four shapes on the host's own text, and the three adapters that draw them: the web (Custom Highlight API, overlay fallback), Word (content controls plus underline styles, no colour available), and Outlook (spans stripped on send). The document is the memo; the marks are the rungs from the pane.
+Component 8. The four shapes on the host's own text, and the three adapters that draw them: the web (Custom Highlight API, overlay fallback), Word (content controls plus underline styles, no color available), and Outlook (spans stripped on send). The document is the memo; the marks are the rungs from the pane.
 
 Web host · the marks drawn over the texta 760px document column — letter width
 SECRET//FGI AUS GBR//NOFORN
@@ -900,14 +900,14 @@ Who produced this information? — 3 readings · open in the pane
 SECRET//FGI AUS GBR//NOFORN
 
 Mechanics on the web
-1CSS Custom Highlight API first. The kit registers a Highlight per shape with the host's ranges and styles it with ::highlight(mq-must-act): no DOM change, no wrapper spans, the range follows edits. Underline style and colour are exactly the properties that API allows.
+1CSS Custom Highlight API first. The kit registers a Highlight per shape with the host's ranges and styles it with ::highlight(mq-must-act): no DOM change, no wrapper spans, the range follows edits. Underline style and color are exactly the properties that API allows.
 2Overlay as the fallback. Where the API is missing, the kit draws rects from Range.getClientRects() in a pointer-transparent layer above the text, and redraws on scroll, resize and input.
 3Nothing is inserted into the host's text for a mark — except the placeholder for a missing portion mark, which uses the host's own placeholder mechanism and is removed on apply or finalize.
 4Hover on a mark shows the tier-1 tooltip with the finding's headline and a way into the pane; click opens the row. The banner placeholder carries one chip: Apply.
 5Generated, not applied. The dashed outline is the shape for "Marque has a value and hasn't written it". It applies at finalize, on the chip, or when the host says it may write.
 What is drawn, by rung
 ·Quiet — nothing. ¶1 and ¶6 were fixed silently; the receipt has them.
-·Noticeable — thin underline in the text colour (¶2).
+·Noticeable — thin underline in the text color (¶2).
 ·Advisory — dotted, 2px, act-ink (¶5: Marque wrote the safe reading, (S//NF), and the dotted rule says the other reading is one click away).
 ·Action required and Blocking — double rule, attn-ink (¶3).
 ·Absent — dashed outline around a placeholder: ( ) for a portion mark, the derived value for a banner, greyed.
@@ -927,8 +927,8 @@ Marque · banner (generated)SECRET//FGI AUS GBR//NOFORN
 6. (C//REL TO USA, GBR) The working group will reconvene next month.
 
 Mechanics in Word
-1A content control per marked span, tagged mq:<finding id>, titled in words ("Marque · needs you"), coloured by rung. The tag is the kit's registry key; the title is what Word shows when the cursor lands there; the colour draws the box. Appearance: bounding box, so nothing shows at rest except the underline.
-2The shape as an underline style. Word's font API offers single, double, dotted and dashed underlines but no underline colour — so in Word the shape carries the meaning alone, in the text colour. That is why the shapes were chosen to work without colour.
+1A content control per marked span, tagged mq:<finding id>, titled in words ("Marque · needs you"), colored by rung. The tag is the kit's registry key; the title is what Word shows when the cursor lands there; the color draws the box. Appearance: bounding box, so nothing shows at rest except the underline.
+2The shape as an underline style. Word's font API offers single, double, dotted and dashed underlines but no underline color — so in Word the shape carries the meaning alone, in the text color. That is why the shapes were chosen to work without color.
 3A missing mark is a content control with placeholder text ( ) — grey, disappears when typed over. A generated banner is the same control in the header, holding the derived value as placeholder.
 4Selection follows. No hover in Word: the pane watches the selection and shows the row for the control under it. The tier-1 panel from C5 is the same mechanism.
 5Every mark is reversible and the kit owns the reversal. At mark time the adapter records the range's original underline; on apply, close, save or send it removes its controls (keeping the text) and restores the recorded formatting. The kit never leaves a mark in a document it did not author.
@@ -943,7 +943,7 @@ SECRET//FGI AUS GBR//NOFORN
 5. (S//NF) British liaison has requested a follow-up briefing.
 
 Mechanics in Outlook
-1Spans with a data attribute. The compose body is get/set as HTML, so a mark is <span data-mq="…" style="…"> with the shape as an inline text-decoration. Colour is allowed here; the shape still carries the meaning.
+1Spans with a data attribute. The compose body is get/set as HTML, so a mark is <span data-mq="…" style="…"> with the shape as an inline text-decoration. Color is allowed here; the shape still carries the meaning.
 2Send is the gate. The ItemSend event lets the add-in hold the message: that is where Action required becomes Blocking, and where the kit strips its spans and applies or withholds the generated banner.
 3Markings in the subject are text; the kit marks nothing there and shows the subject's finding in the pane only.
 One component, three adapters
@@ -1116,7 +1116,7 @@ One card, kinds by artifact.kind
 1Kinds — banner (front marking), authority block, declassify instruction, notice, caveat layer. Same anatomy: a stamp for the state, the placement from the manual, a headline about the document, the value or the fields, actions, Why? and the citation.
 2States — present · present-not-canonical · present-not-required · absent-but-required · absent-not-required. The card only exists for the middle three and for absent-but-required; the other two are receipt entries, not findings.
 3Fixability — fixable means Marque has the value (banner, notice text, canonical date) and the card offers Apply. Flag-only means a person must supply it (names, sources), and the card offers fields.
-4Placement is Marque's to state and the host's to honour: first page · every page · near the marking · the host decides. The card states it in the manual's words; the kit never assumes it may write to a header.
+4Placement is Marque's to state and the host's to honor: first page · every page · near the marking · the host decides. The card states it in the manual's words; the kit never assumes it may write to a header.
 Says what is missing, not what is wrong
 A card with no as-written opens on the anchor ("Whole document", "First page") and names the absence. "The document has no banner" is a fact; "Missing banner" is a verdict. The derivation sentence under a generated value is the short form of the derivation panel — enough to trust it, with "Show how" for the rest.
 
@@ -1224,7 +1224,7 @@ What the gate is
 The host calls it at the moment that matters — send, save-as-final, publish, submit — with the findings whose blocks is at finalize. The gate is the Needs-you section with defer removed and the answers inline: nothing new to learn at the worst moment. It also shows what Marque will apply on the way out, because that is the last chance to object.
 
 Rules
-1No "send anyway". Blocking is a rung, not a dialog setting. An organisation that wants a question to be skippable configures that rule's rung in .marque.toml; the gate never offers to override it.
+1No "send anyway". Blocking is a rung, not a dialog setting. An organization that wants a question to be skippable configures that rule's rung in .marque.toml; the gate never offers to override it.
 2Save as draft is always offered. The person is never trapped; the document just doesn't leave.
 3Order is document order, same as the pane. Numbers, not severity.
 4Each item commits on its own. Answering one re-evaluates the rest: an answer that resolves a dependency removes the dependent item, with a one-line note.

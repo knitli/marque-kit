@@ -116,9 +116,9 @@ export function parse(text: string): Marking {
   return { text, layers: layers(text).map((l) => ({ tokens: tokens(l).map((t) => ({ t })) })), masks: [] };
 }
 
-/** Normalise whatever the caller passed — a string, or an engine marking —
+/** Normalize whatever the caller passed — a string, or an engine marking —
  *  into { text, layers:[{tokens:[{t, help?}]}], masks:[] }. */
-export function normalise(marking: MarkingLike): Marking {
+export function normalize(marking: MarkingLike): Marking {
   if (typeof marking === 'string') return parse(marking);
   if (marking && marking.layers) return conceal({ ...marking, layers: marking.layers, masks: marking.masks || [] });
   if (marking && marking.text) return conceal({ ...parse(marking.text), masks: marking.masks || [] });
@@ -199,7 +199,7 @@ export function button(cls: string, text: string, onClick: (e: MouseEvent) => vo
  * @param o.help       tokens with a help entry (says.help[]); each becomes a tier-1 target
  */
 export function render(marking: MarkingLike, o: RenderOptions = {}): HTMLSpanElement {
-  const m = normalise(marking);
+  const m = normalize(marking);
   const root = el('span', 'mq-mark');
   if (o.state) root.classList.add(o.state);
   if (o.size && o.size !== 'sm') root.classList.add(o.size);
@@ -209,7 +209,7 @@ export function render(marking: MarkingLike, o: RenderOptions = {}): HTMLSpanEle
   }
   root.setAttribute('dir', 'ltr');
   root.dataset.text = m.text;
-  // Read out as words, not slashes: a labelled group, so its help tokens are still reachable inside.
+  // Read out as words, not slashes: a labeled group, so its help tokens are still reachable inside.
   root.setAttribute('role', 'group');
   root.setAttribute('aria-label', spoken(m, o.vocab));
   models.set(root, m);
@@ -272,7 +272,7 @@ export function render(marking: MarkingLike, o: RenderOptions = {}): HTMLSpanEle
 const chars = (n: number): string => `${n} character${n === 1 ? '' : 's'}`;
 /** The marking as plain text with its masks drawn, never the bytes they cover: for a label that can't hold a marking. */
 export function masked(marking: MarkingLike): string {
-  const m = normalise(marking);
+  const m = normalize(marking);
   return m.layers
     .map(
       (l, i) =>
@@ -359,7 +359,7 @@ export function relabel(node: ParentNode, vocab: SpokenVocab): void {
 
 /** Spoken form for assistive tech: "Secret, releasable to U-S-A and F-V-E-Y". */
 export function spoken(marking: MarkingLike, vocab: SpokenVocab = {}): string {
-  const m = normalise(marking);
+  const m = normalize(marking);
   const words: string[] = [];
   // Masks are said as what they are, never as what they cover: in place, or at the end for one given by layer.
   const said = (mask: Mask): string =>

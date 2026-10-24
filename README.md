@@ -24,7 +24,7 @@ packages/core/       @marque/kit-core: the logic with no DOM, so it runs anywher
   test/                the fixtures held to the types
 packages/kit/        @marque/kit: the DOM and the CSS
   src/theme.css        the theme layer: --mq-* tokens (light default, dark, auto), how a marking fits,
-                       the four shapes that carry meaning, control states, print, forced colours
+                       the four shapes that carry meaning, control states, print, forced colors
   src/kit.css          the components, built only on theme.css
   src/marking.ts       the marking primitive: layers, tokens, four forms, never breaks inside a token
   src/render.ts        finding JSON → DOM: rung(), markClass(), card(), row(), pane(), status(), artifact(), gate(),
@@ -67,13 +67,13 @@ p.update({ moment: 'finalize' }); // the host's moment; the kit never guesses it
 p.destroy();                    // when the pane goes away
 ```
 
-`act` is null when only the seen list changed. An answer shows on its card at once but stays in `document.pending`, and the document is not ready, until the host applies it, re-lints and calls `p.update({ doc })`. `@marque/kit/help` has what a host needs to answer `onHelp` and `onLookup`. The contract's types and the state log are `@marque/kit-core/types` and `@marque/kit-core/state`. At mount the kit measures the host's `--mq-*` tokens against the contrast and size floors (`@marque/kit/theme`); a failing token falls back to the shipped value, and the report is `p.theme` and `onTheme(report)`. Under forced colours the system palette stands and only sizes and the mark font are measured. When the room the host gives the pane is under 240px, the report says `narrow: true` and the kit shows rows only: opening one calls `onOpen(f)` for the host to show it its own way.
+`act` is null when only the seen list changed. An answer shows on its card at once but stays in `document.pending`, and the document is not ready, until the host applies it, re-lints and calls `p.update({ doc })`. `@marque/kit/help` has what a host needs to answer `onHelp` and `onLookup`. The contract's types and the state log are `@marque/kit-core/types` and `@marque/kit-core/state`. At mount the kit measures the host's `--mq-*` tokens against the contrast and size floors (`@marque/kit/theme`); a failing token falls back to the shipped value, and the report is `p.theme` and `onTheme(report)`. Under forced colors the system palette stands and only sizes and the mark font are measured. When the room the host gives the pane is under 240px, the report says `narrow: true` and the kit shows rows only: opening one calls `onOpen(f)` for the host to show it its own way.
 
 The demo runs under `vp dev`, which serves the TypeScript source as modules.
 
 ## The idea in one paragraph
 
-Marque emits findings. Each finding says what it found, what it did or needs, whether a person is required (`needs_person`) and whether it stops the document going out (`blocks`). The kit turns that into one of five rungs of attention — Quiet, Noticeable, Advisory, Action required, Blocking — using the host's moment (editing or finalize), and shows each rung with a shape, not just a colour: a thin underline means changed, a blue dotted line means you *can* act, a gold double rule means you *must*, a dashed outline means something is missing. Gold is the only thing that asks for a person. The question comes first on a card; the marking is context; every question can be answered by typing; "not my call" is always there; and an override is recorded, never hidden.
+Marque emits findings. Each finding says what it found, what it did or needs, whether a person is required (`needs_person`) and whether it stops the document going out (`blocks`). The kit turns that into one of five rungs of attention — Quiet, Noticeable, Advisory, Action required, Blocking — using the host's moment (editing or finalize), and shows each rung with a shape, not just a color: a thin underline means changed, a blue dotted line means you *can* act, a gold double rule means you *must*, a dashed outline means something is missing. Gold is the only thing that asks for a person. The question comes first on a card; the marking is context; every question can be answered by typing; "not my call" is always there; and an override is recorded, never hidden.
 
 ## Reading order
 

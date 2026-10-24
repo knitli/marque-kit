@@ -93,7 +93,7 @@ Inline, in the document
 ¶2 (S//REL TO USA, FVEY) changed
 ¶5 (S//REL TO USA, GBR) can act
 ¶3 (//JOINT S AUS GBR//REL TO USA, GBR) must act
-¶4 ( ) absent | Forced colours (simulated)Windows "High Contrast Black". Fills become Canvas, text CanvasText, links LinkText. Gold is gone; the double rule and the word NEEDS YOU carry "must act".
+¶4 ( ) absent | Forced colors (simulated)Windows "High Contrast Black". Fills become Canvas, text CanvasText, links LinkText. Gold is gone; the double rule and the word NEEDS YOU carry "must act".
 Action required
 
 NEEDS YOUParagraph 3
@@ -119,7 +119,7 @@ Inline, in the document
 ¶5 (S//REL TO USA, GBR) can act
 ¶3 (//JOINT S AUS GBR//REL TO USA, GBR) must act
 ¶4 ( ) absent |
-| What a host may set. Any --mq-* token, on the kit root, in CSS or through mq.theme.extend({…}). In practice: the four fonts, the colours, the radius and border, the spacing unit, the one motion duration. A host supplies light values, dark values, or both; the kit's dark still applies where the host gave none. What it may not. The shapes, which colour means what, how a marking is set, the focus ring, and the contrast floors. Those aren't tokens, so there is nothing to override. | How the theme is chosen. data-mq-theme on the kit root: light (the default — decided 16 Oct: dark-mode use in Word and Outlook is rare, documents are laid out as they will print), dark, or auto (opt-in; follows prefers-color-scheme). A host that knows its own scheme sets it explicitly: Office.js exposes officeTheme, and the add-in may set dark from it for the few who use it. Both themes set color-scheme, so native controls and scrollbars follow. | mq.theme.check() — host override "agency", attn set to #ffe066 with white ink
+| What a host may set. Any --mq-* token, on the kit root, in CSS or through mq.theme.extend({…}). In practice: the four fonts, the colors, the radius and border, the spacing unit, the one motion duration. A host supplies light values, dark values, or both; the kit's dark still applies where the host gave none. What it may not. The shapes, which color means what, how a marking is set, the focus ring, and the contrast floors. Those aren't tokens, so there is nothing to override. | How the theme is chosen. data-mq-theme on the kit root: light (the default — decided 16 Oct: dark-mode use in Word and Outlook is rare, documents are laid out as they will print), dark, or auto (opt-in; follows prefers-color-scheme). A host that knows its own scheme sets it explicitly: Office.js exposes officeTheme, and the add-in may set dark from it for the few who use it. Both themes set color-scheme, so native controls and scrollbars follow. | mq.theme.check() — host override "agency", attn set to #ffe066 with white ink
 |---|---|
 rejected attn-on / attn 1.30 floor 4.5 → shipped value used
 rejected attn-ink / surface 1.78 floor 4.5 → shipped value used
@@ -131,7 +131,7 @@ ok text / surface 15.11 · act-ink / surface 11.48 · focus / surface 11.48
 ---
 
 ## The theme layer — 32 tokens, and the part that isn't tokens
-The whole surface a host can touch is this table. Values are Knitli's, vendored into kit/marque-theme.css; the kit depends on Knitli's values, not its component bundle, so an Office add-in carries no React. Four values depart from Knitli for contrast on dark and say so. Everything under "Fixed" is behaviour the kit keeps regardless of theme — including how a marking fits its container (T3) and the control states (T4).
+The whole surface a host can touch is this table. Values are Knitli's, vendored into kit/marque-theme.css; the kit depends on Knitli's values, not its component bundle, so an Office add-in carries no React. Four values depart from Knitli for contrast on dark and say so. Everything under "Fixed" is behavior the kit keeps regardless of theme — including how a marking fits its container (T3) and the control states (T4).
 
 token
 what it's for
@@ -304,7 +304,7 @@ one duration, one curve; 0 under reduced motion
 yes
 | Fixed — not tokens, not overridable
 |
-.mq-changedthin underline in the text colour. Marque changed it; nothing to do.
+.mq-changedthin underline in the text color. Marque changed it; nothing to do.
 .mq-can-actdotted underline, 2px, in act-ink. One action is available.
 .mq-must-actdouble rule in attn-ink; on a card, a 4px double border. A person must answer.
 .mq-absentdashed outline where a marking should be and isn't.
@@ -315,7 +315,7 @@ yes
 z 10 · 20 · 30popover on its card, tooltip on the pane, section window above the pane. Fixed.
 @media printblack on white, no fills, no shadow, buttons hidden; shapes and words carry the states.
 :focus-visible2px ring in --mq-focus, 2px outside. Never removed.
-forced-colorsfills go to Canvas, text to CanvasText, links to LinkText; the shapes stay. Gold has no system colour, so the stamp also says it in words.
+forced-colorsfills go to Canvas, text to CanvasText, links to LinkText; the shapes stay. Gold has no system color, so the stamp also says it in words.
 reduced-motion--mq-duration becomes 0.
 meaninga host may recolour attn; whatever it is, it means "a person must look". Nothing else may mean that. | The gate — mq.theme.check() at mount
 Reads the computed tokens and measures each pair. A pair under its floor is logged, reported to the host as theme.rejected[{token, measured, floor}], and that token falls back to the shipped value for the active theme. The card renders either way; it never renders unreadable. Shipped light and dark both clear every floor.
@@ -403,7 +403,7 @@ It's British, with some Australian information(//GBR S//FGI AUS//REL TO USA, GBR
 Answer
 Ask me at finalize
 Why?CAPCO-2016 §H.3 p55
-What changes as the pane narrows. Nothing structural. The question wraps; the option prose wraps; a marking that no longer fits stacks its layers. Below 360px the footer's two links stack and the card's padding tightens by one unit — that is the whole of the responsive behaviour, written once in the kit file as a container query.
+What changes as the pane narrows. Nothing structural. The question wraps; the option prose wraps; a marking that no longer fits stacks its layers. Below 360px the footer's two links stack and the card's padding tightens by one unit — that is the whole of the responsive behavior, written once in the kit file as a container query.
 What never changes. The marking's size, its font, the tokens, the order of the layers, the radio, the gold.
 The floor is 240px. Under it the kit renders only the collapsed row and tells the host it cannot lay out a card. Word's pane doesn't go that narrow; a web host could.
 Banners, lists, SCI — at 290px, light and dark
@@ -499,7 +499,7 @@ Marque's cap
 4,096
 bytes · ~170 lines stacked. Drawn a little past the longest marking the grammar allows; it will not occur, but the kit must not fall over if it does. Never rendered inline — the row says so in words and the popover scrolls.
 Why not just stack. Stacking is correct and complete, and in a card it is the right answer up to about four lines. Past that the marking stops being read and starts being skipped — the opposite of what a decision card is for.
-Why not cut. A marking is what the person is verifying. Anything that looks like the marking but isn't the whole marking is a lie in OCR-B. So every fold is visibly a fold, in a different face and colour, and opens in place.
+Why not cut. A marking is what the person is verifying. Anything that looks like the marking but isn't the whole marking is a lie in OCR-B. So every fold is visibly a fold, in a different face and color, and opens in place.
 Four forms of one marking light, then dark
 Full · the reference form · popover
 Paragraph 3 · as Marque will write it
@@ -565,7 +565,7 @@ Readings compared layer by layer. The layer that differs is always full and tint
 1The full marking always exists — in copy, in the audit, in print, in the Why? popover, and one click or hover from any other form. The popover is the only place a marking may scroll.
 2A fold is never marking text. It is UI type, act-ink, dotted — the "can act" shape — and it names a count. It happens only at a list boundary, after the heading and the first three codes. In the document itself the kit never folds; the host's text is the host's.
 3In a decision, a fold never hides a difference. Readings are compared layer by layer; a layer that differs is always full and tinted. Only a layer identical in every reading may fold, and its label says so.
-4Rows and strips summarise when the stacked form would pass three lines: first layer verbatim, long lists as heading plus a count badge with first and last code.
+4Rows and strips summarize when the stacked form would pass three lines: first layer verbatim, long lists as heading plus a count badge with first and last code.
 5Pathological markings — the engine's PathologicalMarking, or anything past about 1,000 bytes — never render inline. The row says "a marking too long to show here"; the popover shows it and scrolls.
 6Within a layer, break after a list comma first, between tokens next, before a slash last; never inside a token. Every continuation line carries a one-character hanging indent. | Where each form shows
 
@@ -631,5 +631,5 @@ Aaradio accent (blue-500) on 12% gold tint1.753.0fail
 AaArrow (blue-500) on raised2.183.0fail
 Aarule-strong border vs raised2.053.0fail
 Aaerror text on raised1.984.5fail |
-| Blue on blue is fine. The derived marking is blue-700 ink on a 10% blue tint: 6.8:1 on Reference, 5.4:1 on Instrument. It reads as "blue on blue" because the state is carried by hue; the kit adds a shape too — thin underline for changed, double rule for must-act, dotted for can-act — so colour never carries the meaning alone. Blue and gold are also the safe pair for the common colour-vision deficiencies: they differ in lightness, not just hue. | Blue touches gold in two places, and both are avoidable. The focus ring over a gold button is 2.5:1 (Reference) and 1.1:1 (Instrument) — but Knitli offsets the ring 2px outside the element, so it is judged against the card, where it passes. Blue radio dots on a gold tint pass on Reference (5.2) and fail on Instrument (1.8): the kit uses action-ink for the dot, not action, and never puts options on a gold tint. | Fix before the kit ships. On Instrument: the Arrow defaults to action (2.2:1) and should take action-ink; text-faint on a raised card is 3.97 (the token was measured on the ground, not the card); the review marking's gold-on-gold-tint is 4.41, a hair under. On Reference: a gold border on a white card is 2.28, so the review state needs its double rule, not the border alone. These are design-system issues to send back, not kit workarounds. |
+| Blue on blue is fine. The derived marking is blue-700 ink on a 10% blue tint: 6.8:1 on Reference, 5.4:1 on Instrument. It reads as "blue on blue" because the state is carried by hue; the kit adds a shape too — thin underline for changed, double rule for must-act, dotted for can-act — so color never carries the meaning alone. Blue and gold are also the safe pair for the common color-vision deficiencies: they differ in lightness, not just hue. | Blue touches gold in two places, and both are avoidable. The focus ring over a gold button is 2.5:1 (Reference) and 1.1:1 (Instrument) — but Knitli offsets the ring 2px outside the element, so it is judged against the card, where it passes. Blue radio dots on a gold tint pass on Reference (5.2) and fail on Instrument (1.8): the kit uses action-ink for the dot, not action, and never puts options on a gold tint. | Fix before the kit ships. On Instrument: the Arrow defaults to action (2.2:1) and should take action-ink; text-faint on a raised card is 3.97 (the token was measured on the ground, not the card); the review marking's gold-on-gold-tint is 4.41, a hair under. On Reference: a gold border on a white card is 2.28, so the review state needs its double rule, not the border alone. These are design-system issues to send back, not kit workarounds. |
 |---|---|---|

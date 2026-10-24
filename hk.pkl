@@ -1,0 +1,32 @@
+amends "package://github.com/jdx/hk/releases/download/v2.8.1/hk@2.8.1#/Config.pkl"
+
+import "package://github.com/jdx/hk/releases/download/v2.8.1/hk@2.8.1#/Builtins.pkl"
+// Using a coding agent? See https://hk.jdx.dev/agents
+
+local linters = new Mapping {
+  ["jactionlint"] = Builtins.jactionlint
+  // ["tsc"] = (Builtins.tsc) {
+  //   check = (Builtins.tsc.check) { command = "pnpm exec tsc --noEmit -p {{workspace_indicator}}" }
+  // }
+  ["vp_check"] = Builtins.vp_check
+  ["vp_fmt"] = Builtins.vp_fmt
+  ["vp_lint"] = Builtins.vp_lint
+  ["zizmor"] = Builtins.zizmor
+  ["check_merge_conflict"] = Builtins.check_merge_conflict
+  ["check_shebang_scripts_are_executable"] = Builtins.check_shebang_scripts_are_executable
+  ["check_symlinks"] = Builtins.check_symlinks
+  ["destroyed_symlinks"] = Builtins.destroyed_symlinks
+  ["detect_private_key"] = Builtins.detect_private_key
+  ["fix_smart_quotes"] = Builtins.fix_smart_quotes
+  // ["knip"] = Builtins.knip
+  ["mise"] = Builtins.mise
+  ["pkl"] = Builtins.pkl
+  ["pkl_format"] = Builtins.pkl_format
+  ["shellcheck"] = Builtins.shellcheck
+  ["shfmt"] = Builtins.shfmt
+  ["trailing_whitespace"] = Builtins.trailing_whitespace
+  ["typos"] = Builtins.typos
+  //  ["yq"] = Builtins.yq
+}
+
+steps = linters

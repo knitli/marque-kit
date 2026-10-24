@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+#:schema https://raw.githubusercontent.com/crate-ci/typos/master/config.schema.json
+#:tombi schema.strict = false
+
+[files]
+
+extend-exclude = []
+
+[default]
+binary = false
+check-file = true
+check-filename = true
+extend-ignore-identifiers-re = []
+extend-ignore-re = [
+  # Ignore lines that end with `# spellchecker:disable-line`
+  "(?Rm)^.*(#|//|///|//!)\\s*spellchecker:disable-line$",
+  # Ignore the line after `# spellchecker:ignore-next-line`:
+  "(#|//|///|//!)\\s*spellchecker:ignore-next-line\\n.*",
+  # Ignore blocks between `# spellchecker:off` and `# spellchecker:on`
+  "(?s)(#|//|///|//!)\\s*spellchecker:off.*?\\n\\s*(#|//|///|//!)\\s*spellchecker:on",
+  # Generated git-cliff entries in CHANGELOG.md — a whole bullet line ending in
+  # a commit link: `- **scope**: Subject ([5ba0223](https://…/commit/5ba0223…))`.
+  #
+
+  # Line-scoped, not a whole-file exclude, so the hand-written release notes
+  # above the generated block stay spell-checked.
+  "(?m)^- .*\\(\\[[0-9a-f]{7,40}\\]\\(https://github\\.com/[^)]+\\)\\)$",
+]
+extend-ignore-words-re = []
+identifier-leading-digits = false
+ignore-hex = true
+locale = "en-us"
+unicode = true
+
+[default.extend-words]
+wdth = "wdth"
+THA = "THA"
+
+[default.extend-identifiers]
+
+
+[type.xml.extend-words]

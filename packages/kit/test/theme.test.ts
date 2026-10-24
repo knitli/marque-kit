@@ -43,13 +43,13 @@ for (const [name, t] of [
   }
 }
 // ── Coverage: every pairing the stylesheets can paint is measured by the gate or excused here.
-// A new colour in kit.css or theme.css fails this until someone decides which.
+// A new color in kit.css or theme.css fails this until someone decides which.
 {
   const sheets = ['theme.css', 'kit.css']
     .map((f) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8'))
     .join('\n')
     .replace(/\/\*[\s\S]*?\*\//g, '');
-  const colours = new Set(
+  const colors = new Set(
     Object.entries(light)
       .filter(([, v]) => /^(#|rgba?\()/.test(v))
       .map(([k]) => k),
@@ -59,7 +59,7 @@ for (const [name, t] of [
     decl: [...body.matchAll(/([a-z-]+)\s*:\s*([^;]+)/g)],
   }));
   const tok = (v: string): string[] =>
-    [...v.matchAll(/var\(--mq-([a-z-]+)\)/g)].map((m) => m[1] ?? '').filter((t) => colours.has(t));
+    [...v.matchAll(/var\(--mq-([a-z-]+)\)/g)].map((m) => m[1] ?? '').filter((t) => colors.has(t));
   const of = (r: (typeof rules)[number], re: RegExp): string[] =>
     r.decl.filter(([, p = '']) => re.test(p)).flatMap(([, , v = '']) => tok(v));
   const uses = rules.map((r) => ({
@@ -103,13 +103,13 @@ for (const [name, t] of [
     'attn-ink/act-tint': 'no gold text is drawn on a hovered row or option',
     'text-muted/attn-tint': 'highlights are on body text and readings, never on muted text',
     'rule-strong/act-tint':
-      'a hovered option or button has the tint inside its border; the surface outside is the neighbour measured',
+      'a hovered option or button has the tint inside its border; the surface outside is the neighbor measured',
     'rule-strong/attn-tint': 'nothing with a strong border sits on a highlight',
   };
 
   for (const u of uses) {
     for (const f of u.fg)
-      assert.ok(TEXT.includes(f) || f in LABELS, `${u.sel}: text colour --mq-${f} is new; add it to TEXT or LABELS`);
+      assert.ok(TEXT.includes(f) || f in LABELS, `${u.sel}: text color --mq-${f} is new; add it to TEXT or LABELS`);
     // A label is only ever on its own fill, set in the same rule.
     for (const f of u.fg)
       if (f in LABELS)

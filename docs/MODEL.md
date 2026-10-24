@@ -7,7 +7,7 @@ SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
 
 # The model: rungs, state, anchors, hosts, help
 
-The conceptual boards from the first day of design: the attention ladder, the two layers of state, theme vs behaviour, where findings attach, the decision prompt, three hosts, tooltips vs popovers, help in three tiers. Later component boards supersede details here; the principles stand.
+The conceptual boards from the first day of design: the attention ladder, the two layers of state, theme vs behavior, where findings attach, the decision prompt, three hosts, tooltips vs popovers, help in three tiers. Later component boards supersede details here; the principles stand.
 
 _Extracted from the Marque UI kit design canvas (boards: Attention, States, Boundary, Anchors, Decision, Hosts, Tooltips, Help), 21 Oct 2026. The canvas is the visual record; this file is the text the kit is built to. Edit here from now on._
 
@@ -137,17 +137,17 @@ Generated is not applied. Applied is not complete. Complete is not ready — rea
 ---
 
 ## A UI kit, not a style — what hosts may change, and what they may not
-Most integrators will ship the default as it comes. So the default is the design we want, in full. Hosts that re-theme change the surface; the behaviour underneath is the product.
+Most integrators will ship the default as it comes. So the default is the design we want, in full. Hosts that re-theme change the surface; the behavior underneath is the product.
 
 | Theme — change freely
 |
 Typefaces — as long as a marking is never wrapped mid-token, dimmed, or tinted.
-Colours — every token re-points, the two semantic colours included. They stay two, stay distinct from each other and from everything else, and appear nowhere else in the kit.
+Colors — every token re-points, the two semantic colors included. They stay two, stay distinct from each other and from everything else, and appear nowhere else in the kit.
 Radii, borders, shadows, spacing, density.
 Placement — a pane, a popover, inline, a margin, a status bar. The host decides where; the kit decides what.
 Icons — any set, or none.
 Motion — any timing, or none.
-The host's own strings — button labels, pane titles. Marque's explanations and questions stay Marque's. | Behaviour — fixed
+The host's own strings — button labels, pane titles. Marque's explanations and questions stay Marque's. | Behavior — fixed
 Five attention rungs, each with a fixed ask: nothing · see · can act · must act · the operation waits.
 Two layers of state. Generated is never shown as applied; applied never as complete; complete never as ready.
 Routine corrections are not approved one by one.
@@ -159,8 +159,8 @@ Readiness is checked again at send or finalize, whatever was shown earlier.
 Lint and fix tell the same story about the same condition.
 Markings are quoted exactly as written — never restyled, dimmed, or wrapped mid-token.
 The text is judged, never the person.
-Every distinction survives without colour, hover, pointer, or position. |
-The test for any theme: strip every colour, font and radius. If a distinction disappears, it was living in the theme layer — move it into behaviour.
+Every distinction survives without color, hover, pointer, or position. |
+The test for any theme: strip every color, font and radius. If a distinction disappears, it was living in the theme layer — move it into behavior.
 
 
 ---
@@ -242,7 +242,7 @@ Four axes: level, ownership, releasability, controls. Nearly every question Marq
 The text is judged, not the person
 "Can't be right as written" — never "you left out USA".
 One likely reading, with alternatives
-Marque's best guess is labelled as a guess. The rare sub-case lives under its option, not as a fourth.
+Marque's best guess is labeled as a guess. The rare sub-case lives under its option, not as a fourth.
 The person picks a meaning; Marque writes the marking
 The resulting marking is shown so a reviewer can verify it — not so the author has to parse it.
 "Not my call" is always there
