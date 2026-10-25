@@ -6,9 +6,9 @@
 // `pnpm test` (vp test, happy-dom)
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, test } from 'vite-plus/test';
+import { describe, expect, test, vi } from 'vite-plus/test';
 import { render as mark, masked } from '../../src/marking.ts';
-import { artifact, card, gate, mount, pane, receipt, rung } from '../../src/render.ts';
+import { artifact, card, gate, mount, pane, receipt, rung, UNDO_MS } from '../../src/render.ts';
 import { why } from '../../src/help.ts';
 import { docView, empty, record, snapshot } from '@marque/kit-core/state';
 import type { Doc, FindingView, Moment } from '@marque/kit-core/types';
@@ -151,4 +151,66 @@ test('a citation without the manual’s words cites and quotes nothing', () => {
   expect(c.querySelector('blockquote')).toBeNull();
   expect(c.textContent).not.toContain('undefined');
   expect(c.querySelector('.mq-cite')).toBeTruthy();
+});
+
+describe('the undo window (DECISIONS #23)', () => {
+  const setup = () => {
+    const box = document.createElement('div'),
+      root = document.createElement('div');
+    for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
+    box.append(root);
+    document.body.append(box);
+    const p = mount(root, { doc: memo });
+    const answer = () => {
+      const x = p.view()!.findings.find((y) => y.id === P3)!;
+      p.host.onAct?.(x, 'answered', { reading: x.outcome!.readings![0]! });
+    };
+    return { root, p, answer, done: () => (p.destroy(), box.remove()) };
+  };
+  const strip = (root: Element) => root.querySelector(`.mq-undo[data-undo="${P3}"]`);
+
+  test('an answer leaves Undo in its place for 8 seconds; a redraw keeps it there', () => {
+    vi.useFakeTimers();
+    const { root, p, answer, done } = setup();
+    answer();
+    expect(strip(root)?.textContent).toContain('Answered');
+    expect(buttons(strip(root)!)).toEqual(['Undo']);
+    // ¶3 was all Action required held while editing: its section went with it, so the strip stands where it was.
+    const top = () => strip(root)!.parentElement!.nextElementSibling;
+    expect(top()?.matches('.mq-section.can')).toBe(true);
+    p.update({ moment: 'editing' });
+    expect(top()?.matches('.mq-section.can')).toBe(true);
+    vi.advanceTimersByTime(UNDO_MS - 1);
+    expect(strip(root)).toBeTruthy();
+    vi.advanceTimersByTime(1);
+    expect(strip(root)).toBeNull();
+    done();
+    vi.useRealTimers();
+  });
+
+  test('hovering stops the clock; leaving starts it again with what was left', () => {
+    vi.useFakeTimers();
+    const { root, answer, done } = setup();
+    answer();
+    vi.advanceTimersByTime(5000);
+    strip(root)!.dispatchEvent(new MouseEvent('mouseenter'));
+    vi.advanceTimersByTime(60_000);
+    expect(strip(root)).toBeTruthy();
+    strip(root)!.dispatchEvent(new MouseEvent('mouseleave'));
+    vi.advanceTimersByTime(UNDO_MS - 5000);
+    expect(strip(root)).toBeNull();
+    done();
+    vi.useRealTimers();
+  });
+
+  test('Undo on an answer to a must-act question brings the question back', async () => {
+    const { root, p, answer, done } = setup();
+    answer();
+    strip(root)!.querySelector('button')!.click();
+    expect(strip(root)).toBeNull();
+    expect(p.view()!.findings.find((y) => y.id === P3)!.asks).toBeTruthy();
+    await new Promise((r) => setTimeout(r));
+    expect(root.querySelector(`.mq-row-item[data-finding="${P3}"]`)?.classList.contains('open')).toBe(true);
+    done();
+  });
 });

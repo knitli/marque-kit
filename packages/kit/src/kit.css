@@ -378,6 +378,13 @@
 .mq-row-item.open {
   background: var(--mq-surface-sunken);
 }
+/* The undo window: an act's card leaves what was done and an Undo in its place for a few seconds. */
+.mq-row-item.mq-undo {
+  cursor: default;
+}
+.mq-row-item.mq-undo:hover {
+  background: none;
+}
 .mq-row-detail {
   padding: 0 calc(var(--mq-unit) * 3) calc(var(--mq-unit) * 3);
   border-top: 0;
