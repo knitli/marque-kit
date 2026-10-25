@@ -116,13 +116,14 @@ s = act(shown, s, P3, 'answered', { free: 'The UK alone' });
 assert.ok(text(s).includes('4. Analysts') && text(s).includes('3. (//JOINT S AUS GBR//REL TO USA, GBR) A joint'));
 [shown, s] = lint(s);
 assert.ok(asks(shown, s, P3) && asks(shown, s, P4), 'still asked');
-// A level after an owner prefix is read; one above the banner is held, one at it is written.
+// A level after an owner prefix is read and held when above the banner; a typed mark with controls is
+// held whatever its level (the banner would move); a bare level at or below the banner is written.
 s = act(shown, s, P4, 'answered', { free: '(//JOINT TS AUS GBR USA//REL TO USA, AUS, GBR)' });
 assert.ok(held(doc, s).has(P4) && text(s).includes('4. Analysts'), 'TS after JOINT held');
 [shown, s] = lint(s);
-s = act(shown, s, P4, 'answered', { free: '(//AUS GBR S//REL TO USA, AUS, GBR)' });
-assert.ok(
-  !held(doc, s).has(P4) && text(s).includes('4. (//AUS GBR S//REL TO USA, AUS, GBR) Analysts'),
-  'S after owners written',
-);
+s = act(shown, s, P4, 'answered', { free: '(S//NF)' });
+assert.ok(held(doc, s).has(P4) && text(s).includes('4. Analysts'), 'NOFORN typed held');
+[shown, s] = lint(s);
+s = act(shown, s, P4, 'answered', { free: '(S)' });
+assert.ok(!held(doc, s).has(P4) && text(s).includes('4. (S) Analysts'), 'a bare level written');
 console.log('write: ok');

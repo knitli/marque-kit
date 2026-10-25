@@ -224,7 +224,7 @@ void Office.onReady(async (info) => {
     el(
       'p',
       'mq-p',
-      'This sample pane can’t write every answer yet: one that isn’t a marking, a portion marked above the banner, or the authority block. Those questions stay open.',
+      'This sample pane can’t write every answer yet: one that isn’t a marking, a typed portion mark with more than its level or above the banner’s, or the authority block. Those questions stay open.',
     ),
   );
 

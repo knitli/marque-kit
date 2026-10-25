@@ -71,7 +71,8 @@ const level = (t: string | null): number => {
 
 /**
  * The acts this host can't write yet, by id: an answer that isn't a marking (prose, for the engine to
- * read), a portion above the banner (the banner would need deriving again), and the authority block.
+ * read), a portion above the banner or a typed one with controls (the banner would need deriving
+ * again), and the authority block.
  * They aren't written, and the re-lint leaves their findings as Marque had them: the question stays open.
  * shortcut: the stand-in's limits; the engine re-derives the banner and the Word adapter writes the block.
  */
@@ -83,8 +84,11 @@ export function held(doc: Doc, state: State): Set<string> {
     const e = last(state, f.id);
     if (f.stale || (e?.act !== 'answered' && e?.act !== 'changed') || e.value == null) continue;
     const t = textOf(f.outcome?.result);
-    // One it can't read the level of is held too: it might be above the banner.
-    if (!t || level(t) < 0 || level(t) > top) out.add(f.id);
+    // One it can't read the level of is held too: it might be above the banner. A typed one is written
+    // only as a bare level (`(U)`): controls in it (NOFORN, FGI, REL TO) would move the banner, which
+    // only Marque's own readings carry a derivation for.
+    const bare = !e.value.free || /^\(\s*(TOP SECRET|TS|SECRET|S|CONFIDENTIAL|C|UNCLASSIFIED|U)\s*\)$/.test(t ?? '');
+    if (!t || !bare || level(t) < 0 || level(t) > top) out.add(f.id);
   }
   for (const a of v.document.artifacts)
     if (a.kind !== 'front_marking' && last(state, a.id)?.act === 'answered') out.add(a.id);
