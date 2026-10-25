@@ -213,4 +213,38 @@ describe('the undo window (DECISIONS #23)', () => {
     expect(root.querySelector(`.mq-row-item[data-finding="${P3}"]`)?.classList.contains('open')).toBe(true);
     done();
   });
+
+  test('from the keyboard, Undo puts focus back on the reopened card', async () => {
+    const { root, answer, done } = setup();
+    answer();
+    const undo = strip(root)!.querySelector('button')!;
+    undo.focus();
+    undo.click();
+    await new Promise((r) => setTimeout(r));
+    expect(root.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement?.closest(`[data-finding="${P3}"]`)).toBeTruthy();
+    done();
+  });
+
+  test('kept as written from Done: the section opens to show Undo, and the marking is full size', () => {
+    const { root, p, done } = setup();
+    p.host.onAct?.(
+      p.view()!.findings.find((y) => y.id === P2)!,
+      'kept_as_written',
+    );
+    const s = root.querySelector(`.mq-undo[data-undo="${P2}"]`)!;
+    expect(s.closest('details')?.open).toBe(true);
+    expect(s.querySelector('.mq-mark.xs')).toBeNull();
+    done();
+  });
+
+  test('an apply is asked for, not done; a typed field gets no Undo', () => {
+    const { root, p, done } = setup();
+    const art = (id: string) => p.view()!.document.artifacts.find((a) => a.id === id)!;
+    p.host.onAct?.(art('a-banner'), 'answered', { apply: true });
+    expect(root.querySelector('.mq-undo[data-undo="a-banner"]')?.textContent).toContain('Will be applied');
+    p.host.onAct?.(art('a-cab'), 'answered', { fields: { derived_from: 'Memo 12' } });
+    expect(root.querySelector('.mq-undo[data-undo="a-cab"]')).toBeNull();
+    done();
+  });
 });

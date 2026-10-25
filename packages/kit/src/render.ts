@@ -1272,7 +1272,8 @@ export function mount(
       const inPane = body.contains(document.activeElement);
       // Putting it back to what Marque said reopens the card where the finding now lives, focus kept.
       // Any other act leaves what was done and an Undo in the card's place (DECISIONS #23).
-      const back = (act === 'changed' && value == null) || !cur.doc;
+      // A typed field has no Undo yet: core can't take one back (field answers accumulate).
+      const back = (act === 'changed' && value == null) || !cur.doc || !!value?.fields;
       if (back) cur.open = f.id;
       else {
         cur.open = null;
@@ -1313,22 +1314,29 @@ export function mount(
       [...docView(cur.doc, cur.state).findings, ...docView(cur.doc, cur.state).document.artifacts].find(
         (x) => x.id === f.id,
       );
-    const word = value?.apply ? 'Applied' : value?.remove ? 'Removed' : DONE[act];
+    // The host applies: an apply or a removal is asked for here, not done.
+    const word = value?.apply ? 'Will be applied' : value?.remove ? 'Will be removed' : DONE[act];
     const strip = el('div', 'mq-row-item mq-undo');
     strip.dataset.undo = f.id;
     strip.append(el('span', 'where', where(f)));
     const what = el('div', 'what', word);
     const m = now && (act === 'answered' || act === 'changed') && !isArtifact(now) ? now.outcome?.result : null;
-    if (m && isMarking(m)) what.append(mark(m, { form: 'folded', size: 'xs' }));
+    if (m && isMarking(m)) what.append(mark(m, { form: 'folded' }));
     strip.append(what);
     const end = el('div', 'end');
     end.append(
       button('ghost', 'Undo', () => {
-        const id = f.id;
+        const id = f.id,
+          had = strip.contains(document.activeElement);
         stop();
+        // A re-lint may have withdrawn it since: the act is taken back on what it was taken on.
         const v = cur.doc && docView(cur.doc, cur.state);
-        const x = v && [...v.findings, ...v.document.artifacts].find((y) => y.id === id);
-        if (x) h.onAct?.(x, 'changed', null);
+        h.onAct?.(
+          [...(v?.findings ?? []), ...(v?.document.artifacts ?? [])].find((y) => y.id === id) ?? f,
+          'changed',
+          null,
+        );
+        if (had) refocus(id);
       }),
     );
     strip.append(end);
@@ -1381,6 +1389,9 @@ export function mount(
     const before = sec && next ? sec.querySelector(`.mq-row-item[data-finding="${CSS.escape(next)}"]`) : null;
     if (before) before.before(strip);
     else if (sec) (sec.querySelector('details') ?? sec.querySelector('.mq-rows'))?.append(strip);
+    // Done is collapsed: open while it holds the strip, or nobody sees it.
+    const det = strip.closest('details');
+    if (det) det.open = true;
     else {
       // Its section went with it: the strip stands on its own above the first one left.
       const rows = el('div', 'mq-rows');
