@@ -1303,6 +1303,10 @@ export function mount(
     strip: HTMLElement;
     say: string;
     end: () => void;
+    /** Was focus on it when the pane was taken down to redraw? */
+    focused: boolean;
+    /** Focus isn't on it: start the clock again if focus was what stopped it. */
+    left: () => void;
   } | null = null;
   function undoable(f: Subject, act: Act, value: ActValue | null): void {
     recent?.end();
@@ -1378,6 +1382,12 @@ export function mount(
       strip,
       say: `${spokenWhere(f)}: ${word.toLowerCase()}. Undo is in its place.`,
       end: stop,
+      focused: false,
+      left: () => {
+        if (!within || strip.contains(document.activeElement)) return;
+        within = false;
+        run();
+      },
     };
     run();
   }
@@ -1387,11 +1397,9 @@ export function mount(
     const { section, next, strip } = recent;
     const sec = section && body.querySelector(`.mq-section.${section}`);
     const before = sec && next ? sec.querySelector(`.mq-row-item[data-finding="${CSS.escape(next)}"]`) : null;
+    const into = sec && (sec.querySelector('details') ?? sec.querySelector('.mq-rows'));
     if (before) before.before(strip);
-    else if (sec) (sec.querySelector('details') ?? sec.querySelector('.mq-rows'))?.append(strip);
-    // Done is collapsed: open while it holds the strip, or nobody sees it.
-    const det = strip.closest('details');
-    if (det) det.open = true;
+    else if (into) into.append(strip);
     else {
       // Its section went with it: the strip stands on its own above the first one left.
       const rows = el('div', 'mq-rows');
@@ -1400,6 +1408,12 @@ export function mount(
       if (at) at.before(rows);
       else body.querySelector('.mq-pane')?.append(rows);
     }
+    // Done is collapsed: open while it holds the strip, or nobody sees it.
+    const det = strip.closest('details');
+    if (det) det.open = true;
+    // Focus that was on it comes back; a browser that sent no focusout when it left mustn't leave the clock stopped.
+    if (recent.focused) strip.querySelector('button')?.focus();
+    else recent.left();
   }
 
   /** A redraw replaces the pane; put focus back on the same finding's card,
@@ -1496,6 +1510,7 @@ export function mount(
     closeWithin(root, { windows: false });
     // Read after the popover has handed focus back to its row or card, so focus follows into the new draw.
     if (focusId === undefined) focusId = focusedId();
+    if (recent) recent.focused = recent.strip.contains(document.activeElement);
     body.replaceChildren(pane(v, h));
     replace();
     if (host.vocab) relabel(body, host.vocab); // this pane's own vocabulary

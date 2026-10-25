@@ -214,6 +214,23 @@ describe('the undo window (DECISIONS #23)', () => {
     done();
   });
 
+  test('deferred where its section stays: the strip stays beside it, and focus on Undo survives a redraw', () => {
+    vi.useFakeTimers();
+    const { root, p, done } = setup();
+    const x = p.view()!.findings.find((y) => y.id === P3)!;
+    p.update({ moment: 'finalize' });
+    p.host.onAct?.(x, 'declined');
+    expect(strip(root)?.closest('.mq-section')).toBeTruthy();
+    const undo = strip(root)!.querySelector('button')!;
+    undo.focus();
+    p.update({ moment: 'finalize' });
+    expect(document.activeElement).toBe(undo);
+    vi.advanceTimersByTime(60_000);
+    expect(strip(root)).toBeTruthy();
+    done();
+    vi.useRealTimers();
+  });
+
   test('from the keyboard, Undo puts focus back on the reopened card', async () => {
     const { root, answer, done } = setup();
     answer();
