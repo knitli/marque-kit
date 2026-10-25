@@ -231,6 +231,15 @@ describe('the undo window (DECISIONS #23)', () => {
     vi.useRealTimers();
   });
 
+  test('a re-lint that asks something new under the same id takes the strip away', () => {
+    const { root, p, answer, done } = setup();
+    answer();
+    const asks = { ...f(P3).asks!, text: 'Whose information is this now?' };
+    p.update({ doc: { ...memo, findings: memo.findings.map((x) => (x.id === P3 ? { ...x, asks } : x)) } });
+    expect(strip(root)).toBeNull();
+    done();
+  });
+
   test('from the keyboard, Undo puts focus back on the reopened card', async () => {
     const { root, answer, done } = setup();
     answer();

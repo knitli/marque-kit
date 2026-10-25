@@ -1303,6 +1303,8 @@ export function mount(
     strip: HTMLElement;
     say: string;
     end: () => void;
+    /** Is the act still the one in force on its finding? */
+    holds: () => boolean;
     /** Was focus on it when the pane was taken down to redraw? */
     focused: boolean;
     /** Focus isn't on it: start the clock again if focus was what stopped it. */
@@ -1332,18 +1334,25 @@ export function mount(
       button('ghost', 'Undo', () => {
         const id = f.id,
           had = strip.contains(document.activeElement);
+        const ok = holds();
         stop();
         // A re-lint may have withdrawn it since: the act is taken back on what it was taken on.
-        const v = cur.doc && docView(cur.doc, cur.state);
-        h.onAct?.(
-          [...(v?.findings ?? []), ...(v?.document.artifacts ?? [])].find((y) => y.id === id) ?? f,
-          'changed',
-          null,
-        );
+        if (ok) h.onAct?.(target() ?? f, 'changed', null);
         if (had) refocus(id);
       }),
     );
     strip.append(end);
+    // The act this strip undoes, and whether it is still the one in force: a re-lint may have put another
+    // question or marking under the same id, and Undo must not bring the old one back over it.
+    const entry = canon(cur.state.log[cur.state.log.length - 1]);
+    const target = (): Subject | undefined => {
+      const v = cur.doc && docView(cur.doc, cur.state);
+      return [...(v?.findings ?? []), ...(v?.document.artifacts ?? [])].find((y) => y.id === f.id);
+    };
+    const holds = (): boolean => {
+      const x = target();
+      return !x || [x.person, decision(x)].some((d) => d && canon(d) === entry);
+    };
     let left = UNDO_MS,
       since = 0,
       timer: ReturnType<typeof setTimeout> | undefined,
@@ -1382,6 +1391,7 @@ export function mount(
       strip,
       say: `${spokenWhere(f)}: ${word.toLowerCase()}. Undo is in its place.`,
       end: stop,
+      holds,
       focused: false,
       left: () => {
         if (!within || strip.contains(document.activeElement)) return;
@@ -1394,6 +1404,8 @@ export function mount(
   /** Put the undo strip back where the card was, in a pane just drawn. */
   function replace(): void {
     if (!recent) return;
+    // Nothing left to undo: a re-lint put something else under its id.
+    if (!recent.holds()) return recent.end();
     const { section, next, strip } = recent;
     const sec = section && body.querySelector(`.mq-section.${section}`);
     const before = sec && next ? sec.querySelector(`.mq-row-item[data-finding="${CSS.escape(next)}"]`) : null;
