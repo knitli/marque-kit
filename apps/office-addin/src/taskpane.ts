@@ -22,13 +22,13 @@ import '@marque/kit/theme.css';
 import '@marque/kit/kit.css';
 import { mount } from '@marque/kit';
 import { button, el } from '@marque/kit/marking';
-import { docView, record, snapshot } from '@marque/kit-core/state';
+import { record, snapshot } from '@marque/kit-core/state';
 import type { Doc, State, Subject, Vocab } from '@marque/kit-core/types';
 import findingsUrl from '../../../fixtures/memo.findings.json?url';
 import vocabUrl from '../../../fixtures/memo.vocab.json?url';
 import memo from '../../../fixtures/memo.txt?raw';
 import { locate, paragraphAt, written } from './locate.ts';
-import { banner, edits, relint } from './write.ts';
+import { banner, edits, made, relint } from './write.ts';
 
 /** In dev, what the pane would say to a console it doesn't have goes to the dev server's .dev.log. */
 const log = (...what: unknown[]): void => {
@@ -45,9 +45,9 @@ interface Layout {
   at: (span: [number, number]) => [number, number];
   banner: string | null;
 }
-const layout = (view: Doc): Layout => {
-  const w = written(memo, edits(view, memo));
-  return { lines: w.text.replace(/\n$/, '').split('\n'), at: w.at, banner: banner(view) };
+const layout = (doc: Doc, state: State): Layout => {
+  const w = written(memo, edits(made(doc, state), memo));
+  return { lines: w.text.replace(/\n$/, '').split('\n'), at: w.at, banner: banner(relint(doc, state)) };
 };
 let now: Layout = { lines: [], at: (s) => s, banner: null };
 
@@ -115,12 +115,14 @@ const differs = (a: string, b: string): { was: string; is: string; at: number } 
 };
 
 /** Write what changed from one layout to the next: in each paragraph, only the part that differs. A
- *  paragraph that already says the new line (Word's own undo put it there) is left alone. */
+ *  paragraph that already says the new line (Word's own undo put it there) is left alone. A document
+ *  that says neither isn't the memo as the pane knows it: nothing is written, and the act stays pending. */
 const write = (from: Layout, to: Layout): Promise<void> =>
   Word.run(async (ctx) => {
     const ps = ctx.document.body.paragraphs.load('items/text');
     await ctx.sync();
     const texts = ps.items.map((p) => p.text);
+    if (!says(texts, from.lines) && !says(texts, to.lines)) throw new Error('the document is not the memo');
     for (const [line, next] of to.lines.entries()) {
       const p = ps.items[toWord(texts, line)];
       const prev = from.lines[line] ?? '';
@@ -191,9 +193,8 @@ void Office.onReady(async (info) => {
   if (info.host !== Office.HostType.Word) return;
   const doc = (await (await fetch(findingsUrl)).json()) as Doc;
   const vocab = (await (await fetch(vocabUrl)).json()) as Vocab;
-  // The document as the last re-lint left it: what was written is the document's from then on.
-  let applied = doc;
-  // One write at a time, in the order the person acted.
+  // One write at a time, in the order the person acted. What each writes, and the re-lint after it,
+  // come from Marque's findings and the log as of that act, never from an earlier re-lint.
   let queue = Promise.resolve();
 
   const pane = mount(document.querySelector<HTMLElement>('#pane')!, {
@@ -204,18 +205,17 @@ void Office.onReady(async (info) => {
       if (!act) return; // only the seen list moved
       // The host applies: write the act into the document, then re-lint, so the card says done
       // only once the text is there. A failed write leaves the act pending, as the kit shows it.
-      const to = layout(docView(applied, state));
+      const to = layout(doc, state);
       queue = queue
         .then(() => write(now, to))
         .then(() => {
           now = to;
-          applied = relint(applied, state);
-          pane.update({ doc: applied, linted: state.log.length });
+          pane.update({ doc: relint(doc, state), linted: state.log.length });
         })
         .catch((e: unknown) => log('write failed', String(e)));
     },
   });
-  now = layout(pane.view()!);
+  now = layout(doc, pane.state);
 
   // Spans mean something only in the memo itself: while the document isn't the memo, say so and offer it.
   // Kept in step on every selection change (typing is one) from the text cursor-follow reads anyway.
@@ -233,16 +233,14 @@ void Office.onReady(async (info) => {
     }),
   );
 
-  /** Word's undo took an answer out of the document behind the pane's back: the act whose take-back
-   *  makes the layout match the document again. Recorded as taken back, so the question comes back. */
+  /** Word's undo took an act out of the document behind the pane's back: the act whose take-back
+   *  makes the layout match the document again. Recorded as taken back, so the question comes back.
+   *  Written or not: an answer the last re-lint applied no longer shows as the person's on the view. */
   const undone = (texts: string[]): Subject | null => {
     const v = pane.view()!;
     for (const id of new Set([...pane.state.log].reverse().map((e) => e.id))) {
-      const f = [...v.findings, ...v.document.artifacts].find((x) => x.id === id && x.person?.value != null);
-      if (
-        f &&
-        says(texts, layout(docView(applied, record(pane.state, id, 'changed', null, undefined, snapshot(f)))).lines)
-      )
+      const f = [...v.findings, ...v.document.artifacts].find((x) => x.id === id);
+      if (f && says(texts, layout(doc, record(pane.state, id, 'changed', null, undefined, snapshot(f))).lines))
         return f;
     }
     return null;

@@ -9,7 +9,7 @@
  * back takes its edit out, so the text goes back with the question.
  */
 
-import { docView } from '@marque/kit-core/state';
+import { docView, last } from '@marque/kit-core/state';
 import type { ArtifactView, Doc, FindingView, State, Subject } from '@marque/kit-core/types';
 
 export interface Edit {
@@ -50,32 +50,47 @@ export function edits(view: Doc, memo: string): Edit[] {
   });
 }
 
-/** The banner the document carries: Marque's derived value once it's applied, or none. */
-export function banner(view: Doc): string | null {
-  const a = view.document.artifacts.find((x: ArtifactView) => x.kind === 'front_marking');
-  return a && (a.applying || a.state === 'present') ? textOf(a.derived_value) : null;
+/** The banner a re-linted document carries: Marque's derived value once it's applied, or none. */
+export function banner(linted: Doc): string | null {
+  const a = linted.document.artifacts.find((x: ArtifactView) => x.kind === 'front_marking');
+  return a?.state === 'present' ? textOf(a.derived_value) : null;
 }
+
+/** The document as the person's acts make it, from Marque's own findings and the whole log: every
+ *  act overlays, written or not. A pure function of the two, so it never builds on an earlier view. */
+export const made = (doc: Doc, state: State): Doc => docView(doc, { ...state, linted: 0 });
 
 /**
  * The lint after the host wrote what the person did. There's no engine yet, so this stands in for
- * one, as the demo's does: what was written is now the document's, an answer reads as applied, and
- * what blocks is what still needs a person.
+ * one: an answer in force reads as applied and is the document's from now on; anything else (an
+ * override, a deferral, a take-back, nothing) leaves Marque's finding as it was, since the pane
+ * overlays those itself. Artifacts follow the findings, so a banner moves with the alternatives taken.
+ * Always from Marque's first lint, never from the last re-lint: taking an alternative back restores
+ * what it replaced. What blocks is what still needs a person.
  * shortcut: a stand-in for the engine's re-lint; it goes when the WASM engine lints the document.
  */
-export function relint(applied: Doc, state: State): Doc {
-  const v = docView(applied, state);
-  const strip = <T extends Subject>({ person: _p, history: _h, applying, ...x }: T): T =>
-    (applying
-      ? { ...x, state: (x as ArtifactView).state === 'present_not_required' ? 'absent_not_required' : 'present' }
-      : x) as T;
-  const settled = (f: FindingView): FindingView =>
-    f.asked ? { ...strip(f), outcome: { ...f.outcome, kind: 'applied' } } : strip(f);
-  const blocking = [...v.findings, ...v.document.artifacts]
+export function relint(doc: Doc, state: State): Doc {
+  const v = made(doc, state);
+  const strip = <T extends Subject>({ person: _p, history: _h, applying: _a, stale: _s, ...x }: T): T => x as T;
+  // An artifact is in once applied and out once removed, whatever its derived value has moved to since:
+  // the overlay checks an apply against the value it was taken on, and an alternative taken moves it.
+  const put = (a: ArtifactView): ArtifactView => {
+    const e = last(state, a.id),
+      x = strip(a);
+    if (e?.act !== 'answered') return x;
+    return e.value?.apply ? { ...x, state: 'present' } : e.value?.remove ? { ...x, state: 'absent_not_required' } : x;
+  };
+  const answer = (f: FindingView): boolean => {
+    const e = last(state, f.id);
+    return !f.stale && (e?.act === 'answered' || e?.act === 'changed') && e.value != null;
+  };
+  const findings = doc.findings.map((f, i) => {
+    const x = v.findings[i]!;
+    return answer(x) ? { ...strip(x), outcome: { ...x.outcome, ...(x.asked && { kind: 'applied' as const }) } } : f;
+  });
+  const artifacts = v.document.artifacts.map(put);
+  const blocking = [...findings, ...artifacts]
     .filter((x) => x.needs_person === 'required' && x.blocks !== 'never')
     .map((x) => x.id);
-  return {
-    ...v,
-    findings: v.findings.map(settled),
-    document: { ...v.document, artifacts: v.document.artifacts.map(strip), blocking, pending: [], withdrawn: [] },
-  };
+  return { ...doc, findings, document: { ...v.document, artifacts, blocking, pending: [], withdrawn: [] } };
 }

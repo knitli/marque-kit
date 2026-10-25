@@ -10,55 +10,92 @@ import { readFileSync } from 'node:fs';
 import { docView, empty, linted, record, snapshot } from '@marque/kit-core/state';
 import type { Act, ActValue, Doc, State } from '@marque/kit-core/types';
 import { written } from '../src/locate.ts';
-import { banner, edits, relint } from '../src/write.ts';
+import { banner, edits, made, relint } from '../src/write.ts';
 
 const read = (f: string): string => readFileSync(new URL(`../../../fixtures/${f}`, import.meta.url), 'utf8');
 const memo = read('memo.txt');
 const doc = JSON.parse(read('memo.findings.json')) as Doc;
 const P3 = 'f-p3-ownership',
   P4 = 'f-p4-portion-mark-absent',
-  P5 = 'f-p5-noforn-rel-conflict';
+  P5 = 'f-p5-noforn-rel-conflict',
+  P2 = 'f-p2-rel-to-separator';
 
-/** The text the document carries for this view. */
-const text = (d: Doc, s: State): string => written(memo, edits(docView(d, s), memo)).text;
-/** An act as the pane records it, with what it was about. */
-const act = (d: Doc, s: State, id: string, a: Act, value: ActValue | null): State => {
-  const f = [...docView(d, s).findings, ...docView(d, s).document.artifacts].find((x) => x.id === id)!;
+/** The text the document carries for these acts. */
+const text = (s: State): string => written(memo, edits(made(doc, s), memo)).text;
+/** The banner it carries. */
+const top = (s: State): string | null => banner(relint(doc, s));
+/** An act as the pane records it, on what the pane shows: the last re-lint with the acts since. */
+const act = (shown: Doc, s: State, id: string, a: Act, value: ActValue | null): State => {
+  const v = docView(shown, s);
+  const f = [...v.findings, ...v.document.artifacts].find((x) => x.id === id)!;
   return record(s, id, a, value, undefined, snapshot(f));
 };
+/** The host wrote and re-linted: the pane takes the new lint, as mount() does on update({ doc }). */
+const lint = (s: State): [Doc, State] => [relint(doc, s), linted(s)];
+const asks = (shown: Doc, s: State, id: string): boolean => !!docView(shown, s).findings.find((f) => f.id === id)!.asks;
 
 // At the start: Marque's fixes are in (¶2 and ¶6 applied, ¶5's safe reading), nothing else.
-let s = empty();
-assert.equal(edits(docView(doc, s), memo).length, 3);
-assert.ok(text(doc, s).includes('2. (S//REL TO USA, FVEY)') && text(doc, s).includes('5. (S//NF) British'));
-assert.equal(banner(docView(doc, s)), null, 'no banner until it is applied');
+let s = empty(),
+  shown = doc;
+assert.equal(edits(made(doc, s), memo).length, 3);
+assert.ok(text(s).includes('2. (S//REL TO USA, FVEY)') && text(s).includes('5. (S//NF) British'));
+assert.equal(top(s), null, 'no banner until it is applied');
 
 // ¶3: the reading the person picks is written in its place.
 const r0 = doc.findings.find((f) => f.id === P3)!.outcome!.readings![0]!;
-s = act(doc, s, P3, 'answered', { reading: r0 });
-assert.ok(text(doc, s).includes(`3. ${r0.result!.text} A joint`), '¶3 says what was chosen');
+s = act(shown, s, P3, 'answered', { reading: r0 });
+assert.ok(text(s).includes(`3. ${r0.result!.text} A joint`), '¶3 says what was chosen');
 
 // ¶4: the typed mark goes in after the paragraph's number.
-s = act(doc, s, P4, 'answered', { free: '(U)' });
-assert.ok(text(doc, s).includes('4. (U) Analysts'), '¶4 has its mark');
+s = act(shown, s, P4, 'answered', { free: '(U)' });
+assert.ok(text(s).includes('4. (U) Analysts'), '¶4 has its mark');
 
 // The re-lint keeps both; taking ¶3 back puts the marking as written back, and the question with it.
-let applied = relint(doc, s);
-s = linted(s); // as mount() does on update({ doc })
-assert.ok(text(applied, s).includes(`3. ${r0.result!.text} A joint`));
-s = act(applied, s, P3, 'changed', null);
-assert.ok(text(applied, s).includes('3. (//JOINT S AUS GBR//REL TO USA, GBR) A joint'), '¶3 back as written');
-assert.ok(docView(applied, s).findings.find((f) => f.id === P3)!.asks, 'and asked again');
-assert.ok(text(applied, s).includes('4. (U) Analysts'), '¶4 untouched');
+[shown, s] = lint(s);
+assert.ok(text(s).includes(`3. ${r0.result!.text} A joint`));
+assert.ok(!asks(shown, s, P3), 'answered after the re-lint');
+s = act(shown, s, P3, 'changed', null);
+assert.ok(text(s).includes('3. (//JOINT S AUS GBR//REL TO USA, GBR) A joint'), '¶3 back as written');
+assert.ok(asks(shown, s, P3), 'and asked again');
+assert.ok(text(s).includes('4. (U) Analysts'), '¶4 untouched');
+[shown, s] = lint(s);
+assert.ok(asks(shown, s, P3), 'still asked after the re-lint');
 
 // The banner: Marque's derived value once applied; REL TO once ¶5's alternative is taken.
-s = act(applied, s, 'a-banner', 'answered', { apply: true });
-assert.equal(banner(docView(applied, s)), 'SECRET//FGI AUS GBR//NOFORN');
-applied = relint(applied, s);
-s = linted(s);
-assert.equal(banner(docView(applied, s)), 'SECRET//FGI AUS GBR//NOFORN', 'still there after the re-lint');
+s = act(shown, s, 'a-banner', 'answered', { apply: true });
+assert.equal(top(s), 'SECRET//FGI AUS GBR//NOFORN');
+[shown, s] = lint(s);
+assert.equal(top(s), 'SECRET//FGI AUS GBR//NOFORN', 'still there after the re-lint');
 const alt = doc.findings.find((f) => f.id === P5)!.outcome!.readings!.find((r) => r.result?.text.includes('REL TO'))!;
-s = act(applied, s, P5, 'answered', { reading: alt });
-assert.ok(text(applied, s).includes(`5. ${alt.result!.text} British`), '¶5 takes REL TO back');
-assert.equal(banner(docView(applied, s)), 'SECRET//FGI AUS GBR//REL TO USA, GBR', 'and the banner follows');
+s = act(shown, s, P5, 'answered', { reading: alt });
+assert.ok(text(s).includes(`5. ${alt.result!.text} British`), '¶5 takes REL TO back');
+assert.equal(top(s), 'SECRET//FGI AUS GBR//REL TO USA, GBR', 'and the banner follows');
+// Taken back after the re-lint wrote it: ¶5 and the banner go back to NOFORN.
+[shown, s] = lint(s);
+s = act(shown, s, P5, 'changed', null);
+assert.ok(text(s).includes('5. (S//NF) British'), '¶5 NOFORN again');
+assert.equal(top(s), 'SECRET//FGI AUS GBR//NOFORN', 'and so is the banner');
+[shown, s] = lint(s);
+assert.equal(top(s), 'SECRET//FGI AUS GBR//NOFORN', 'after the re-lint too');
+
+// ¶2 kept as written, written, then fixed after all: the comma Marque added comes back.
+s = act(shown, s, P2, 'kept_as_written', null);
+assert.ok(text(s).includes('2. (S//REL TO USA FVEY)'), '¶2 as written');
+[shown, s] = lint(s);
+assert.ok(docView(shown, s).findings.find((f) => f.id === P2)!.overridden, 'the override shows after the re-lint');
+s = act(shown, s, P2, 'changed', null);
+assert.ok(text(s).includes('2. (S//REL TO USA, FVEY)'), '¶2 fixed after all');
+
+// Answered and taken back before the first write lands: each write and re-lint is of the log as of
+// its own act, so when the first lands the pane still shows the question, and the second leaves it.
+s = act(shown, s, P4, 'changed', null);
+[shown, s] = lint(s);
+const first = act(shown, s, P4, 'answered', { free: '(C)' });
+const second = act(shown, first, P4, 'changed', null);
+shown = relint(doc, first);
+s = linted(second, first.log.length);
+assert.ok(asks(shown, s, P4), '¶4 asked again while the second write is under way');
+[shown, s] = lint(s);
+assert.ok(asks(shown, s, P4), 'and after it');
+assert.ok(text(s).includes('4. Analysts'), '¶4 unmarked again');
 console.log('write: ok');
