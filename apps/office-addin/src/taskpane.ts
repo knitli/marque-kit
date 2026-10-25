@@ -28,7 +28,7 @@ import findingsUrl from '../../../fixtures/memo.findings.json?url';
 import vocabUrl from '../../../fixtures/memo.vocab.json?url';
 import memo from '../../../fixtures/memo.txt?raw';
 import { locate, paragraphAt, written } from './locate.ts';
-import { banner, edits, made, relint } from './write.ts';
+import { banner, edits, held, made, relint } from './write.ts';
 
 /** In dev, what the pane would say to a console it doesn't have goes to the dev server's .dev.log. */
 const log = (...what: unknown[]): void => {
@@ -210,12 +210,23 @@ void Office.onReady(async (info) => {
         .then(() => write(now, to))
         .then(() => {
           now = to;
+          note.hidden = !held(doc, state).size;
           pane.update({ doc: relint(doc, state), linted: state.log.length });
         })
         .catch((e: unknown) => log('write failed', String(e)));
     },
   });
   now = layout(doc, pane.state);
+
+  // What this pane can't write yet goes back to its question; this says why, rather than leave it unexplained.
+  const note = document.querySelector<HTMLElement>('#note')!;
+  note.append(
+    el(
+      'p',
+      'mq-p',
+      'This sample pane can’t write every answer yet: one that isn’t a marking, a portion marked above the banner, or the authority block. Those questions stay open.',
+    ),
+  );
 
   // Spans mean something only in the memo itself: while the document isn't the memo, say so and offer it.
   // Kept in step on every selection change (typing is one) from the text cursor-follow reads anyway.

@@ -56,9 +56,44 @@ export function banner(linted: Doc): string | null {
   return a?.state === 'present' ? textOf(a.derived_value) : null;
 }
 
-/** The document as the person's acts make it, from Marque's own findings and the whole log: every
- *  act overlays, written or not. A pure function of the two, so it never builds on an earlier view. */
-export const made = (doc: Doc, state: State): Doc => docView(doc, { ...state, linted: 0 });
+/** A marking's classification, lowest 0; -1 when it doesn't start with one. */
+const level = (t: string | null): number => {
+  const c = /^\(?\s*(TOP SECRET|TS|SECRET|S|CONFIDENTIAL|C|UNCLASSIFIED|U)\b/.exec(t ?? '')?.[1] ?? '';
+  return ['U', 'C', 'S', 'TS'].indexOf(
+    ({ UNCLASSIFIED: 'U', CONFIDENTIAL: 'C', SECRET: 'S', 'TOP SECRET': 'TS' } as Record<string, string>)[c] ?? c,
+  );
+};
+
+/**
+ * The acts this host can't write yet, by id: an answer that isn't a marking (prose, for the engine to
+ * read), a portion above the banner (the banner would need deriving again), and the authority block.
+ * They aren't written, and the re-lint leaves their findings as Marque had them: the question stays open.
+ * shortcut: the stand-in's limits; the engine re-derives the banner and the Word adapter writes the block.
+ */
+export function held(doc: Doc, state: State): Set<string> {
+  const v = docView(doc, { ...state, linted: 0 });
+  const top = level(textOf(v.document.artifacts.find((a) => a.kind === 'front_marking')?.derived_value));
+  const out = new Set<string>();
+  for (const f of v.findings) {
+    const e = last(state, f.id);
+    if (f.stale || (e?.act !== 'answered' && e?.act !== 'changed') || e.value == null) continue;
+    const t = textOf(f.outcome?.result);
+    if (!t || level(t) > top) out.add(f.id);
+  }
+  for (const a of v.document.artifacts)
+    if (a.kind !== 'front_marking' && last(state, a.id)?.act === 'answered') out.add(a.id);
+  return out;
+}
+
+/** The log without the last act on each id this host can't write. */
+const writable = (doc: Doc, state: State): State => {
+  const h = held(doc, state);
+  return h.size ? { ...state, log: state.log.filter((e) => !h.has(e.id) || e !== last(state, e.id)) } : state;
+};
+
+/** The document as the person's acts make it, from Marque's own findings and the whole log: every act
+ *  this host can write overlays, written or not. A pure function of the two, so it never builds on an earlier view. */
+export const made = (doc: Doc, state: State): Doc => docView(doc, { ...writable(doc, state), linted: 0 });
 
 /**
  * The lint after the host wrote what the person did. There's no engine yet, so this stands in for
@@ -69,8 +104,9 @@ export const made = (doc: Doc, state: State): Doc => docView(doc, { ...state, li
  * what it replaced. What blocks is what still needs a person.
  * shortcut: a stand-in for the engine's re-lint; it goes when the WASM engine lints the document.
  */
-export function relint(doc: Doc, state: State): Doc {
-  const v = made(doc, state);
+export function relint(doc: Doc, all: State): Doc {
+  const state = writable(doc, all);
+  const v = made(doc, all);
   const strip = <T extends Subject>({ person: _p, history: _h, applying: _a, stale: _s, ...x }: T): T => x as T;
   // An artifact is in once applied and out once removed, whatever its derived value has moved to since:
   // the overlay checks an apply against the value it was taken on, and an alternative taken moves it.

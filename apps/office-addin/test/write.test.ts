@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { docView, empty, linted, record, snapshot } from '@marque/kit-core/state';
 import type { Act, ActValue, Doc, State } from '@marque/kit-core/types';
 import { written } from '../src/locate.ts';
-import { banner, edits, made, relint } from '../src/write.ts';
+import { banner, edits, held, made, relint } from '../src/write.ts';
 
 const read = (f: string): string => readFileSync(new URL(`../../../fixtures/${f}`, import.meta.url), 'utf8');
 const memo = read('memo.txt');
@@ -98,4 +98,16 @@ assert.ok(asks(shown, s, P4), '¶4 asked again while the second write is under w
 [shown, s] = lint(s);
 assert.ok(asks(shown, s, P4), 'and after it');
 assert.ok(text(s).includes('4. Analysts'), '¶4 unmarked again');
+// What the stand-in can't write stays a question: prose for ¶3, ¶4 above the banner, the authority block.
+s = act(shown, s, P3, 'answered', { free: 'The UK alone' });
+s = act(shown, s, P4, 'answered', { free: '(TS)' });
+s = act(shown, s, 'a-cab', 'answered', { fields: { derived_from: 'Memo 12' } });
+assert.deepEqual([...held(doc, s)].sort(), [P3, P4, 'a-cab'].sort());
+assert.ok(
+  text(s).includes('3. (//JOINT S AUS GBR//REL TO USA, GBR) A joint') && text(s).includes('4. Analysts'),
+  'nothing written',
+);
+[shown, s] = lint(s);
+assert.ok(asks(shown, s, P3) && asks(shown, s, P4), 'both asked again');
+assert.ok(docView(shown, s).document.blocking.includes('a-cab'), 'the authority block still holds finalize');
 console.log('write: ok');
