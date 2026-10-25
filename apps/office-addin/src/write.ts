@@ -56,12 +56,17 @@ export function banner(linted: Doc): string | null {
   return a?.state === 'present' ? textOf(a.derived_value) : null;
 }
 
-/** A marking's classification, lowest 0; -1 when it doesn't start with one. */
+/** A marking's classification, lowest 0; -1 when this can't read one. The first layer, after any owner
+ *  prefix (`//AUS GBR S`, `//JOINT S AUS GBR`): owners are three letters or more, so the level is its short word. */
 const level = (t: string | null): number => {
-  const c = /^\(?\s*(TOP SECRET|TS|SECRET|S|CONFIDENTIAL|C|UNCLASSIFIED|U)\b/.exec(t ?? '')?.[1] ?? '';
-  return ['U', 'C', 'S', 'TS'].indexOf(
-    ({ UNCLASSIFIED: 'U', CONFIDENTIAL: 'C', SECRET: 'S', 'TOP SECRET': 'TS' } as Record<string, string>)[c] ?? c,
-  );
+  const body = (t ?? '').replace(/^\(\s*/, '');
+  const first = (body.startsWith('//') ? body.slice(2) : body).split('//')[0]!.replace(/[)\s]+$/, '');
+  const names: Record<string, string> = { UNCLASSIFIED: 'U', CONFIDENTIAL: 'C', SECRET: 'S' };
+  for (const w of first.replace('TOP SECRET', 'TS').split(/\s+/)) {
+    const i = ['U', 'C', 'S', 'TS'].indexOf(names[w] ?? w);
+    if (i >= 0) return i;
+  }
+  return -1;
 };
 
 /**
@@ -78,17 +83,19 @@ export function held(doc: Doc, state: State): Set<string> {
     const e = last(state, f.id);
     if (f.stale || (e?.act !== 'answered' && e?.act !== 'changed') || e.value == null) continue;
     const t = textOf(f.outcome?.result);
-    if (!t || level(t) > top) out.add(f.id);
+    // One it can't read the level of is held too: it might be above the banner.
+    if (!t || level(t) < 0 || level(t) > top) out.add(f.id);
   }
   for (const a of v.document.artifacts)
     if (a.kind !== 'front_marking' && last(state, a.id)?.act === 'answered') out.add(a.id);
   return out;
 }
 
-/** The log without the last act on each id this host can't write. */
+/** The log without the acts on each id this host can't write: all of them, so an earlier answer it
+ *  couldn't write either never comes back in when a later one is held. Marque's finding stands. */
 const writable = (doc: Doc, state: State): State => {
   const h = held(doc, state);
-  return h.size ? { ...state, log: state.log.filter((e) => !h.has(e.id) || e !== last(state, e.id)) } : state;
+  return h.size ? { ...state, log: state.log.filter((e) => !h.has(e.id)) } : state;
 };
 
 /** The document as the person's acts make it, from Marque's own findings and the whole log: every act

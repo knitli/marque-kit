@@ -110,4 +110,19 @@ assert.ok(
 [shown, s] = lint(s);
 assert.ok(asks(shown, s, P3) && asks(shown, s, P4), 'both asked again');
 assert.ok(docView(shown, s).document.blocking.includes('a-cab'), 'the authority block still holds finalize');
+// Sent again once the question is back: the earlier one doesn't come back in with it.
+s = act(shown, s, P4, 'answered', { free: '(TS)' });
+s = act(shown, s, P3, 'answered', { free: 'The UK alone' });
+assert.ok(text(s).includes('4. Analysts') && text(s).includes('3. (//JOINT S AUS GBR//REL TO USA, GBR) A joint'));
+[shown, s] = lint(s);
+assert.ok(asks(shown, s, P3) && asks(shown, s, P4), 'still asked');
+// A level after an owner prefix is read; one above the banner is held, one at it is written.
+s = act(shown, s, P4, 'answered', { free: '(//JOINT TS AUS GBR USA//REL TO USA, AUS, GBR)' });
+assert.ok(held(doc, s).has(P4) && text(s).includes('4. Analysts'), 'TS after JOINT held');
+[shown, s] = lint(s);
+s = act(shown, s, P4, 'answered', { free: '(//AUS GBR S//REL TO USA, AUS, GBR)' });
+assert.ok(
+  !held(doc, s).has(P4) && text(s).includes('4. (//AUS GBR S//REL TO USA, AUS, GBR) Analysts'),
+  'S after owners written',
+);
 console.log('write: ok');
