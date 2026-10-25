@@ -1351,7 +1351,9 @@ export function mount(
     };
     const holds = (): boolean => {
       const x = target();
-      return !x || [x.person, decision(x)].some((d) => d && canon(d) === entry);
+      // An artifact's apply or removal can be taken back only until it is written: core has no reversal
+      // of a written one, so once the host re-lints the strip goes.
+      return !x || [x.person, isArtifact(x) ? null : decision(x)].some((d) => d && canon(d) === entry);
     };
     let left = UNDO_MS,
       since = 0,

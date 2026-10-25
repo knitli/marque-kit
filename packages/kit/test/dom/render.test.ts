@@ -269,6 +269,9 @@ describe('the undo window (DECISIONS #23)', () => {
     const art = (id: string) => p.view()!.document.artifacts.find((a) => a.id === id)!;
     p.host.onAct?.(art('a-banner'), 'answered', { apply: true });
     expect(root.querySelector('.mq-undo[data-undo="a-banner"]')?.textContent).toContain('Will be applied');
+    // Once the host writes it, there's no taking it back: the strip goes.
+    p.update({ doc: memo });
+    expect(root.querySelector('.mq-undo[data-undo="a-banner"]')).toBeNull();
     p.host.onAct?.(art('a-cab'), 'answered', { fields: { derived_from: 'Memo 12' } });
     expect(root.querySelector('.mq-undo[data-undo="a-cab"]')).toBeNull();
     done();
