@@ -240,6 +240,28 @@ describe('the undo window (DECISIONS #23)', () => {
     done();
   });
 
+  test('a re-lint that conceals a code in the answer masks it in the strip too', () => {
+    const { root, p, answer, done } = setup();
+    answer();
+    const r = f(P3).outcome!.readings![0]!.result!;
+    const at = r.text.indexOf('AUS');
+    const result = { ...r, masks: [{ kind: 'concealed' as const, span: [at, at + 3] as [number, number] }] };
+    const settled = {
+      ...f(P3),
+      asks: undefined,
+      needs_person: 'none' as const,
+      blocks: 'never' as const,
+      outcome: { ...f(P3).outcome!, kind: 'applied' as const, result },
+    };
+    p.update({
+      doc: { ...memo, findings: memo.findings.map((x) => (x.id === P3 ? settled : x)) },
+      linted: p.state.log.length,
+    });
+    expect(strip(root)?.querySelector('.mq-conceal')).toBeTruthy();
+    expect(strip(root)?.querySelector('.mq-l')?.textContent).not.toContain('AUS');
+    done();
+  });
+
   test('from the keyboard, Undo puts focus back on the reopened card', async () => {
     const { root, answer, done } = setup();
     answer();

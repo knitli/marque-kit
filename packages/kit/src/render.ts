@@ -1305,6 +1305,8 @@ export function mount(
     end: () => void;
     /** Is the act still the one in force on its finding? */
     holds: () => boolean;
+    /** Draw its marking again from the latest view. */
+    paint: () => void;
     /** Was focus on it when the pane was taken down to redraw? */
     focused: boolean;
     /** Focus isn't on it: start the clock again if focus was what stopped it. */
@@ -1315,19 +1317,12 @@ export function mount(
     const li = body.querySelector<HTMLElement>(`.mq-row-item[data-finding="${CSS.escape(f.id)}"]`);
     const sec = li?.closest('.mq-section');
     const after = [...(sec?.querySelectorAll<HTMLElement>('.mq-row-item[data-finding]') ?? [])];
-    const now =
-      cur.doc &&
-      [...docView(cur.doc, cur.state).findings, ...docView(cur.doc, cur.state).document.artifacts].find(
-        (x) => x.id === f.id,
-      );
     // The host applies: an apply or a removal is asked for here, not done.
     const word = value?.apply ? 'Will be applied' : value?.remove ? 'Will be removed' : DONE[act];
     const strip = el('div', 'mq-row-item mq-undo');
     strip.dataset.undo = f.id;
     strip.append(el('span', 'where', where(f)));
-    const what = el('div', 'what', word);
-    const m = now && (act === 'answered' || act === 'changed') && !isArtifact(now) ? now.outcome?.result : null;
-    if (m && isMarking(m)) what.append(mark(m, { form: 'folded' }));
+    const what = el('div', 'what');
     strip.append(what);
     const end = el('div', 'end');
     end.append(
@@ -1355,6 +1350,16 @@ export function mount(
       // of a written one, so once the host re-lints the strip goes.
       return !x || [x.person, isArtifact(x) ? null : decision(x)].some((d) => d && canon(d) === entry);
     };
+    // The marking as the latest view has it: a re-lint may have concealed a code in it since.
+    let seen: Subject | undefined;
+    const paint = (): void => {
+      const x = target() ?? seen;
+      seen = x;
+      const m = x && (act === 'answered' || act === 'changed') && !isArtifact(x) ? x.outcome?.result : null;
+      what.replaceChildren(word);
+      if (m && isMarking(m)) what.append(mark(m, { form: 'folded' }));
+    };
+    paint();
     let left = UNDO_MS,
       since = 0,
       timer: ReturnType<typeof setTimeout> | undefined,
@@ -1394,6 +1399,7 @@ export function mount(
       say: `${spokenWhere(f)}: ${word.toLowerCase()}. Undo is in its place.`,
       end: stop,
       holds,
+      paint,
       focused: false,
       left: () => {
         if (!within || strip.contains(document.activeElement)) return;
@@ -1408,6 +1414,7 @@ export function mount(
     if (!recent) return;
     // Nothing left to undo: a re-lint put something else under its id.
     if (!recent.holds()) return recent.end();
+    recent.paint();
     const { section, next, strip } = recent;
     const sec = section && body.querySelector(`.mq-section.${section}`);
     const before = sec && next ? sec.querySelector(`.mq-row-item[data-finding="${CSS.escape(next)}"]`) : null;
