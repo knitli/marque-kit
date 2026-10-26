@@ -6,9 +6,9 @@
 // `pnpm test` (vp test, happy-dom)
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, test } from 'vite-plus/test';
+import { describe, expect, test, vi } from 'vite-plus/test';
 import { render as mark, masked } from '../../src/marking.ts';
-import { artifact, card, gate, mount, pane, receipt, rung } from '../../src/render.ts';
+import { artifact, card, gate, mount, pane, receipt, rung, UNDO_MS } from '../../src/render.ts';
 import { why } from '../../src/help.ts';
 import { docView, empty, record, snapshot } from '@marque/kit-core/state';
 import type { Doc, FindingView, Moment } from '@marque/kit-core/types';
@@ -151,4 +151,151 @@ test('a citation without the manual’s words cites and quotes nothing', () => {
   expect(c.querySelector('blockquote')).toBeNull();
   expect(c.textContent).not.toContain('undefined');
   expect(c.querySelector('.mq-cite')).toBeTruthy();
+});
+
+describe('the undo window (DECISIONS #23)', () => {
+  const setup = () => {
+    const box = document.createElement('div'),
+      root = document.createElement('div');
+    for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
+    box.append(root);
+    document.body.append(box);
+    const p = mount(root, { doc: memo });
+    const answer = () => {
+      const x = p.view()!.findings.find((y) => y.id === P3)!;
+      p.host.onAct?.(x, 'answered', { reading: x.outcome!.readings![0]! });
+    };
+    return { root, p, answer, done: () => (p.destroy(), box.remove()) };
+  };
+  const strip = (root: Element) => root.querySelector(`.mq-undo[data-undo="${P3}"]`);
+
+  test('an answer leaves Undo in its place for 8 seconds; a redraw keeps it there', () => {
+    vi.useFakeTimers();
+    const { root, p, answer, done } = setup();
+    answer();
+    expect(strip(root)?.textContent).toContain('Answered');
+    expect(buttons(strip(root)!)).toEqual(['Undo']);
+    // ¶3 was all Action required held while editing: its section went with it, so the strip stands where it was.
+    const top = () => strip(root)!.parentElement!.nextElementSibling;
+    expect(top()?.matches('.mq-section.can')).toBe(true);
+    p.update({ moment: 'editing' });
+    expect(top()?.matches('.mq-section.can')).toBe(true);
+    vi.advanceTimersByTime(UNDO_MS - 1);
+    expect(strip(root)).toBeTruthy();
+    vi.advanceTimersByTime(1);
+    expect(strip(root)).toBeNull();
+    done();
+    vi.useRealTimers();
+  });
+
+  test('hovering stops the clock; leaving starts it again with what was left', () => {
+    vi.useFakeTimers();
+    const { root, answer, done } = setup();
+    answer();
+    vi.advanceTimersByTime(5000);
+    strip(root)!.dispatchEvent(new MouseEvent('mouseenter'));
+    vi.advanceTimersByTime(60_000);
+    expect(strip(root)).toBeTruthy();
+    strip(root)!.dispatchEvent(new MouseEvent('mouseleave'));
+    vi.advanceTimersByTime(UNDO_MS - 5000);
+    expect(strip(root)).toBeNull();
+    done();
+    vi.useRealTimers();
+  });
+
+  test('Undo on an answer to a must-act question brings the question back', async () => {
+    const { root, p, answer, done } = setup();
+    answer();
+    strip(root)!.querySelector('button')!.click();
+    expect(strip(root)).toBeNull();
+    expect(p.view()!.findings.find((y) => y.id === P3)!.asks).toBeTruthy();
+    await new Promise((r) => setTimeout(r));
+    expect(root.querySelector(`.mq-row-item[data-finding="${P3}"]`)?.classList.contains('open')).toBe(true);
+    done();
+  });
+
+  test('deferred where its section stays: the strip stays beside it, and focus on Undo survives a redraw', () => {
+    vi.useFakeTimers();
+    const { root, p, done } = setup();
+    const x = p.view()!.findings.find((y) => y.id === P3)!;
+    p.update({ moment: 'finalize' });
+    p.host.onAct?.(x, 'declined');
+    expect(strip(root)?.closest('.mq-section')).toBeTruthy();
+    const undo = strip(root)!.querySelector('button')!;
+    undo.focus();
+    p.update({ moment: 'finalize' });
+    expect(document.activeElement).toBe(undo);
+    vi.advanceTimersByTime(60_000);
+    expect(strip(root)).toBeTruthy();
+    done();
+    vi.useRealTimers();
+  });
+
+  test('a re-lint that asks something new under the same id takes the strip away', () => {
+    const { root, p, answer, done } = setup();
+    answer();
+    const asks = { ...f(P3).asks!, text: 'Whose information is this now?' };
+    p.update({ doc: { ...memo, findings: memo.findings.map((x) => (x.id === P3 ? { ...x, asks } : x)) } });
+    expect(strip(root)).toBeNull();
+    done();
+  });
+
+  test('a re-lint that conceals a code in the answer masks it in the strip too', () => {
+    const { root, p, answer, done } = setup();
+    answer();
+    const r = f(P3).outcome!.readings![0]!.result!;
+    const at = r.text.indexOf('AUS');
+    const result = { ...r, masks: [{ kind: 'concealed' as const, span: [at, at + 3] as [number, number] }] };
+    const settled = {
+      ...f(P3),
+      asks: undefined,
+      needs_person: 'none' as const,
+      blocks: 'never' as const,
+      outcome: { ...f(P3).outcome!, kind: 'applied' as const, result },
+    };
+    p.update({
+      doc: { ...memo, findings: memo.findings.map((x) => (x.id === P3 ? settled : x)) },
+      linted: p.state.log.length,
+    });
+    expect(strip(root)?.querySelector('.mq-conceal')).toBeTruthy();
+    expect(strip(root)?.querySelector('.mq-l')?.textContent).not.toContain('AUS');
+    done();
+  });
+
+  test('from the keyboard, Undo puts focus back on the reopened card', async () => {
+    const { root, answer, done } = setup();
+    answer();
+    const undo = strip(root)!.querySelector('button')!;
+    undo.focus();
+    undo.click();
+    await new Promise((r) => setTimeout(r));
+    expect(root.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement?.closest(`[data-finding="${P3}"]`)).toBeTruthy();
+    done();
+  });
+
+  test('kept as written from Done: the section opens to show Undo, and the marking is full size', () => {
+    const { root, p, done } = setup();
+    p.host.onAct?.(
+      p.view()!.findings.find((y) => y.id === P2)!,
+      'kept_as_written',
+    );
+    const s = root.querySelector(`.mq-undo[data-undo="${P2}"]`)!;
+    expect(s.closest('details')?.open).toBe(true);
+    expect(s.querySelector('.mq-mark.xs')).toBeNull();
+    done();
+  });
+
+  test('an apply is asked for, not done; a typed field gets no Undo', () => {
+    const { root, p, done } = setup();
+    const art = (id: string) => p.view()!.document.artifacts.find((a) => a.id === id)!;
+    p.host.onAct?.(art('a-banner'), 'answered', { apply: true });
+    expect(root.querySelector('.mq-undo[data-undo="a-banner"]')?.textContent).toContain('Will be applied');
+    // Once the host writes it, there's no taking it back: the strip goes.
+    p.update({ doc: memo });
+    expect(root.querySelector('.mq-undo[data-undo="a-banner"]')).toBeNull();
+    p.host.onAct?.(art('a-cab'), 'answered', { fields: { derived_from: 'Memo 12' } });
+    expect(root.querySelector('.mq-undo[data-undo="a-cab"]')).toBeNull();
+    done();
+  });
 });

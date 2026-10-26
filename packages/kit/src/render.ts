@@ -75,6 +75,17 @@ import type {
 export { rung, markClass, sections } from '@marque/kit-core/attention';
 export type { Attention, Sections } from '@marque/kit-core/attention';
 
+/** How long an act's Undo stays in its card's place, while nobody is on it (DECISIONS #23). */
+export const UNDO_MS = 8000;
+/** What the undo strip says was done, by act. */
+const DONE: Record<Act, string> = {
+  answered: 'Answered',
+  changed: 'Changed',
+  kept_as_written: 'Kept as written',
+  deferred: 'Will ask at finalize',
+  declined: 'Left for someone else',
+};
+
 /** A stamp: its tone class and its word. */
 type Stamp = [tone: string, word: string];
 /** A line on the receipt: a finding, an artifact, or acts on one the lint withdrew. */
@@ -1258,9 +1269,16 @@ export function mount(
     },
     onAct(f: Subject, act: Act, value: ActValue | null = null) {
       cur.state = record(cur.state, f.id, act, value, undefined, snapshot(f));
-      // The card stays open where the finding now lives, and keeps focus if it had it.
       const inPane = body.contains(document.activeElement);
-      cur.open = f.id;
+      // Putting it back to what Marque said reopens the card where the finding now lives, focus kept.
+      // Any other act leaves what was done and an Undo in the card's place (DECISIONS #23).
+      // A typed field has no Undo yet: core can't take one back (field answers accumulate).
+      const back = (act === 'changed' && value == null) || !cur.doc || !!value?.fields;
+      if (back) cur.open = f.id;
+      else {
+        cur.open = null;
+        undoable(f, act, value);
+      }
       // A host that re-lints at once redraws inside onChange; this finding's draft went with the act.
       acting = f.id;
       try {
@@ -1268,9 +1286,156 @@ export function mount(
       } finally {
         acting = null;
       }
-      draw(inPane ? f.id : null, { fresh: true });
+      draw(back && inPane ? f.id : null, { fresh: true });
+      if (!back && recent) {
+        if (inPane) recent.strip.querySelector('button')?.focus();
+        live.textContent = `${live.textContent} ${recent.say}`.trim();
+      }
     },
   };
+
+  /** The undo window: for UNDO_MS after an act, the card's place says what was done and offers Undo.
+   *  Hovering or focusing it stops the clock; leaving starts it again. One at a time: the next act replaces it. */
+  let recent: {
+    id: string;
+    section: string | null;
+    next: string | null;
+    strip: HTMLElement;
+    say: string;
+    end: () => void;
+    /** Is the act still the one in force on its finding? */
+    holds: () => boolean;
+    /** Draw its marking again from the latest view. */
+    paint: () => void;
+    /** Was focus on it when the pane was taken down to redraw? */
+    focused: boolean;
+    /** Focus isn't on it: start the clock again if focus was what stopped it. */
+    left: () => void;
+  } | null = null;
+  function undoable(f: Subject, act: Act, value: ActValue | null): void {
+    recent?.end();
+    const li = body.querySelector<HTMLElement>(`.mq-row-item[data-finding="${CSS.escape(f.id)}"]`);
+    const sec = li?.closest('.mq-section');
+    const after = [...(sec?.querySelectorAll<HTMLElement>('.mq-row-item[data-finding]') ?? [])];
+    // The host applies: an apply or a removal is asked for here, not done.
+    const word = value?.apply ? 'Will be applied' : value?.remove ? 'Will be removed' : DONE[act];
+    const strip = el('div', 'mq-row-item mq-undo');
+    strip.dataset.undo = f.id;
+    strip.append(el('span', 'where', where(f)));
+    const what = el('div', 'what');
+    strip.append(what);
+    const end = el('div', 'end');
+    end.append(
+      button('ghost', 'Undo', () => {
+        const id = f.id,
+          had = strip.contains(document.activeElement);
+        const ok = holds();
+        stop();
+        // A re-lint may have withdrawn it since: the act is taken back on what it was taken on.
+        if (ok) h.onAct?.(target() ?? f, 'changed', null);
+        if (had) refocus(id);
+      }),
+    );
+    strip.append(end);
+    // The act this strip undoes, and whether it is still the one in force: a re-lint may have put another
+    // question or marking under the same id, and Undo must not bring the old one back over it.
+    const entry = canon(cur.state.log[cur.state.log.length - 1]);
+    const target = (): Subject | undefined => {
+      const v = cur.doc && docView(cur.doc, cur.state);
+      return [...(v?.findings ?? []), ...(v?.document.artifacts ?? [])].find((y) => y.id === f.id);
+    };
+    const holds = (): boolean => {
+      const x = target();
+      // An artifact's apply or removal can be taken back only until it is written: core has no reversal
+      // of a written one, so once the host re-lints the strip goes.
+      return !x || [x.person, isArtifact(x) ? null : decision(x)].some((d) => d && canon(d) === entry);
+    };
+    // The marking as the latest view has it: a re-lint may have concealed a code in it since.
+    let seen: Subject | undefined;
+    const paint = (): void => {
+      const x = target() ?? seen;
+      seen = x;
+      const m = x && (act === 'answered' || act === 'changed') && !isArtifact(x) ? x.outcome?.result : null;
+      what.replaceChildren(word);
+      if (m && isMarking(m)) what.append(mark(m, { form: 'folded' }));
+    };
+    paint();
+    let left = UNDO_MS,
+      since = 0,
+      timer: ReturnType<typeof setTimeout> | undefined,
+      over = false,
+      within = false;
+    const run = () => {
+      if (over || within || timer !== undefined) return;
+      since = Date.now();
+      timer = setTimeout(stop, left);
+    };
+    const hold = () => {
+      if (timer === undefined) return;
+      clearTimeout(timer);
+      timer = undefined;
+      left -= Date.now() - since;
+    };
+    const stop = () => {
+      clearTimeout(timer);
+      if (recent?.strip !== strip) return;
+      recent = null;
+      // Focus can't be in it (that stops the clock), unless it is going away with the pane.
+      strip.remove();
+    };
+    strip.addEventListener('mouseenter', () => ((over = true), hold()));
+    strip.addEventListener('mouseleave', () => ((over = false), run()));
+    strip.addEventListener('focusin', () => ((within = true), hold()));
+    strip.addEventListener('focusout', (e) => {
+      if (strip.contains(e.relatedTarget as Node | null)) return;
+      within = false;
+      run();
+    });
+    recent = {
+      id: f.id,
+      section: sec ? (['must', 'can', 'later', 'done'].find((k) => sec.classList.contains(k)) ?? null) : null,
+      next: (li && after[after.indexOf(li) + 1]?.dataset.finding) ?? null,
+      strip,
+      say: `${spokenWhere(f)}: ${word.toLowerCase()}. Undo is in its place.`,
+      end: stop,
+      holds,
+      paint,
+      focused: false,
+      left: () => {
+        if (!within || strip.contains(document.activeElement)) return;
+        within = false;
+        run();
+      },
+    };
+    run();
+  }
+  /** Put the undo strip back where the card was, in a pane just drawn. */
+  function replace(): void {
+    if (!recent) return;
+    // Nothing left to undo: a re-lint put something else under its id.
+    if (!recent.holds()) return recent.end();
+    recent.paint();
+    const { section, next, strip } = recent;
+    const sec = section && body.querySelector(`.mq-section.${section}`);
+    const before = sec && next ? sec.querySelector(`.mq-row-item[data-finding="${CSS.escape(next)}"]`) : null;
+    const into = sec && (sec.querySelector('details') ?? sec.querySelector('.mq-rows'));
+    if (before) before.before(strip);
+    else if (into) into.append(strip);
+    else {
+      // Its section went with it: the strip stands on its own above the first one left.
+      const rows = el('div', 'mq-rows');
+      rows.append(strip);
+      const at = body.querySelector('.mq-section, .mq-pane-foot');
+      if (at) at.before(rows);
+      else body.querySelector('.mq-pane')?.append(rows);
+    }
+    // Done is collapsed: open while it holds the strip, or nobody sees it.
+    const det = strip.closest('details');
+    if (det) det.open = true;
+    // Focus that was on it comes back; a browser that sent no focusout when it left mustn't leave the clock stopped.
+    if (recent.focused) strip.querySelector('button')?.focus();
+    else recent.left();
+  }
 
   /** A redraw replaces the pane; put focus back on the same finding's card,
    *  or its row when the card is closed, so a keyboard user isn't sent to the top. */
@@ -1366,7 +1531,9 @@ export function mount(
     closeWithin(root, { windows: false });
     // Read after the popover has handed focus back to its row or card, so focus follows into the new draw.
     if (focusId === undefined) focusId = focusedId();
+    if (recent) recent.focused = recent.strip.contains(document.activeElement);
     body.replaceChildren(pane(v, h));
+    replace();
     if (host.vocab) relabel(body, host.vocab); // this pane's own vocabulary
     refocus(focusId);
     // After the open card is back (a microtask) and focus with it.
@@ -1388,6 +1555,7 @@ export function mount(
     /** Take the pane down: its theme watchers go, and so does what it drew. */
     destroy() {
       dead = true;
+      recent?.end();
       closeWithin(root);
       unwatch();
       if (sized) sized.disconnect();
