@@ -331,6 +331,35 @@
   color: var(--mq-text-muted);
 }
 
+/* Findings and History (DECISIONS #24): the chosen tab is underlined, the other muted. */
+.mq-tabs {
+  display: flex;
+  gap: calc(var(--mq-unit) * 4);
+  border-bottom: var(--mq-border-hair) solid var(--mq-rule-strong);
+}
+.mq-tab {
+  font-family: var(--mq-font-mark), ui-monospace, monospace;
+  font-size: var(--mq-size-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mq-text-muted);
+  background: none;
+  border: 0;
+  border-bottom: var(--mq-tab-rule) solid transparent;
+  margin-bottom: calc(var(--mq-border-hair) * -1);
+  padding: calc(var(--mq-unit) * 1.5) 0;
+  cursor: pointer;
+}
+.mq-tab[aria-selected='true'] {
+  color: var(--mq-text);
+  border-bottom-color: var(--mq-text);
+}
+.mq-panel {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--mq-unit) * 3.5);
+}
+
 /* A collapsed finding row — the pane's list item */
 .mq-rows {
   display: flex;

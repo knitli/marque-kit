@@ -299,3 +299,115 @@ describe('the undo window (DECISIONS #23)', () => {
     done();
   });
 });
+
+describe('History (DECISIONS #24)', () => {
+  const setup = () => {
+    const box = document.createElement('div'),
+      root = document.createElement('div');
+    for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
+    box.append(root);
+    document.body.append(box);
+    const p = mount(root, { doc: memo });
+    const act = (id: string, a: Parameters<NonNullable<typeof p.host.onAct>>[1], value?: object) => {
+      const x = [...p.view()!.findings, ...p.view()!.document.artifacts].find((y) => y.id === id)!;
+      p.host.onAct?.(x, a, value ?? null);
+    };
+    const answer = () => act(P3, 'answered', { reading: f(P3).outcome!.readings![0]! });
+    const tab = (k: string) => root.querySelector<HTMLElement>(`.mq-tab[data-tab="${k}"]`);
+    const rows = () => [...root.querySelectorAll<HTMLElement>('.mq-history .mq-row-item')];
+    return { root, p, act, answer, tab, rows, done: () => (p.destroy(), box.remove()) };
+  };
+
+  test('no tabs until something is done; then Findings, chosen', () => {
+    const { tab, answer, done } = setup();
+    expect(tab('history')).toBeNull();
+    answer();
+    expect(tab('findings')?.getAttribute('aria-selected')).toBe('true');
+    expect(tab('history')?.getAttribute('aria-selected')).toBe('false');
+    done();
+  });
+
+  test('every act, newest first; only the one in force can be taken back, with its marking', () => {
+    const { act, answer, tab, rows, done } = setup();
+    act(P2, 'kept_as_written');
+    answer();
+    act('a-cab', 'answered', { fields: { derived_from: 'Memo 12' } });
+    tab('history')!.click();
+    expect(rows().map((r) => r.querySelector('.where')?.textContent)).toEqual(['CAB', '¶3', '¶2']);
+    const [cab, p3, p2] = rows();
+    expect(buttons(cab!)).toEqual([]);
+    expect(buttons(p3!)).toEqual(['Take back']);
+    expect(p3!.querySelector('.mq-mark')).toBeTruthy();
+    // An override stays listed, and can be taken back: Marque's fix goes in after all.
+    expect(p2!.textContent).toContain('Kept as written');
+    expect(buttons(p2!)).toEqual(['Take back']);
+    done();
+  });
+
+  test('taking an answer back asks the question again, on Findings, with its card open', async () => {
+    const { root, p, answer, tab, rows, done } = setup();
+    answer();
+    tab('history')!.click();
+    rows()[0]!.querySelector('button')!.click();
+    expect(tab('findings')?.getAttribute('aria-selected')).toBe('true');
+    expect(p.view()!.findings.find((y) => y.id === P3)!.asks).toBeTruthy();
+    await new Promise((r) => setTimeout(r));
+    expect(root.querySelector(`.mq-row-item[data-finding="${P3}"]`)?.classList.contains('open')).toBe(true);
+    tab('history')!.click();
+    expect(rows().map((r) => r.querySelector('.what')?.textContent)).toEqual(['Taken back', 'Answered']);
+    expect(rows().flatMap((r) => buttons(r))).toEqual([]);
+    done();
+  });
+
+  test('a routing act has nothing to take back; a written answer still does', () => {
+    const { p, act, answer, tab, rows, done } = setup();
+    answer();
+    // The host wrote it: the re-lint has ¶3 settled on the reading chosen.
+    const result = f(P3).outcome!.readings![0]!.result!;
+    const settled = {
+      ...f(P3),
+      asks: undefined,
+      needs_person: 'none' as const,
+      blocks: 'never' as const,
+      outcome: { ...f(P3).outcome!, kind: 'applied' as const, result },
+    };
+    p.update({
+      doc: { ...memo, findings: memo.findings.map((x) => (x.id === P3 ? settled : x)) },
+      linted: p.state.log.length,
+    });
+    expect(p.view()!.findings.find((y) => y.id === P3)!.person).toBeNull();
+    act(P4, 'deferred');
+    tab('history')!.click();
+    expect(rows()[0]!.textContent).toContain('Will ask at finalize');
+    expect(buttons(rows()[0]!)).toEqual([]);
+    expect(buttons(rows()[1]!)).toEqual(['Take back']);
+    done();
+  });
+
+  test('what was typed on Findings is still there after a look at History', async () => {
+    const { root, p, act, tab, done } = setup();
+    act(P2, 'kept_as_written');
+    p.update({ open: P4 });
+    await new Promise((r) => setTimeout(r));
+    const input = () => root.querySelector<HTMLInputElement>(`input[type="text"][data-draft^="${P4}:"]`);
+    input()!.value = '(U)';
+    input()!.dispatchEvent(new Event('input'));
+    tab('history')!.click();
+    expect(input()).toBeNull();
+    tab('findings')!.click();
+    await new Promise((r) => setTimeout(r));
+    expect(input()?.value).toBe('(U)');
+    done();
+  });
+
+  test('arrow keys move between the tabs, and focus goes with them', () => {
+    const { answer, tab, done } = setup();
+    answer();
+    tab('findings')!.focus();
+    tab('findings')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(tab('history')?.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(tab('history'));
+    expect(document.activeElement?.getAttribute('tabindex')).toBe('0');
+    done();
+  });
+});

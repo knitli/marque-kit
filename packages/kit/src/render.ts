@@ -68,6 +68,7 @@ import type {
   Snapshot,
   State,
   Subject,
+  Tab,
   ThemeReport,
 } from '@marque/kit-core/types';
 
@@ -678,6 +679,105 @@ function engineState(host: Host): HTMLDivElement {
   return box;
 }
 
+/** The two tabs, Findings and History, and the panel the chosen one fills. */
+function tabbed(p: HTMLElement, host: Host): HTMLElement {
+  const on: Tab = host.tab === 'history' ? 'history' : 'findings';
+  const bar = el('div', 'mq-tabs');
+  bar.setAttribute('role', 'tablist');
+  const panel = el('div', 'mq-panel');
+  panel.setAttribute('role', 'tabpanel');
+  panel.id = `mq-panel-${++uid}`;
+  for (const [k, text] of [
+    ['findings', 'Findings'],
+    ['history', 'History'],
+  ] as const) {
+    const t = el('button', 'mq-tab', text);
+    t.type = 'button';
+    t.id = `${panel.id}-${k}`;
+    t.dataset.tab = k;
+    t.setAttribute('role', 'tab');
+    t.setAttribute('aria-selected', String(k === on));
+    t.tabIndex = k === on ? 0 : -1;
+    if (k === on) {
+      t.setAttribute('aria-controls', panel.id);
+      panel.setAttribute('aria-labelledby', t.id);
+    }
+    t.addEventListener('click', () => host.onTab?.(k));
+    // Two tabs: an arrow goes to the other one, Home and End to the first and last.
+    t.addEventListener('keydown', (e) => {
+      const to: Tab | null =
+        e.key === 'Home'
+          ? 'findings'
+          : e.key === 'End'
+            ? 'history'
+            : e.key === 'ArrowLeft' || e.key === 'ArrowRight'
+              ? k === 'findings'
+                ? 'history'
+                : 'findings'
+              : null;
+      if (!to) return;
+      e.preventDefault();
+      host.onTab?.(to);
+    });
+    bar.append(t);
+  }
+  p.append(bar, panel);
+  return panel;
+}
+
+/** What an act did, in a word or two. */
+const did = (e: LogEntry): string =>
+  e.act === 'changed' && e.value == null
+    ? 'Taken back'
+    : e.value?.apply
+      ? 'Asked to apply'
+      : e.value?.remove
+        ? 'Asked to remove'
+        : e.value?.fields
+          ? 'Filled in'
+          : DONE[e.act];
+
+/** Every act, newest first. The answer or override still in force can be taken back, which asks the
+ *  question again; an artifact's only until it is written, and a typed field's not yet (core can't).
+ *  Only that act shows its marking, from the latest view: a code concealed since is masked there too. */
+function history(doc: Doc, log: readonly LogEntry[], host: Host): HTMLElement {
+  const rows = el('div', 'mq-rows mq-history');
+  const all: Subject[] = [...doc.findings, ...doc.document.artifacts];
+  [...log].reverse().forEach((e, i, newest) => {
+    const x = all.find((y) => y.id === e.id);
+    const li = el('div', 'mq-row-item');
+    li.dataset.act = e.act;
+    li.append(el('span', 'where', x ? where(x) : e.about?.anchor ? where({ anchor: e.about.anchor }) : '—'));
+    const what = el('div', 'what', did(e));
+    // In force: the last act on its id, and still the one the finding stands on.
+    const last = newest.findIndex((y) => y.id === e.id) === i;
+    const force = last && !!x && [x.person, isArtifact(x) ? null : decision(x)].some((d) => d && canon(d) === canon(e));
+    if (force && !isArtifact(x)) {
+      const m =
+        e.act === 'kept_as_written'
+          ? x.marking?.as_written
+          : e.act === 'answered' || e.act === 'changed'
+            ? x.outcome?.result
+            : null;
+      if (m && isMarking(m)) what.append(placed(mark(m, { form: 'folded' })));
+      else if (e.value?.free) what.append(el('span', 'mq-p', `“${e.value.free}”`));
+    }
+    li.append(what);
+    // Routing acts (later, not my call) leave the question open: there is nothing to take back.
+    const back =
+      force &&
+      !e.value?.fields &&
+      (e.act === 'kept_as_written' || ((e.act === 'answered' || e.act === 'changed') && e.value != null));
+    if (back) {
+      const end = el('div', 'end');
+      end.append(button('ghost', 'Take back', () => host.onAct?.(x, 'changed', null)));
+      li.append(end);
+    }
+    rows.append(li);
+  });
+  return rows;
+}
+
 export function pane(doc: Doc | null, host: Host = {}): HTMLDivElement {
   const p = el('div', 'mq-pane');
   const head = el('div', 'mq-pane-head');
@@ -730,13 +830,17 @@ export function pane(doc: Doc | null, host: Host = {}): HTMLDivElement {
     p.append(ro);
   }
 
-  if (!g.must.length && !g.can.length && !g.later.length) {
-    p.append(el('div', 'mq-empty', 'Nothing needs you.'));
+  // Once anything is done, it can be looked back on: the findings or the History (DECISIONS #24).
+  const out = host.log?.length ? tabbed(p, host) : p;
+  const findings = !host.log?.length || host.tab !== 'history';
+  if (!findings) out.append(history(doc, host.log!, host));
+  else if (!g.must.length && !g.can.length && !g.later.length) {
+    out.append(el('div', 'mq-empty', 'Nothing needs you.'));
   }
 
   for (const k of ['must', 'can', 'later', 'done'] as const) {
     const list = g[k];
-    if (!list.length) continue;
+    if (!list.length || !findings) continue;
     const sec = el('section', `mq-section ${k}`);
     const sh = el('div', 'mq-section-head');
     const id = `mq-sec-${k}-${++uid}`;
@@ -769,7 +873,7 @@ export function pane(doc: Doc | null, host: Host = {}): HTMLDivElement {
       rows.append(det);
     } else list.forEach((f) => rows.append(row(f, host, doc)));
     sec.append(rows);
-    p.append(sec);
+    out.append(sec);
   }
 
   const foot = el('div', 'mq-pane-foot');
@@ -1172,8 +1276,9 @@ export function mount(
     engine: EngineState;
     readOnly: boolean;
     open: string | null;
+    tab: Tab;
     seq: number | null;
-  } = { doc, state, moment, engine, readOnly, open: null, seq: null };
+  } = { doc, state, moment, engine, readOnly, open: null, tab: 'findings', seq: null };
   // Findings already there at mount aren't news; the first ones to arrive later are.
   let said: Set<string> | null = doc ? null : new Set(),
     unseen = false;
@@ -1246,6 +1351,20 @@ export function mount(
     get open() {
       return cur.open;
     },
+    get tab() {
+      return cur.tab;
+    },
+    get log() {
+      return cur.state.log;
+    },
+    onTab(t: Tab) {
+      // The undo strip belongs to the findings it stood among.
+      recent?.end();
+      cur.tab = t;
+      draw();
+      // From the keyboard, focus goes with the tab chosen.
+      body.querySelector<HTMLElement>(`.mq-tab[data-tab="${t}"]`)?.focus();
+    },
     get narrow() {
       return !!theme?.narrow;
     },
@@ -1274,8 +1393,11 @@ export function mount(
       // Any other act leaves what was done and an Undo in the card's place (DECISIONS #23).
       // A typed field has no Undo yet: core can't take one back (field answers accumulate).
       const back = (act === 'changed' && value == null) || !cur.doc || !!value?.fields;
-      if (back) cur.open = f.id;
-      else {
+      // Taken back from History: the question is the point, so the findings come back with its card open.
+      if (back) {
+        cur.open = f.id;
+        cur.tab = 'findings';
+      } else {
         cur.open = null;
         undoable(f, act, value);
       }
@@ -1357,7 +1479,7 @@ export function mount(
       seen = x;
       const m = x && (act === 'answered' || act === 'changed') && !isArtifact(x) ? x.outcome?.result : null;
       what.replaceChildren(word);
-      if (m && isMarking(m)) what.append(mark(m, { form: 'folded' }));
+      if (m && isMarking(m)) what.append(placed(mark(m, { form: 'folded' })));
     };
     paint();
     let left = UNDO_MS,
@@ -1505,10 +1627,14 @@ export function mount(
   }
 
   // `fresh`: the person just acted, so what they had in the form went with it.
+  let parked: Draft[] = [];
   let dead = false; // destroyed: a draw queued before it (onOpen, a resize) draws nothing
   function draw(focusId?: string | null, { fresh = false }: { fresh?: boolean } = {}): void {
     if (dead) return;
-    const kept = fresh ? [] : drafts();
+    // While History shows, what was picked or typed on Findings is held for when it comes back.
+    const got = fresh ? [] : body.querySelector('.mq-history') ? parked : drafts();
+    const kept = cur.tab === 'history' ? [] : got;
+    parked = cur.tab === 'history' ? got : [];
     const v = cur.doc && docView(cur.doc, cur.state);
     let say = '';
     const ok = cur.engine === 'ok';
@@ -1532,8 +1658,10 @@ export function mount(
     // Read after the popover has handed focus back to its row or card, so focus follows into the new draw.
     if (focusId === undefined) focusId = focusedId();
     if (recent) recent.focused = recent.strip.contains(document.activeElement);
+    const onTab = body.contains(document.activeElement) && document.activeElement?.closest<HTMLElement>('.mq-tab');
     body.replaceChildren(pane(v, h));
     replace();
+    if (onTab) body.querySelector<HTMLElement>(`.mq-tab[data-tab="${onTab.dataset.tab}"]`)?.focus();
     if (host.vocab) relabel(body, host.vocab); // this pane's own vocabulary
     refocus(focusId);
     // After the open card is back (a microtask) and focus with it.

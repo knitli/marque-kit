@@ -377,6 +377,8 @@ export interface ThemeReport {
   narrow: boolean;
 }
 
+export type Tab = 'findings' | 'history';
+
 export type EngineState = 'ok' | 'checking' | 'failed' | (string & {});
 
 /** The thing the kit never decides. Every callback is optional; a missing one makes its control inert, not absent. */
@@ -389,10 +391,15 @@ export interface Host {
   narrow?: boolean | undefined;
   /** The id whose card is open. */
   open?: string | null | undefined;
+  /** What the pane shows once anything is done: the findings, or the History of acts (DECISIONS #24). */
+  tab?: Tab | undefined;
+  /** The person's acts, oldest first. History lists them; without any, there are no tabs. */
+  log?: readonly LogEntry[] | undefined;
   onAct?: (f: Subject, act: Act, value?: ActValue | null) => void;
   onHelp?: (req: HelpRequest) => void;
   onJump?: (f: Subject) => void;
   onOpen?: (f: Subject | null) => void;
+  onTab?: (tab: Tab) => void;
   onGate?: () => void;
   /** From the pane's button (its element), or a code picked in the lookup. */
   onLookup?: (target: HTMLElement | string) => void;
