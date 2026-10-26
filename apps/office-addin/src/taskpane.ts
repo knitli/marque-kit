@@ -84,14 +84,22 @@ const isMemo = (ps: string[]): boolean => {
   return same;
 };
 
-/** The banner, top and bottom of every page: the header and the footer, centered. Cleared when there's none. */
-const setBanner = (ctx: Word.RequestContext, text: string | null): void => {
-  const s = ctx.document.sections.getFirst();
-  for (const part of [s.getHeader('Primary'), s.getFooter('Primary')]) {
-    if (!text) part.clear();
-    else part.insertText(text, 'Replace').paragraphs.getFirst().alignment = 'Centered';
-  }
+/** The banner, top and bottom of every page: each section's headers and footers, first-page and even-page
+ *  ones too, centered. Cleared when there's none. */
+const setBanner = async (ctx: Word.RequestContext, text: string | null): Promise<void> => {
+  const ss = ctx.document.sections.load('items');
+  await ctx.sync();
+  for (const s of ss.items)
+    for (const type of ['Primary', 'FirstPage', 'EvenPages'] as const)
+      for (const part of [s.getHeader(type), s.getFooter(type)]) {
+        if (!text) part.clear();
+        else part.insertText(text, 'Replace').paragraphs.getFirst().alignment = 'Centered';
+      }
 };
+
+/** The banner as the document has it: the first section's header. */
+const header = (ctx: Word.RequestContext): Word.Body =>
+  ctx.document.sections.getFirst().getHeader('Primary').load('text');
 
 /** Replace the document with the memo as it stands, a paragraph per line, and its banner. */
 const insertMemo = (): Promise<void> =>
@@ -101,7 +109,7 @@ const insertMemo = (): Promise<void> =>
     const [first = '', ...rest] = now.lines;
     body.paragraphs.getFirst().insertText(first, 'Replace');
     for (const l of rest) body.insertParagraph(l, 'End');
-    setBanner(ctx, now.banner);
+    await setBanner(ctx, now.banner);
     await ctx.sync();
   });
 
@@ -143,7 +151,7 @@ const write = (from: Layout, to: Layout): Promise<void> =>
       else if (d.is) r.insertText(d.is, 'Replace');
       else r.delete();
     }
-    if (from.banner !== to.banner) setBanner(ctx, to.banner);
+    if (from.banner !== to.banner) await setBanner(ctx, to.banner);
     await ctx.sync();
   });
 
@@ -176,17 +184,18 @@ const jump = (f: Subject): Promise<void> =>
   });
 
 /** The index of the paragraph the selection starts in, or -1. */
-const selected = (): Promise<{ index: number; texts: string[] }> =>
+const selected = (): Promise<{ index: number; texts: string[]; head: string }> =>
   Word.run(async (ctx) => {
     const sel = ctx.document.getSelection();
     const ps = ctx.document.body.paragraphs.load('items/text');
+    const h = header(ctx);
     await ctx.sync();
     // shortcut: one comparison per paragraph on every selection change; fine for a memo, slow for a long
     // document. The Word adapter's content controls (packages/word) will say which finding the cursor is in.
     const where = ps.items.map((p) => p.getRange('Whole').compareLocationWith(sel));
     await ctx.sync();
     const index = where.findIndex((r) => ['Contains', 'Equal', 'ContainsStart'].includes(r.value));
-    return { index, texts: ps.items.map((p) => p.text) };
+    return { index, texts: ps.items.map((p) => p.text), head: h.text.trim() };
   });
 
 void Office.onReady(async (info) => {
@@ -245,23 +254,23 @@ void Office.onReady(async (info) => {
   );
 
   /** Word's undo took an act out of the document behind the pane's back: the act whose take-back
-   *  makes the layout match the document again. Recorded as taken back, so the question comes back.
+   *  makes the layout, body and banner, match the document again. Recorded as taken back, so the question comes back.
    *  Written or not: an answer the last re-lint applied no longer shows as the person's on the view. */
-  const undone = (texts: string[]): Subject | null => {
+  const undone = (texts: string[], head: string): Subject | null => {
     const v = pane.view()!;
     for (const id of new Set([...pane.state.log].reverse().map((e) => e.id))) {
       const f = [...v.findings, ...v.document.artifacts].find((x) => x.id === id);
-      if (f && says(texts, layout(doc, record(pane.state, id, 'changed', null, undefined, snapshot(f))).lines))
-        return f;
+      const was = f && layout(doc, record(pane.state, id, 'changed', null, undefined, snapshot(f)));
+      if (was && says(texts, was.lines) && head === (was.banner ?? '')) return f;
     }
     return null;
   };
 
   // Cursor-follow: the card for the paragraph the cursor is in comes up. Leaving it keeps the card open.
   const follow = async (): Promise<void> => {
-    const { index, texts } = await selected();
-    if (!says(texts, now.lines)) {
-      const f = undone(texts);
+    const { index, texts, head } = await selected();
+    if (!says(texts, now.lines) || head !== (now.banner ?? '')) {
+      const f = undone(texts, head);
       if (f) {
         log('undone in Word', f.id);
         pane.host.onAct?.(f, 'changed', null);
