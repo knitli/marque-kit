@@ -759,7 +759,7 @@ function history(doc: Doc, log: readonly LogEntry[], host: Host): HTMLElement {
           : e.act === 'answered' || e.act === 'changed'
             ? x.outcome?.result
             : null;
-      if (m && isMarking(m)) what.append(mark(m, { form: 'folded' }));
+      if (m && isMarking(m)) what.append(placed(mark(m, { form: 'folded' })));
       else if (e.value?.free) what.append(el('span', 'mq-p', `“${e.value.free}”`));
     }
     li.append(what);
@@ -1479,7 +1479,7 @@ export function mount(
       seen = x;
       const m = x && (act === 'answered' || act === 'changed') && !isArtifact(x) ? x.outcome?.result : null;
       what.replaceChildren(word);
-      if (m && isMarking(m)) what.append(mark(m, { form: 'folded' }));
+      if (m && isMarking(m)) what.append(placed(mark(m, { form: 'folded' })));
     };
     paint();
     let left = UNDO_MS,
@@ -1627,10 +1627,14 @@ export function mount(
   }
 
   // `fresh`: the person just acted, so what they had in the form went with it.
+  let parked: Draft[] = [];
   let dead = false; // destroyed: a draw queued before it (onOpen, a resize) draws nothing
   function draw(focusId?: string | null, { fresh = false }: { fresh?: boolean } = {}): void {
     if (dead) return;
-    const kept = fresh ? [] : drafts();
+    // While History shows, what was picked or typed on Findings is held for when it comes back.
+    const got = fresh ? [] : body.querySelector('.mq-history') ? parked : drafts();
+    const kept = cur.tab === 'history' ? [] : got;
+    parked = cur.tab === 'history' ? got : [];
     const v = cur.doc && docView(cur.doc, cur.state);
     let say = '';
     const ok = cur.engine === 'ok';

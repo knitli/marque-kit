@@ -77,6 +77,7 @@
   --mq-radius: 0; /* paper doesn't round                    */
   --mq-border: 2px; /* card and control borders               */
   --mq-border-hair: 1px;
+  --mq-tab-rule: 2px; /* the chosen tab's underline             */
   --mq-unit: 4px; /* spacing unit; the kit uses multiples.
                                       A dense host sets 3px.                 */
   --mq-shadow-overlay: 0 8px 28px rgba(47, 55, 50, 0.18); /* popovers only     */

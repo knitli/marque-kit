@@ -384,6 +384,22 @@ describe('History (DECISIONS #24)', () => {
     done();
   });
 
+  test('what was typed on Findings is still there after a look at History', async () => {
+    const { root, p, act, tab, done } = setup();
+    act(P2, 'kept_as_written');
+    p.update({ open: P4 });
+    await new Promise((r) => setTimeout(r));
+    const input = () => root.querySelector<HTMLInputElement>(`input[type="text"][data-draft^="${P4}:"]`);
+    input()!.value = '(U)';
+    input()!.dispatchEvent(new Event('input'));
+    tab('history')!.click();
+    expect(input()).toBeNull();
+    tab('findings')!.click();
+    await new Promise((r) => setTimeout(r));
+    expect(input()?.value).toBe('(U)');
+    done();
+  });
+
   test('arrow keys move between the tabs, and focus goes with them', () => {
     const { answer, tab, done } = setup();
     answer();

@@ -345,7 +345,7 @@
   color: var(--mq-text-muted);
   background: none;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-bottom: var(--mq-tab-rule) solid transparent;
   margin-bottom: calc(var(--mq-border-hair) * -1);
   padding: calc(var(--mq-unit) * 1.5) 0;
   cursor: pointer;
