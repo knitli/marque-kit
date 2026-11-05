@@ -1,0 +1,65 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
+version: 2
+
+updates:
+  # pnpm workspace: one entry covering the root and every workspace package.
+  # Dependabot reads pnpm-lock.yaml; PRs must still pass `pnpm check/test`.
+  - package-ecosystem: npm
+    directories:
+      - /
+      - /packages/core
+      - /packages/kit
+      - /packages/web
+      - /packages/word
+      - /packages/outlook
+      - /apps/office-addin
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: America/New_York
+    # Let a release age a week before proposing it; patches arrive sooner.
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      prefix: 'chore'
+      include: scope
+    groups:
+      minor-and-patch:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+
+  # Workflow actions are pinned by SHA in this repo; Dependabot keeps both
+  # the SHA and the version comment current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: America/New_York
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: 'chore'
+      include: scope
+    groups:
+      actions:
+        patterns:
+          - '*'
