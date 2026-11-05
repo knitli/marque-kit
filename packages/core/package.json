@@ -1,9 +1,8 @@
 {
-  "name": "@marque/kit-core",
+  "name": "@knitli/marque-kit-core",
   "version": "0.1.0",
-  "private": true,
   "description": "The kit's logic with no DOM: the contract as types, the state log, and the rungs. Runs where a page can't, such as Outlook's send handler.",
-  "license": "SEE LICENSE IN LICENSE.md",
+  "license": "AGPL-3.0-only",
   "author": "Knitli Inc.",
   "repository": {
     "type": "git",
@@ -31,6 +30,9 @@
       "types": "./dist/types.d.ts",
       "default": "./dist/types.js"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "vp pack",

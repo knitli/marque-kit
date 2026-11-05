@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 //
-// SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+// SPDX-License-Identifier: AGPL-3.0-only
 
 /**
  * The theme gate (docs/THEME.md, "The gate"; the footer of theme.css): at
@@ -14,7 +14,7 @@
 
 // [foreground, background, floor]; a tint is laid over the surface first. test/theme.test.js
 // checks this against what kit.css and theme.css paint: a pairing is measured here or excused there.
-import type { Rejected, ThemeReport } from '@marque/kit-core/types';
+import type { Rejected, ThemeReport } from '@knitli/marque-kit-core/types';
 
 /** An sRGB color with alpha: [r, g, b, a], channels 0–255, alpha 0–1. */
 export type RGBA = [number, number, number, number];

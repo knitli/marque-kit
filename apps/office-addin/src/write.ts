@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 //
-// SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+// SPDX-License-Identifier: AGPL-3.0-only
 
 /**
  * What the document should say, from the pane's view of it. The host applies:
@@ -9,8 +9,8 @@
  * back takes its edit out, so the text goes back with the question.
  */
 
-import { docView, last } from '@marque/kit-core/state';
-import type { ArtifactView, Doc, FindingView, State, Subject } from '@marque/kit-core/types';
+import { docView, last } from '@knitli/marque-kit-core/state';
+import type { ArtifactView, Doc, FindingView, State, Subject } from '@knitli/marque-kit-core/types';
 
 export interface Edit {
   span: [number, number];

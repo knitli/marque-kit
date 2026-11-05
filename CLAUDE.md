@@ -1,7 +1,7 @@
 <!--
 SPDX-FileCopyrightText: 2026 Knitli Inc.
 
-SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 # CLAUDE.md
@@ -10,7 +10,7 @@ Guidance for working in this repo. The kit is the human-facing half of Marque; t
 
 ## What this is
 
-A UI kit for hosts that show Marque findings to a person: a web page, a Word or Outlook task pane, Marque's own surfaces. TypeScript and plain CSS, no framework, no runtime dependencies; `vp pack` builds each package's `dist/` (DECISIONS #20). A pnpm workspace (DECISIONS #22): `packages/core` (`@marque/kit-core`) is the logic with no DOM: the contract in types (`packages/core/src/types.ts`), the state log, and the rungs and sections (`attention.ts`); `packages/kit` (`@marque/kit`) builds the DOM and ships the CSS; `packages/web`, `packages/word` and `packages/outlook` will draw the inline marks in each host; `apps/office-addin` is the Office add-in: so far the Word pane on the sample memo, with jump and cursor-follow. The three adapter packages are placeholders. `docs/` is the design it implements; `fixtures/` is the memo every example uses; `demo/` renders it.
+A UI kit for hosts that show Marque findings to a person: a web page, a Word or Outlook task pane, Marque's own surfaces. TypeScript and plain CSS, no framework, no runtime dependencies; `vp pack` builds each package's `dist/` (DECISIONS #20). A pnpm workspace (DECISIONS #22): `packages/core` (`@knitli/marque-kit-core`) is the logic with no DOM: the contract in types (`packages/core/src/types.ts`), the state log, and the rungs and sections (`attention.ts`); `packages/kit` (`@knitli/marque-kit`) builds the DOM and ships the CSS; `packages/web`, `packages/word` and `packages/outlook` will draw the inline marks in each host; `apps/office-addin` is the Office add-in: so far the Word pane on the sample memo, with jump and cursor-follow. The three adapter packages are placeholders. `docs/` is the design it implements; `fixtures/` is the memo every example uses; `demo/` renders it.
 
 ## Fixed, by decision (docs/DECISIONS.md)
 
@@ -82,4 +82,4 @@ Banner derived: `SECRET//FGI AUS GBR//NOFORN`, or `…//REL TO USA, GBR` if ¶5'
 - The docs under `docs/` were extracted from the canvas on 21 Oct 2026 and are now the source. Edit them here; the canvas is history.
 - Engine gaps go to marque-dev as issues, labeled `ui-kit` (+ `engine`, `audit`, `office`, `capco/ism` as they apply), and get a row in `docs/ENGINE-ASKS.md`. The Linear triage agent assigns cluster and lineage.
 - Commits and PRs end with the attribution lines the session provides.
-- SPDX header on every file: `SPDX-FileCopyrightText: 2026 Knitli Inc.` / `SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense`. A file that can't carry a comment (JSON, lockfiles, `memo.txt`) goes in `REUSE.toml`. CI runs `reuse lint`.
+- SPDX header on every file: `SPDX-FileCopyrightText: 2026 Knitli Inc.` / `SPDX-License-Identifier: AGPL-3.0-only`. A file that can't carry a comment (JSON, lockfiles, `memo.txt`) goes in `REUSE.toml`. CI runs `reuse lint`.

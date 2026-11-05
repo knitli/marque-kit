@@ -1,12 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 //
-// SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+// SPDX-License-Identifier: AGPL-3.0-only
 
 /**
  * Render — finding JSON (docs/CONTRACT.md) → the kit's DOM.
  *
  * One function per component, in build order (docs/COMPONENTS.md):
- *   rung, markClass, sections — re-exported from @marque/kit-core/attention,
+ *   rung, markClass, sections — re-exported from @knitli/marque-kit-core/attention,
  *                     which has no DOM (docs/DERIVATION.md; C8's shape class)
  *   card(f, host)   — C3, the finding card; C4 (the asks renderer) lives inside it
  *   row(f, host, d) — C6, the pane's collapsed list item
@@ -45,8 +45,8 @@ import {
   canon,
   face,
   isArtifact,
-} from '@marque/kit-core/state';
-import { GATE, rung, waits, artRung, artWaits, sections, type Sections } from '@marque/kit-core/attention';
+} from '@knitli/marque-kit-core/state';
+import { GATE, rung, waits, artRung, artWaits, sections, type Sections } from '@knitli/marque-kit-core/attention';
 import { cite, hasTip, tips, closeWithin } from './help.ts';
 import { check, watch, release } from './theme.ts';
 import type {
@@ -70,11 +70,11 @@ import type {
   Subject,
   Tab,
   ThemeReport,
-} from '@marque/kit-core/types';
+} from '@knitli/marque-kit-core/types';
 
 // The rung, the inline mark's class and the sections live in core; hosts still find them here.
-export { rung, markClass, sections } from '@marque/kit-core/attention';
-export type { Attention, Sections } from '@marque/kit-core/attention';
+export { rung, markClass, sections } from '@knitli/marque-kit-core/attention';
+export type { Attention, Sections } from '@knitli/marque-kit-core/attention';
 
 /** How long an act's Undo stays in its card's place, while nobody is on it (DECISIONS #23). */
 export const UNDO_MS = 8000;

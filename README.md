@@ -1,7 +1,7 @@
 <!--
 SPDX-FileCopyrightText: 2026 Knitli Inc.
 
-SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 # Marque UI kit
@@ -17,14 +17,14 @@ It is an embeddable widget, not a box of parts. The model is Stripe Elements: on
 A pnpm workspace (DECISIONS #22). Packages import each other by name; the `source` export condition points tests, typecheck and the demo at `src/`.
 
 ```
-packages/core/       @marque/kit-core: the logic with no DOM, so it runs anywhere, Outlook's send handler included
+packages/core/       @knitli/marque-kit-core: the logic with no DOM, so it runs anywhere, Outlook's send handler included
   src/types.ts         the contract as types: findings, artifacts, the state log, the vocabulary, the host
   src/state.ts         the kit's half of the ladder: what the person did (answered, changed, kept as written,
                        deferred, declined), keyed by finding id, append-only, plain JSON the host persists
   src/attention.ts     rung(), sections(), markClass(): which of the five rungs a finding sits on, and the pane's
                        four sections; what Outlook's send gate decides with
   test/                the fixtures held to the types; the rung table and the state layer, against the memo
-packages/kit/        @marque/kit: the DOM and the CSS
+packages/kit/        @knitli/marque-kit: the DOM and the CSS
   src/theme.css        the theme layer: --mq-* tokens (light default, dark, auto), how a marking fits,
                        the four shapes that carry meaning, control states, print, forced colors
   src/kit.css          the components, built only on theme.css
@@ -36,9 +36,9 @@ packages/kit/        @marque/kit: the DOM and the CSS
   src/theme.ts         the theme gate at mount: contrast and size floors, falling back to shipped values
   test/                the parser, the theme gate, lookup and citation landing under plain node
   test/dom/            the decided rules as they reach the DOM (card, gate, receipt), under vp test and happy-dom
-packages/web/        @marque/kit-web: inline marks on a page's own text (placeholder)
-packages/word/       @marque/kit-word: inline marks as content controls, selection-follow, the Purview label (placeholder)
-packages/outlook/    @marque/kit-outlook: marks in the compose body, classification headers, the send gate (placeholder)
+packages/web/        @knitli/marque-kit-web: inline marks on a page's own text (placeholder)
+packages/word/       @knitli/marque-kit-word: inline marks as content controls, selection-follow, the Purview label (placeholder)
+packages/outlook/    @knitli/marque-kit-outlook: marks in the compose body, classification headers, the send gate (placeholder)
 apps/office-addin/   the Word and Outlook add-in: manifest, task pane, Office.js ↔ WASM engine ↔ kit; so far the Word pane on the memo
 fixtures/memo.txt            a six-paragraph memo with five things wrong
 fixtures/memo.findings.json  what Marque should say about it, in the contract's shape
@@ -62,7 +62,7 @@ pnpm demo         # vp dev; open /demo/
 A host mounts the pane and listens:
 
 ```js
-import { mount } from '@marque/kit';
+import { mount } from '@knitli/marque-kit';
 const p = mount(el, { doc, state, vocab, moment: 'editing', onChange: (state, act) => save(state), onHelp, onJump });
 p.update({ doc });              // after a re-lint; async hosts add { linted: n, seq }
 p.update({ moment: 'finalize' }); // the host's moment; the kit never guesses it
@@ -70,7 +70,7 @@ p.update({ open: id });         // an Office host's cursor in a marking: its car
 p.destroy();                    // when the pane goes away
 ```
 
-`act` is null when only the seen list changed. An answer shows on its card at once but stays in `document.pending`, and the document is not ready, until the host applies it, re-lints and calls `p.update({ doc })`. `@marque/kit/help` has what a host needs to answer `onHelp` and `onLookup`. The contract's types and the state log are `@marque/kit-core/types` and `@marque/kit-core/state`. At mount the kit measures the host's `--mq-*` tokens against the contrast and size floors (`@marque/kit/theme`); a failing token falls back to the shipped value, and the report is `p.theme` and `onTheme(report)`. Under forced colors the system palette stands and only sizes and the mark font are measured. When the room the host gives the pane is under 240px, the report says `narrow: true` and the kit shows rows only: opening one calls `onOpen(f)` for the host to show it its own way.
+`act` is null when only the seen list changed. An answer shows on its card at once but stays in `document.pending`, and the document is not ready, until the host applies it, re-lints and calls `p.update({ doc })`. `@knitli/marque-kit/help` has what a host needs to answer `onHelp` and `onLookup`. The contract's types and the state log are `@knitli/marque-kit-core/types` and `@knitli/marque-kit-core/state`. At mount the kit measures the host's `--mq-*` tokens against the contrast and size floors (`@knitli/marque-kit/theme`); a failing token falls back to the shipped value, and the report is `p.theme` and `onTheme(report)`. Under forced colors the system palette stands and only sizes and the mark font are measured. When the room the host gives the pane is under 240px, the report says `narrow: true` and the kit shows rows only: opening one calls `onOpen(f)` for the host to show it its own way.
 
 The demo runs under `vp dev`, which serves the TypeScript source as modules.
 
@@ -96,4 +96,4 @@ The kit depends on Knitli's design-system *values* (vendored into `theme.css`), 
 
 ## License
 
-Marque Commercial License; see [LICENSE.md](LICENSE.md). Source-available with commercial-use restrictions, the same terms as [knitli/marque-dev](https://github.com/knitli/marque-dev).
+Dual-licensed: AGPL-3.0-only or a Knitli commercial license; see [LICENSE.md](LICENSE.md). The full AGPL text is in [LICENSES/AGPL-3.0-only.txt](LICENSES/AGPL-3.0-only.txt). Marque, Knitli and Imprint are Knitli trademarks; see [TRADEMARK.md](TRADEMARK.md). Contributions require Knitli's CLA; see [CONTRIBUTING.md](CONTRIBUTING.md).

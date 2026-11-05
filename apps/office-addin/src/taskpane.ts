@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 //
-// SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+// SPDX-License-Identifier: AGPL-3.0-only
 
 /// <reference types="office-js" />
 /// <reference types="vite/client" />
@@ -18,12 +18,12 @@
  * inline marks (packages/word), Outlook.
  */
 
-import '@marque/kit/theme.css';
-import '@marque/kit/kit.css';
-import { mount } from '@marque/kit';
-import { button, el } from '@marque/kit/marking';
-import { record, snapshot } from '@marque/kit-core/state';
-import type { Doc, State, Subject, Vocab } from '@marque/kit-core/types';
+import '@knitli/marque-kit/theme.css';
+import '@knitli/marque-kit/kit.css';
+import { mount } from '@knitli/marque-kit';
+import { button, el } from '@knitli/marque-kit/marking';
+import { record, snapshot } from '@knitli/marque-kit-core/state';
+import type { Doc, State, Subject, Vocab } from '@knitli/marque-kit-core/types';
 import findingsUrl from '../../../fixtures/memo.findings.json?url';
 import vocabUrl from '../../../fixtures/memo.vocab.json?url';
 import memo from '../../../fixtures/memo.txt?raw';

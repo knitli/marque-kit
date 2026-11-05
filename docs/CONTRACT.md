@@ -1,7 +1,7 @@
 <!--
 SPDX-FileCopyrightText: 2026 Knitli Inc.
 
-SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 

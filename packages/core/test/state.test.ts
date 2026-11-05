@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 //
-// SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The rung function (docs/DERIVATION.md, Table 2, src/attention.ts) and the kit's state layer
 // (src/state.ts), run against the memo under plain node (no DOM).

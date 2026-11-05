@@ -1,13 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 //
-// SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+// SPDX-License-Identifier: AGPL-3.0-only
 
 import type { UserConfig } from 'vite';
 import { defaultClientConditions } from 'vite';
 import { defineConfig } from 'vite-plus';
 
 const config: UserConfig = defineConfig({
-  // @marque/kit-core resolves to its source under test, as it does under node --conditions=source.
+  // @knitli/marque-kit-core resolves to its source under test, as it does under node --conditions=source.
   resolve: { conditions: ['source', ...defaultClientConditions] },
   // DOM tests only (test/dom/); the rest run in node as written (node --test).
   test: {

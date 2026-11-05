@@ -1,13 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 //
-// SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // locate() against the memo: every span the fixture names lands on the marking it quotes,
 // in the paragraph Word will have once the memo is inserted.
 // `node --conditions=source --test test/*.test.ts`
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import type { Doc } from '@marque/kit-core/types';
+import type { Doc } from '@knitli/marque-kit-core/types';
 import { locate, paragraphAt, written } from '../src/locate.ts';
 
 const read = (f: string): string => readFileSync(new URL(`../../../fixtures/${f}`, import.meta.url), 'utf8');

@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
-# SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+# SPDX-License-Identifier: AGPL-3.0-only
 """Extract the help and vocabulary fixtures from a marque-dev checkout.
 
     python3 fixtures/extract.py <marque-dev> <ism-ismcat data/ISMCAT dir>
