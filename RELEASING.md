@@ -26,7 +26,10 @@ Packages publish from [.github/workflows/publish.yml](.github/workflows/publish.
    ```sh
    npm view @knitli/marque-kit@<version> dist.attestations  # provenance present
    gh attestation verify knitli-marque-kit-<version>.tgz --repo knitli/marque-kit
-   cosign verify-blob --bundle SHA256SUMS.sigstore.json SHA256SUMS
+   cosign verify-blob --bundle SHA256SUMS.sigstore.json \
+     --certificate-identity "https://github.com/knitli/marque-kit/.github/workflows/publish.yml@refs/tags/v<version>" \
+     --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+     SHA256SUMS
    ```
 
 A manual run (`workflow_dispatch`) defaults to a dry run: it checks, tests, builds, packs, and attests, but publishes nothing and creates no release.
