@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
-# SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+# SPDX-License-Identifier: AGPL-3.0-only
 
 version = 1
 
@@ -9,4 +9,10 @@ version = 1
 [[annotations]]
 path = ["**/package.json", "pnpm-lock.yaml", "mise.lock", "fixtures/memo.txt", "fixtures/*.json"]
 SPDX-FileCopyrightText = "2026 Knitli Inc."
-SPDX-License-Identifier = "LicenseRef-MarqueCommercialLicense"
+SPDX-License-Identifier = "AGPL-3.0-only"
+
+# Verbatim AGPL text shipped in each published package so the tarball carries its license.
+[[annotations]]
+path = ["packages/*/LICENSE.txt"]
+SPDX-FileCopyrightText = "2007 Free Software Foundation, Inc. <https://fsf.org/>"
+SPDX-License-Identifier = "AGPL-3.0-only"

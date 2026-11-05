@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 //
-// SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The fixtures against the contract in types. JSON.parse gives `unknown`, and a JSON import
 // widens 'span' to string, so each fixture is written out as a literal that `satisfies` its

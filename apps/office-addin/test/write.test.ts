@@ -1,14 +1,14 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 //
-// SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // What the host writes, against the memo: Marque's fixes at the start, then each answer, its
 // take-back, and the banner. The document is the memo with the edits in.
 // `node --conditions=source --test test/*.test.ts`
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { docView, empty, linted, record, snapshot } from '@marque/kit-core/state';
-import type { Act, ActValue, Doc, State } from '@marque/kit-core/types';
+import { docView, empty, linted, record, snapshot } from '@knitli/marque-kit-core/state';
+import type { Act, ActValue, Doc, State } from '@knitli/marque-kit-core/types';
 import { written } from '../src/locate.ts';
 import { banner, edits, held, made, relint } from '../src/write.ts';
 

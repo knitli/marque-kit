@@ -1,9 +1,8 @@
 {
-  "name": "@marque/kit-outlook",
+  "name": "@knitli/marque-kit-outlook",
   "version": "0.0.0",
-  "private": true,
   "description": "The Outlook adapter: marks as spans in the compose body, classification headers, the Purview label, and the send gate.",
-  "license": "SEE LICENSE IN LICENSE.md",
+  "license": "AGPL-3.0-only",
   "author": "Knitli Inc.",
   "repository": {
     "type": "git",
@@ -15,6 +14,9 @@
     ".": {
       "source": "./src/index.ts"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": "^26"

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 //
-// SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+// SPDX-License-Identifier: AGPL-3.0-only
 
 /**
  * From the engine's spans to Word's paragraphs. The engine reads the document as

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 //
-// SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The pure half of src/help.js against the vocabulary fixture, and every
 // citation the memo uses against the manual slices (constitution VIII).
@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { entry, answer, citation, hasTip, type Answer } from '../src/help.ts';
-import type { Citation, Doc, Manual, Vocab } from '@marque/kit-core/types';
+import type { Citation, Doc, Manual, Vocab } from '@knitli/marque-kit-core/types';
 
 const load = <T>(f: string): T =>
   JSON.parse(readFileSync(new URL(`../../../fixtures/${f}`, import.meta.url), 'utf8')) as T;

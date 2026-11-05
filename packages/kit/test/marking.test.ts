@@ -1,12 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 //
-// SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The parsing half of src/marking.js, run under plain node (no DOM).
 // `node test/marking.test.js`
 import assert from 'node:assert/strict';
 import { layers, tokens, parse, spoken, masked } from '../src/marking.ts';
-import type { Marking } from '@marque/kit-core/types';
+import type { Marking } from '@knitli/marque-kit-core/types';
 
 const cases: [text: string, layers: string[], tokens: string[][]][] = [
   ['(U)', ['(U)'], [['(U)']]],

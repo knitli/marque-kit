@@ -1,9 +1,9 @@
 {
-  "name": "@marque/office-addin",
+  "name": "@knitli/marque-kit-office-addin",
   "version": "0.0.0",
   "private": true,
   "description": "The Office add-in for Word and Outlook: manifest, task pane, and the glue between Office.js, Marque's WASM engine and the kit.",
-  "license": "SEE LICENSE IN LICENSE.md",
+  "license": "AGPL-3.0-only",
   "author": "Knitli Inc.",
   "type": "module",
   "scripts": {
@@ -12,8 +12,8 @@
     "test": "node --conditions=source --test 'test/*.test.ts'"
   },
   "dependencies": {
-    "@marque/kit": "workspace:*",
-    "@marque/kit-core": "workspace:*"
+    "@knitli/marque-kit": "workspace:*",
+    "@knitli/marque-kit-core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

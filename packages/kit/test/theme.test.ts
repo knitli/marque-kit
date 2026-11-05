@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 //
-// SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The pure half of src/theme.js: the contrast measure, and every shipped
 // light and dark pair clearing its floor. `node test/theme.test.js`

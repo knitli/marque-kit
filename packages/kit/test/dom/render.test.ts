@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 //
-// SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The decided rules (CLAUDE.md, "Fixed, by decision") as they reach the DOM, on the memo.
 // `pnpm test` (vp test, happy-dom)
@@ -10,8 +10,8 @@ import { describe, expect, test, vi } from 'vite-plus/test';
 import { render as mark, masked } from '../../src/marking.ts';
 import { artifact, card, gate, mount, pane, receipt, rung, UNDO_MS } from '../../src/render.ts';
 import { why } from '../../src/help.ts';
-import { docView, empty, record, snapshot } from '@marque/kit-core/state';
-import type { Doc, FindingView, Moment } from '@marque/kit-core/types';
+import { docView, empty, record, snapshot } from '@knitli/marque-kit-core/state';
+import type { Doc, FindingView, Moment } from '@knitli/marque-kit-core/types';
 
 // By path: under happy-dom, URL is the page's, and won't open a file.
 const memo = JSON.parse(

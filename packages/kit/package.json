@@ -1,9 +1,8 @@
 {
-  "name": "@marque/kit",
+  "name": "@knitli/marque-kit",
   "version": "0.1.0",
-  "private": true,
   "description": "Marque UI kit: the finding card, decision prompt, pane, inline marks and the theme layer. TypeScript and plain CSS; no framework, no runtime dependencies outside the workspace.",
-  "license": "SEE LICENSE IN LICENSE.md",
+  "license": "AGPL-3.0-only",
   "author": "Knitli Inc.",
   "repository": {
     "type": "git",
@@ -45,13 +44,16 @@
       "default": "./dist/kit.css"
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "vp pack",
     "test": "node --conditions=source --test 'test/*.test.ts' && vp test",
     "prepack": "vp pack"
   },
   "dependencies": {
-    "@marque/kit-core": "workspace:*"
+    "@knitli/marque-kit-core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

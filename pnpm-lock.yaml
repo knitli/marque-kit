@@ -205,10 +205,10 @@ importers:
 
   apps/office-addin:
     dependencies:
-      '@marque/kit':
+      '@knitli/marque-kit':
         specifier: workspace:*
         version: link:../../packages/kit
-      '@marque/kit-core':
+      '@knitli/marque-kit-core':
         specifier: workspace:*
         version: link:../../packages/core
     devDependencies:
@@ -245,7 +245,7 @@ importers:
 
   packages/kit:
     dependencies:
-      '@marque/kit-core':
+      '@knitli/marque-kit-core':
         specifier: workspace:*
         version: link:../core
     devDependencies:

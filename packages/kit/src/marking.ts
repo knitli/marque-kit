@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 //
-// SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+// SPDX-License-Identifier: AGPL-3.0-only
 
 /**
  * Marking — the text primitive (component 2).
@@ -21,7 +21,7 @@
  * No framework. Produces DOM nodes; works in any host that has a document.
  */
 
-import type { Layer, Marking, MarkingLike, Mask, Token, Vocab } from '@marque/kit-core/types';
+import type { Layer, Marking, MarkingLike, Mask, Token, Vocab } from '@knitli/marque-kit-core/types';
 
 /** Options for render(). */
 export interface RenderOptions {

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 //
-// SPDX-License-Identifier: LicenseRef-MarqueCommercialLicense
+// SPDX-License-Identifier: AGPL-3.0-only
 
 /**
  * Help in three tiers, and the vocabulary lookup (docs/COMPONENTS.md, C5 and
@@ -24,7 +24,7 @@
  */
 
 import { render as mark, el, button } from './marking.ts';
-import { answered } from '@marque/kit-core/state';
+import { answered } from '@knitli/marque-kit-core/state';
 import type {
   Citation,
   FindingView,
@@ -35,7 +35,7 @@ import type {
   Tetragraph,
   Trigraph,
   Vocab,
-} from '@marque/kit-core/types';
+} from '@knitli/marque-kit-core/types';
 
 /** What the vocabulary knows about a code. */
 export type Entry =
