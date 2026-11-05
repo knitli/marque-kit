@@ -33,4 +33,4 @@ A manual run (`workflow_dispatch`) defaults to a dry run: it checks, tests, buil
 
 ## When an adapter becomes publishable
 
-Give it a build, a `dist/` in `files`, and a real version, then add its `pnpm --filter … publish` line and `npm pack` line to `publish.yml`, bootstrap it once, and configure its trusted publisher on npmjs.com.
+Give it a build, a `dist/` in `files`, and a real version, then add its `pnpm --filter … pack` line and its `pnpm publish release-assets/…tgz` line to `publish.yml` (pack with pnpm, never `npm pack` — pnpm normalizes `workspace:*`, and the attested tarball must be the published one), bootstrap it once, and configure its trusted publisher on npmjs.com.

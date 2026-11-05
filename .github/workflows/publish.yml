@@ -41,6 +41,7 @@ jobs:
       id-token: write # Sigstore keyless signing for the build attestation
       attestations: write
     outputs:
+      version: ${{ steps.version.outputs.version }}
       publish: ${{ steps.version.outputs.publish }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -89,11 +90,14 @@ jobs:
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
           echo "Version $version; publish=$publish"
 
+      # pnpm pack, not npm pack: pnpm normalizes the workspace:* dependency
+      # to the real version in the packed manifest. These exact tarballs are
+      # attested, published to npm, and attached to the GitHub release.
       - name: Pack tarballs
         run: |
           mkdir -p release-assets
-          npm pack ./packages/core --pack-destination release-assets --silent
-          npm pack ./packages/kit --pack-destination release-assets --silent
+          pnpm --filter @knitli/marque-kit-core pack --pack-destination release-assets
+          pnpm --filter @knitli/marque-kit pack --pack-destination release-assets
           ls -l release-assets
 
       # Sigstore-backed GitHub attestation over the exact tarballs npm receives.
@@ -139,20 +143,26 @@ jobs:
           name: release-assets
           path: release-assets
 
-      # pnpm rewrites the workspace:* dependency and, with id-token: write
-      # and no auth token configured, performs npm trusted publishing.
-      # --provenance emits the Sigstore provenance attestation on npm.
+      # Publish the exact tarballs packed, attested, and signed above —
+      # never a repack of the directories, which would be a different
+      # artifact. With id-token: write and no auth token configured, pnpm
+      # performs npm trusted publishing; --provenance emits the Sigstore
+      # provenance attestation on npm.
       - name: Publish to npm (dry run)
         if: needs.build.outputs.publish != 'true'
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
-          pnpm --filter @knitli/marque-kit-core publish --access public --provenance --no-git-checks --dry-run
-          pnpm --filter @knitli/marque-kit publish --access public --provenance --no-git-checks --dry-run
+          pnpm publish "release-assets/knitli-marque-kit-core-$VERSION.tgz" --access public --provenance --no-git-checks --dry-run
+          pnpm publish "release-assets/knitli-marque-kit-$VERSION.tgz" --access public --provenance --no-git-checks --dry-run
 
       - name: Publish to npm
         if: needs.build.outputs.publish == 'true'
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
-          pnpm --filter @knitli/marque-kit-core publish --access public --provenance --no-git-checks
-          pnpm --filter @knitli/marque-kit publish --access public --provenance --no-git-checks
+          pnpm publish "release-assets/knitli-marque-kit-core-$VERSION.tgz" --access public --provenance --no-git-checks
+          pnpm publish "release-assets/knitli-marque-kit-$VERSION.tgz" --access public --provenance --no-git-checks
 
       - name: Install cosign
         if: needs.build.outputs.publish == 'true' && github.event_name == 'push'
