@@ -9,7 +9,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 The add-in a Word or Outlook user installs. It is an app, not a library: it ships the manifest and the task pane, and glues three things together in the user's own Office:
 
 - **Office.js** reads the document or the message (text, selection, headers, the Purview label) and writes what the person decided. The host applies; the kit never does.
-- **Marque's engine as WASM**, built and published from [knitli/marque-dev](https://github.com/knitli/marque-dev), lints the text in the pane. Spans are UTF-8 byte offsets into that text; mapping them to Word ranges is this app's job.
+- **Marque's engine** runs in the pane and lints the text there. Spans are UTF-8 byte offsets into that text; mapping them to Word ranges is this app's job.
 - **The kit** (`@knitli/marque-kit` in the pane, `@knitli/marque-kit-word` and `@knitli/marque-kit-outlook` in the document, `@knitli/marque-kit-core` in Outlook's send handler) shows the findings and records what the person did.
 
 ## What works
@@ -38,7 +38,7 @@ Word drops the empty paragraphs it is given, so the memo's blank lines don't sur
 
 `pnpm build` writes `dist/` for hosting; the manifest's URLs point at localhost until there is somewhere to host it.
 
-Open questions it will answer:
+Known limitations / Help wanted:
 
 - Whether classic Outlook's send runtime runs WebAssembly. If not, the gate works from the pane's last lint.
 - The hosting page's Content Security Policy must allow WebAssembly to compile (`'wasm-unsafe-eval'`).

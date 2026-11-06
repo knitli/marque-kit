@@ -15,9 +15,8 @@
  *   float(content, anchor, o)   a popover or window: never modal; Escape closes the
  *                               innermost and returns focus to where it came from
  *
- * The kit writes no help text of its own. `vocab` is the engine's vocab JSON
- * (/v1/vocab, crates/capco/src/vocabulary/bulk.rs): { version, trigraphs,
- * tetragraphs, help }. `manual` is the cited sections, sliced at build:
+ * The kit writes no help text of its own. `vocab` is the engine's vocab JSON:
+ * { version, trigraphs, tetragraphs, help }. `manual` is the cited sections, sliced at build:
  * { sections: [{ section, title, pages, text }] }. A token with no entry gets
  * no tooltip; a citation with no section says so rather than showing nothing.
  * Authored words and the manual's words are set apart everywhere (.mq-quote).

@@ -7,7 +7,7 @@
  *
  * Renders a classification marking verbatim, in the mark font, so that it
  * never breaks inside a token and never overflows its container. When the
- * engine supplies layers and tokens (knitli/marque-dev#2634) they are used
+ * engine supplies layers and tokens they are used
  * as-is; until then `parse()` derives them from the string with CAPCO's
  * separators — a fallback, and the reason the engine should emit layers.
  *
@@ -263,7 +263,7 @@ export function render(marking: MarkingLike, o: RenderOptions = {}): HTMLSpanEle
     }
     root.appendChild(L);
   });
-  // masks: typed regions from the engine (knitli/marque-dev#2634)
+  // masks: typed regions from the engine; as the engine emits them, layers and masks apply whole
   // One given by neither span nor layer is drawn at the end, where spoken() says it.
   for (const mask of m.masks) root.querySelectorAll('.mq-l')[layerOf(m, mask)]?.appendChild(maskEl(mask));
   return root;

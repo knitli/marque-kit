@@ -6,14 +6,14 @@
 /// <reference types="vite/client" />
 
 /**
- * The Word task pane: the kit's pane on the sample memo's findings, with no engine.
+ * The Word task pane: the kit's pane on the sample memo's findings, until the engine lints the document.
  * Jump selects a finding's marking in the document; the cursor landing in a
  * paragraph with a finding opens its card (DECISIONS #8). What the person does is
  * written into the document, the banner into the header and footer, and the pane
  * re-lints; taking an act back takes its text out again. Word's own undo of an
  * answer is noticed and recorded as the answer taken back.
  *
- * Not yet: an engine (findings come from fixtures/, re-lints are a stand-in), the
+ * Not yet: the engine (findings come from fixtures/, re-lints are a stand-in), the
  * authority block, help popovers and the lookup (their controls stay inert), the
  * inline marks (packages/word), Outlook.
  */

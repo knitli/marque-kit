@@ -7,9 +7,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 # The model: rungs, state, anchors, hosts, help
 
-The conceptual boards from the first day of design: the attention ladder, the two layers of state, theme vs behavior, where findings attach, the decision prompt, three hosts, tooltips vs popovers, help in three tiers. Later component boards supersede details here; the principles stand.
+All documents and markings in this repo are fictional examples.
 
-_Extracted from the Marque UI kit design canvas (boards: Attention, States, Boundary, Anchors, Decision, Hosts, Tooltips, Help), 21 Oct 2026. The canvas is the visual record; this file is the text the kit is built to. Edit here from now on._
+The concepts from the first day of design: the attention ladder, the two layers of state, theme vs behavior, where findings attach, the decision prompt, three hosts, tooltips vs popovers, help in three tiers. Later component sections supersede details here; the principles stand.
+
+_Design specification for @knitli/marque-kit. Edit here._
 
 
 ---
@@ -367,7 +369,7 @@ Enter or tap: why, and undo.
 Tooltip. The original survives the replacement. Undo lives in the popover, never in the tooltip. | Alternative
 advisory · blue
 
-The valid result, the likely intent, and one action. The first thing on this board with a button.
+The valid result, the likely intent, and one action. The first thing on this surface with a button.
 
 (S//REL TO USA, GBR)
 
@@ -408,7 +410,7 @@ Card. Answer opens the full question — here, or in the pane; the host chooses.
 ---
 
 ## Help in three tiers — Marque's words first, the manual's words quoted, the full passage on the reading surface
-The help data carries two kinds of text held to two bars: authored plain language, and verbatim quotes pinned to CAPCO-2016. The reader must always be able to tell which is which. Shown for NF.
+The help data carries two kinds of text held to two bars: authored plain language, and verbatim quotes pinned to CAPCO-2016. CAPCO-2016 passages are U.S. Government work in the public domain. The reader must always be able to tell which is which. Shown for NF.
 
 | Tier 1 · what it means
 |
@@ -448,7 +450,6 @@ The manual says
 CAPCO-2016 §H.8 · p. 145
 
 "NOFORN is an explicit foreign release marking used to indicate the information may not be released in any form to foreign governments, foreign nationals, foreign organizations, or non-US citizens without permission of the originator and in accordance with provisions of, ICD 403, NDP-1, and implementation guidance in this document."
-Sponsor and basis: DNI / National Security Act of 1947, as amended, §103 (c)(5)
 
 Read the full passage
 
@@ -488,7 +489,6 @@ Verbatim
 
 "NOFORN is an explicit foreign release marking used to indicate the information may not be released in any form to foreign governments, foreign nationals, foreign organizations, or non-US citizens without permission of the originator and in accordance with provisions of, ICD 403, NDP-1, and implementation guidance in this document."
 [The §H.8 NOFORN section — the manual sliced at build and keyed to this citation, a page or two, rendered from its markdown. The view lands on the quoted sentence above, highlighted, with the section around it. Emphasis is the manual's own.]
-Sponsor and basis: DNI / National Security Act of 1947, as amended, §103 (c)(5)
 
 
 

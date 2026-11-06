@@ -1,6 +1,6 @@
 {
   "schema": "marque-kit-contract/0.1",
-  "note": "Hand-written in the shape the kit wants (docs/CONTRACT.md). Rule predicate ids are illustrative until wired to the catalog. Spans are byte offsets into fixtures/memo.txt. This is the oracle the kit renders until the engine emits it (knitli/marque-dev#2633).",
+  "note": "Hand-written oracle in the kit contract shape (docs/CONTRACT.md). All documents and markings are fictional examples.",
   "source": "fixtures/memo.txt",
   "document": {
     "ready": false,
@@ -155,7 +155,7 @@
           "classified_by": {
             "state": "known",
             "source": "identity",
-            "value": "J. Doe, Analyst, DIA/XX",
+            "value": "J. Doe, Analyst, EXAMPLE",
             "hint": "From your Marque identity. Change it only if someone else made this classification decision."
           },
           "derived_from": {

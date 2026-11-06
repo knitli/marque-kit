@@ -8,7 +8,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 ## Welcome to Marque Kit!
 
-Thanks for wanting to help make Marque Kit better! Before you start, please read this. If anything’s unclear, [email Knitli](mailto:knitli@knitli.com) or post in the [forum](https://github.com/knitli/marque-kit/discussions). (Right now, Adam *is* Knitli.)
+Thanks for wanting to help make Marque Kit better! Before you start, please read this. If anything’s unclear, [email Knitli](mailto:knitli@knitli.com) or post in the [forum](https://github.com/knitli/marque-kit/discussions).
 
 ---
 

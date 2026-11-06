@@ -7,9 +7,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 # The theme layer
 
+All documents and markings in this repo are fictional examples.
+
 Tokens, the switch, fit, shapes, states, long markings, and the contrast audit. The source of truth for values is `packages/kit/src/theme.css` (v0.4); this file is the rationale and the rules. Light is the default theme (decided 16 Oct 2026).
 
-_Extracted from the Marque UI kit design canvas (boards: Theme, ThemeTokens, Fit, ThemeStates, LongMarkings, Contrast), 21 Oct 2026. The canvas is the visual record; this file is the text the kit is built to. Edit here from now on._
+_Design specification for @knitli/marque-kit. Edit here._
 
 
 ---
@@ -473,10 +475,10 @@ Padding and gaps are multiples of one unit. Type sizes are not — they have flo
 Marque · session receipt · 2026-10-13
 Paragraph 2 — comma added
 (S//REL TO USA, FVEY)was (S//REL TO USA FVEY)
-CAPCO-2016 §H.8 p151 · applied by the engine · classifier J. Doe
+CAPCO-2016 §H.8 p151 · applied by the engine · classifier A. Example
 Paragraph 3 — kept as written, reported
 (//JOINT S AUS GBR//REL TO USA, GBR)
-Open question: who produced this information. Deferred to finalize by J. Doe.
+Open question: who produced this information. Deferred to finalize by A. Example.
 
 Black on white, no fills, no shadow, buttons gone. The shapes carry the states: the underline says changed, the double rule says a person still has to look. Stacked markings stay stacked, so a printed banner reads layer by layer. |
 
@@ -484,7 +486,7 @@ Black on white, no fills, no shadow, buttons gone. The shapes carry the states: 
 ---
 
 ## Long markings — the plan
-Coalition building puts twenty countries in a REL list on a portion, and ten JOINT members get listed twice. Marque accepts up to 4,096 bytes — a little more than the longest lawful marking. Stacking alone makes a 320px pane a wall of OCR-B. So one marking has four forms, each for a place; the full form is always one click away and is the only one copy, audit and print ever carry.
+Coalition building puts twenty countries in a REL list on a portion, and ten JOINT members get listed twice. Anything past ~1000 bytes goes to the full form in a popover. Stacking alone makes a 320px pane a wall of OCR-B. So one marking has four forms, each for a place; the full form is always one click away and is the only one copy, audit and print ever carry.
 
 How long is long at 320px, the width of Word's task pane
 Five Eyes portion
@@ -495,9 +497,9 @@ Twelve-nation coalition portion
 126
 characters · 6 lines stacked. Common around the start of a conflict; three readings of it make eighteen lines.
 (//JOINT S AUS BEL CAN DEU DNK FRA GBR ITA NLD NOR POL USA//REL TO USA, AUS, BEL, CAN, DEU, DNK, FRA, GBR, ITA, NLD, NOR, POL)
-Marque's cap
-4,096
-bytes · ~170 lines stacked. Drawn a little past the longest marking the grammar allows; it will not occur, but the kit must not fall over if it does. Never rendered inline — the row says so in words and the popover scrolls.
+Very long
+~1,000
+bytes · ~40 lines stacked. Never rendered inline — the row says so in words and the popover scrolls.
 Why not just stack. Stacking is correct and complete, and in a card it is the right answer up to about four lines. Past that the marking stops being read and starts being skipped — the opposite of what a decision card is for.
 Why not cut. A marking is what the person is verifying. Anything that looks like the marking but isn't the whole marking is a lie in OCR-B. So every fold is visibly a fold, in a different face and color, and opens in place.
 Four forms of one marking light, then dark
@@ -566,7 +568,7 @@ Readings compared layer by layer. The layer that differs is always full and tint
 2A fold is never marking text. It is UI type, act-ink, dotted — the "can act" shape — and it names a count. It happens only at a list boundary, after the heading and the first three codes. In the document itself the kit never folds; the host's text is the host's.
 3In a decision, a fold never hides a difference. Readings are compared layer by layer; a layer that differs is always full and tinted. Only a layer identical in every reading may fold, and its label says so.
 4Rows and strips summarize when the stacked form would pass three lines: first layer verbatim, long lists as heading plus a count badge with first and last code.
-5Pathological markings — the engine's PathologicalMarking, or anything past about 1,000 bytes — never render inline. The row says "a marking too long to show here"; the popover shows it and scrolls.
+5Markings too long to examine — anything past about 1,000 bytes — never render inline. The row says "a marking too long to show here"; the popover shows it and scrolls.
 6Within a layer, break after a list comma first, between tokens next, before a slash last; never inside a token. Every continuation line carries a one-character hanging indent. | Where each form shows
 
 placefullfoldedsummarydiff
@@ -578,7 +580,7 @@ Why? popover · derivationalways———
 Audit receipt · print · copyalwaysnevernevernever
 Pathological (> ~1,000 bytes)popover only—row says so—
 
-What the engine should emit for this to work without guessing: every marking as layered tokens (the kit never re-parses a string), and for each reading the layer or axis that differs from the others — AlternativeDescriptor already knows it is the ownership axis. Both are logged in the observations doc. |
+What the kit needs for this to work without guessing: every marking as layered tokens (the kit never re-parses a string), and for each reading the layer that differs from the others — the engine reports the differing layer. |
 
 
 ---
