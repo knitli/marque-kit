@@ -4,7 +4,7 @@ SPDX-FileCopyrightText: 2026 Knitli Inc.
 SPDX-License-Identifier: AGPL-3.0-only
 -->
 
-# AGENTS.md
+# CLAUDE.md
 
 Guidance for working in this repo. The kit is the human-facing half of Marque; the engine is a separate Knitli project. The kit contract in docs/CONTRACT.md is the public boundary.
 
@@ -51,14 +51,14 @@ Every example in the docs and the demo uses the same six paragraphs. Keep it tha
 
 All documents and markings in this repo are fictional examples.
 
-| ¶   | As written                             | Finding                                                                        | Rung                       |
-| --- | -------------------------------------- | ------------------------------------------------------------------------------ | -------------------------- |
-| 1   | `(U)`                                  | —                                                                              | —                          |
-| 2   | `(S//REL TO USA FVEY)`                 | comma added (§H.8 p151)                                                        | Noticeable                 |
-| 3   | `(//JOINT S AUS GBR//REL TO USA, GBR)` | ownership question, three readings + fallback (§H.3 p55)                       | Action required / Blocking |
-| 4   | none                                   | portion mark absent (§C p25); only the author knows                            | Action required / Blocking |
-| 5   | `(S//NF/REL TO USA, GBR)`              | NOFORN kept, REL TO offered back (§H.8 p145); banner becomes NOFORN (§H.3 p57) | Advisory                   |
-| 6   | `(C//REL TO USA,  GBR)`                | extra space removed                                                            | Quiet                      |
+| ¶ | As written | Finding | Rung |
+|---|---|---|---|
+| 1 | `(U)` | — | — |
+| 2 | `(S//REL TO USA FVEY)` | comma added (§H.8 p151) | Noticeable |
+| 3 | `(//JOINT S AUS GBR//REL TO USA, GBR)` | ownership question, three readings + fallback (§H.3 p55) | Action required / Blocking |
+| 4 | none | portion mark absent (§C p25); only the author knows | Action required / Blocking |
+| 5 | `(S//NF/REL TO USA, GBR)` | NOFORN kept, REL TO offered back (§H.8 p145); banner becomes NOFORN (§H.3 p57) | Advisory |
+| 6 | `(C//REL TO USA,  GBR)` | extra space removed | Quiet |
 
 Banner derived: `SECRET//FGI AUS GBR//NOFORN`, or `…//REL TO USA, GBR` if ¶5's alternative is taken. CAB: Classified By known from identity; Derived From blank; Declassify On waits on Derived From.
 
@@ -80,7 +80,7 @@ Banner derived: `SECRET//FGI AUS GBR//NOFORN`, or `…//REL TO USA, GBR` if ¶5'
 ## Working here
 
 - `pnpm check` (format, lint, typecheck) and `pnpm test` (in each package, node runs `test/*.test.ts` as written; in the kit, `vp test` runs `test/dom/` under happy-dom, DECISIONS #21) before a commit. A rule that shows in the DOM gets a test in `packages/kit/test/dom/render.test.ts`. `pnpm fix` formats. `pnpm build` writes each package's `dist/`. Workspace packages import each other by name; the `source` export condition points them at `src/`, so tests, typecheck and the demo run on source. `pnpm demo` to look. Markdown and the two extracted fixtures aren't formatted: a renumbered list changes what a doc says. CI (`.github/workflows/ci.yml`) runs check, test and build on every PR and push to `main`.
-- Check contrast when a token changes: the pairs and floors are `PAIRS` and `SIZES` in `packages/kit/src/theme.ts`, stated at the bottom of `packages/kit/src/theme.css` (`mq.theme.check`). AA 4.5 on text pairs, 3.0 on lines and focus.
+- Check contrast when a token changes: the pairs and floors are `PAIRS` and `SIZES` in `packages/kit/src/theme.ts`, stated at the bottom of `packages/kit/src/theme.css` (`mq.theme.check`). AA 4.5 on text pairs, 3.0 on lines and focus. `packages/kit/test/theme.test.ts` fails when `kit.css` or `theme.css` paints a pairing that isn't measured there or excused in the test with a reason; a new color use means deciding which.
 - The docs under `docs/` are the source of truth. Design specification for `@knitli/marque-kit`. Edit here.
 - Engine gaps are tracked as issues and get a row in `docs/ENGINE-ASKS.md`.
 - SPDX header on every file: `SPDX-FileCopyrightText: 2026 Knitli Inc.` / `SPDX-License-Identifier: AGPL-3.0-only`. A file that can't carry a comment (JSON, lockfiles, `memo.txt`) goes in `REUSE.toml`. CI runs `reuse lint`.
