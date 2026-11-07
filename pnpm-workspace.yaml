@@ -7,11 +7,13 @@ packages:
   - apps/*
 
 catalog:
-  '@types/node': ^26.6.0
-  '@types/office-js': ^1.0.600
+  '@types/node': ^26.6.6
+  '@types/office-js': ^1.0.615
   happy-dom: 21.0.4
-  vite: npm:@voidzero-dev/vite-plus-core@1.3.0
-  vite-plus: 1.3.0
+  # `vite` is an alias for vite-plus-core and must track `vite-plus` exactly:
+  # two core copies break typecheck with duplicate UserConfig identities.
+  vite: npm:@voidzero-dev/vite-plus-core@1.4.0
+  vite-plus: 1.4.0
   typescript: ^7.0.2
 overrides:
   vite@*: 'catalog:'
