@@ -8,7 +8,7 @@
  * - Send is the gate: OnMessageSend holds the message. That handler may run without a DOM,
  *   so the gate imports @knitli/marque-kit-core only, never @knitli/marque-kit.
  * - Classification headers and the subject are places a marking appears: read, checked, written.
- * - The Purview label read and checked against the banner; the mapping is the tenant's configuration.
+ * - Classification-label handling (not built yet).
  *
  * Not built yet: this package holds the place.
  */

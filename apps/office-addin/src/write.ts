@@ -113,7 +113,7 @@ export const made = (doc: Doc, state: State): Doc => docView(doc, { ...writable(
  * overlays those itself. Artifacts follow the findings, so a banner moves with the alternatives taken.
  * Always from Marque's first lint, never from the last re-lint: taking an alternative back restores
  * what it replaced. What blocks is what still needs a person.
- * shortcut: a stand-in for the engine's re-lint; it goes when the WASM engine lints the document.
+ * shortcut: a stand-in for the engine's re-lint; it goes when the engine lints the document.
  */
 export function relint(doc: Doc, all: State): Doc {
   const state = writable(doc, all);

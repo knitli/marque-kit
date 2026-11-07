@@ -139,7 +139,7 @@ assert.equal(rung(view(p2b, see(empty(), f(P2)))), 'noticeable');
 
 // The CAB: Derived From filled → Declassify On opens → both filled → no longer blocks.
 const cab = art(doc, 'a-cab');
-s = record(empty(), 'a-cab', 'answered', { fields: { derived_from: 'DIA SCG 2024-01, 20240115' } });
+s = record(empty(), 'a-cab', 'answered', { fields: { derived_from: 'Example Guide 2024-01, 20240115' } });
 const cv = view(cab, s);
 assert.equal(cv.fields!.derived_from!.state, 'known');
 assert.equal(cv.fields!.declassify_on!.state, 'blank', 'a field waiting on a filled one becomes fillable');
@@ -293,7 +293,7 @@ assert.equal(w.about!.as_written, f(P3).marking!.as_written!.text);
 // A derived field counts as filled.
 const derivedCab: ArtifactView = {
   ...cab,
-  fields: { ...cab.fields!, derived_from: { state: 'derived' as const, value: 'DIA SCG 2024-01' } },
+  fields: { ...cab.fields!, derived_from: { state: 'derived' as const, value: 'Example Guide 2024-01' } },
 };
 assert.equal(view(derivedCab, empty()).fields!.declassify_on!.state, 'blank');
 assert.equal(
@@ -429,11 +429,11 @@ assert.equal(
 }
 // A correction to a filled field is of the value the lint gave; a new value there drops it.
 {
-  const s = record(empty(), 'a-cab', 'answered', { fields: { classified_by: 'J Roe' } }, undefined, snapshot(cab));
-  assert.equal(view(cab, s).fields!.classified_by!.value, 'J Roe');
+  const s = record(empty(), 'a-cab', 'answered', { fields: { classified_by: 'J. Example' } }, undefined, snapshot(cab));
+  assert.equal(view(cab, s).fields!.classified_by!.value, 'J. Example');
   const moved = {
     ...cab,
-    fields: { ...cab.fields!, classified_by: { ...cab.fields!.classified_by!, value: 'Jane Roe' } },
+    fields: { ...cab.fields!, classified_by: { ...cab.fields!.classified_by!, value: 'J. Example, Analyst' } },
   };
   assert.equal(view(moved, s).stale, true);
 }

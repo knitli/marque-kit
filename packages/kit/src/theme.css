@@ -13,14 +13,13 @@
      4. SHAPES   — the four shapes that carry meaning, on text and on cards.
      5. STATES & SURROUNDINGS — controls, layers, print, forced colors,
                    reduced motion, and the contrast gate.
-   Values are Knitli's (tokens.json, Oct 2026), vendored. The kit depends on
+   Values vendored from Knitli's design tokens (Oct 2026). The kit depends on
    Knitli's values, not on its component bundle. Where a value departs from
    Knitli it says so and why. Parts 3–5 are the kit's and not overridable.  */
 
 /* ═══ 1 · TOKENS ══════════════════════════════════════════════════════ */
 
-/* Light — the default, and what a Word or Outlook pane looks like.
-   Knitli calls this the Reference surface.                                 */
+/* Light — the default, and what a Word or Outlook pane looks like.        */
 .mq,
 [data-mq-theme='light'] {
   /* ground and surfaces */
@@ -89,7 +88,7 @@
   color-scheme: light;
 }
 
-/* Dark — Marque's own chrome. Knitli calls this the Instrument surface.    */
+/* Dark — Marque's own chrome.                                                  */
 [data-mq-theme='dark'] {
   --mq-ground: #262d28;
   --mq-surface: #2e3630;
@@ -291,7 +290,7 @@
               across every reading may fold, and the fold says so
               ("+9 more · same in every reading"). A fold never hides a
               difference.
-   Pathological (the engine's PathologicalMarking, or past ~1000 bytes):
+   Pathological (an oversized marking, or past ~1000 bytes):
    cards never render it inline; the row says so in words and opens the
    popover, which scrolls. In the document itself the kit draws nothing but
    the inline shape — the host's text is the host's.                        */

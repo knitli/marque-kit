@@ -32,7 +32,7 @@ export interface Layer {
   tokens: Token[];
 }
 
-/** A marking as the engine emits it (knitli/marque-dev#2634), layers and masks whole. */
+/** A marking as the engine emits it: layers and masks apply whole. */
 export interface Marking {
   text: string;
   layers: Layer[];
@@ -335,7 +335,7 @@ export interface Tetragraph {
   members?: string[];
 }
 
-/** The engine's vocab JSON (/v1/vocab). */
+/** The engine's vocab JSON. */
 export interface Vocab {
   schema?: string;
   note?: string;

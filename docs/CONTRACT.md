@@ -7,9 +7,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 # The finding contract
 
-The shape of a finding the kit consumes and the engine builds to. Each slot has a definition, a "Today:" note on what the lint wire carries now, who supplies it (M = Marque, K = kit, H = host) and who reads it (U = shown to the person, (U) = on request, I = integrator only). Engine-side asks that fall out of this are filed under knitli/marque-dev#2633.
+All documents and markings in this repo are fictional examples.
 
-_Extracted from the Marque UI kit design canvas (boards: Artboard-61c3), 21 Oct 2026. The canvas is the visual record; this file is the text the kit is built to. Edit here from now on._
+The shape of a finding the kit consumes and the engine builds to. Each slot has a definition, a note on what the lint wire carries now, who supplies it (M = Marque, K = kit, H = host) and who reads it (U = shown to the person, (U) = on request, I = integrator only). Engine-side asks that fall out of this are tracked internally.
+
+_Design specification for @knitli/marque-kit. Edit here._
 
 
 ---
@@ -21,7 +23,7 @@ Marque emits semantics: what it saw, said, did, asks, and whether a person is ne
 ### A · Identity and place
 **id**
 Stable across re-lints while the marking and its place survive. The key for host state, deferrals, and withdrawing a stale question.
-Today: none — findings are keyed by rule + span, and spans move with every keystroke above them.
+Not yet emitted: findings are keyed by rule + span, and spans move with every keystroke above them.
 _M · I_
 **rule**
 **severity**
@@ -31,13 +33,13 @@ Today: rule · severity · basis, as is.
 _M · I_
 **anchor**
 { kind: span | portion | page | document | bundle, span?, portion? } — the thing that owns the requirement. A missing mark anchors to its portion; a CAB to the document; a correction to its span.
-Today: span + candidate_span on findings; scope + an optional span on document artifacts. Same facts, two shapes.
+Not yet emitted in this shape: span + candidate_span on findings; scope + an optional span on document artifacts. Same facts, two shapes.
 _M · I_
 **marking**
 **.as_written**
 **.shape**
 (//JOINT S AUS GBR//REL TO USA, GBR)
-The recognized marking, in full; a masked shape where parts are unrecognized. Marque says it, so every surface shows the same thing. Today: the host reads the span itself; recognized_canonical exists only on decoder findings.
+The recognized marking, in full; a masked shape where parts are unrecognized. Marque says it, so every surface shows the same thing. Not yet emitted: today the host reads the span itself.
 _M · U_
 
 ### B · What Marque says
@@ -56,19 +58,19 @@ _M · (U) · I_
 ### C · What Marque did, or could
 **outcome.kind**
 choices — applied · available · chosen_over · choices · needs_fact · withheld · covered_by
-One word for what happened. Today: read fix, alternatives, withholding_reason and sibling_repair together to work it out — board 1b has the mapping.
+One word for what happened. Not yet emitted: DERIVATION.md Table 1 has the mapping.
 _M · I_
 **outcome.result**
 **outcome.because**
 The marking after the repair, rendered — and, for a chosen reading, why it won: manual_prescribed · page_sibling · authored_token · most_restrictive, the protective tie-break that is explicitly not a claim about intent.
-Today: ranking_evidence exists; the result marking renders only at fix time for structural repairs. The card needs it at lint time.
+Not yet emitted at lint time: the result marking renders only at fix time for structural repairs, and the card needs it at lint time.
 _M · U_
 **outcome**
 .readings[]
 jointly_owned — produced by the U.S., the UK and Australia together → (//JOINT S AUS GBR USA//REL TO USA, AUS, GBR)
 foreign_owned — produced by the UK and Australia, without the U.S. → (//AUS GBR S//REL TO USA, AUS, GBR)
 [new value] — British, with some Australian information → (//GBR S//FGI AUS//REL TO USA, GBR)
-Each lawful reading: { asserts, text, result }. Today: alternatives[] carry asserts and text but not the marking they produce; the third reading has no asserts value.
+Each lawful reading: { asserts, text, result }. Not yet emitted: alternatives carry asserts and text but not the marking they produce; the third reading has no asserts value.
 _M · U · I_
 **outcome.reason**
 **outcome.covered_by**
@@ -82,16 +84,16 @@ _M · I_
 asks.options[]
 **asks.field**
 ownership — "Who collected or produced this information?" — options are the readings above; or a field to fill (a date). The kit always appends "I don't know, or it's not my call."
-Kinds: ownership · source_disclosure · compartment · document_date · date_reading · confirm_intent. The question is semantic — the fact Marque lacks — so Marque writes it. Today: lint_decision.options and prompt carry the pieces; nothing carries the question.
+Kinds: ownership · source_disclosure · compartment · document_date · date_reading · confirm_intent. The question is semantic — the fact Marque lacks — so Marque writes it. Not yet emitted as one field: options and a date prompt carry the pieces; nothing carries the question.
 _M · U_
 **needs_person**
 **blocks**
 required · finalize — needs_person: none · optional · required; blocks: never · finalize · now
-The two semantic halves of attention. Whether a person is needed and whether an open finding stops finalize are Marque's to say; when is the host's. Today: derivable from the outcome, not emitted — and every host would derive it differently.
+The two semantic halves of attention. Whether a person is needed and whether an open finding stops finalize are Marque's to say; when is the host's. Not yet emitted: derivable from the outcome — and every host would derive it differently.
 _M · I_
 depends_on[]
 Ids whose answer may change this finding's value. The banner's result waits on paragraph 3.
-How the pane says "computed now; may change" without inventing a fourth confidence state. Today: in the decision trace's cascade chains, not on the lint wire.
+How the pane says "computed now; may change" without inventing a fourth confidence state. Not yet emitted on the lint wire.
 _M · I_
 
 ### E · The document, per lint
@@ -100,7 +102,7 @@ _M · I_
 **.ready**
 **.blocking[]**
 Each artifact: { kind, scope, state, derived, placement, depends_on }. ready is true when nothing needs a person and nothing absent-but-required remains; blocking lists why not. Re-evaluated at finalize — a lint, not a memory.
-Today: artifacts carry kind, scope, the five-state presence × requirement, derived_value and placement — this part is close. Nothing carries ready or blocking.
+Partly emitted: artifacts carry kind, scope, the five-state presence × requirement, derived_value and placement — this part is close. Nothing carries ready or blocking yet.
 _M · U · I_
 
 ### F · Never on Marque's wire — the kit's state, keyed by id
@@ -118,7 +120,7 @@ The host's half of the ladder, persisted by the host, read by the pane, the stam
 _K · H · I_
 **attention**
 **action**
-action required = needs_person × blocks × the host's moment × seen. Board 1b is the function.
+action required = needs_person × blocks × the host's moment × seen. DERIVATION.md Table 2 is the function.
 Answer
 Ask me at finalize
 Actions follow outcome.kind: applied → undo · available → apply · chosen_over → switch · choices or needs_fact → answer, defer · withheld → none, or the host's own edit.
@@ -129,7 +131,7 @@ _K · U_
 The kit records; the host writes; Marque re-lints. `packages/core/src/state.ts` and `mount()` in `packages/kit/src/render.ts` implement this; the tests in `packages/core/test/state.test.ts` are its examples.
 
 **The state.** Plain JSON the host persists whole: `{ log, seen, linted }`.
-- `log` is append-only: `{ id, act, value, at, about }`. `act` is one of answered · changed · kept_as_written · deferred · declined (marque-dev#2643). A `changed` with a null value takes the last decision back to Marque's result. `about` is a snapshot of what the act was about: rule, place, the marking as written, Marque's outcome and question. Markings and Marque's words only, never body text.
+- `log` is append-only: `{ id, act, value, at, about }`. `act` is one of answered · changed · kept_as_written · deferred · declined. A `changed` with a null value takes the last decision back to Marque's result. `about` is a snapshot of what the act was about: rule, place, the marking as written, Marque's outcome and question. Markings and Marque's words only, never body text.
 - `seen` is `[{ id, result }]`. Seeing is of a result, not an id, so a new result under a stable id is unseen again.
 - `linted` is how many log lines the current lint already reflects.
 
@@ -146,7 +148,7 @@ The kit records; the host writes; Marque re-lints. `packages/core/src/state.ts` 
 
 **After step 3** the new findings are the truth.
 - Edits before the checkpoint no longer overlay, so a renewed question under the same id is open again.
-- Overrides, deferrals and declines still overlay, because the engine has no shape for them yet (#2643).
+- Overrides, deferrals and declines still overlay, because the engine has no shape for them yet (tracked internally).
 - An override holds only while the as-written marking and Marque's result match its snapshot.
 - Acts on ids the lint no longer lists move to `document.withdrawn` for the receipt, with their snapshots. They are never pending.
 

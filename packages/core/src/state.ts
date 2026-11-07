@@ -15,7 +15,7 @@
  * The log is append-only. Changing an answer adds a line and never rewrites
  * one, so the receipt shows both answers (docs/COMPONENTS.md, "Answered").
  *
- * Acts are a closed vocabulary (knitli/marque-dev#2643):
+ * Acts are a closed vocabulary:
  *   answered         a reading picked or a value typed for a question or a field
  *   changed          an advisory alternative taken or an answer changed;
  *                    value null puts the finding back to what Marque said
@@ -28,8 +28,8 @@
  * from being ready until the host applies it and re-lints. `linted` counts the
  * log lines the current lint already reflects; answers before it are the
  * engine's to report now, so they are never replayed over a newer finding.
- * Overrides, deferrals and declines have no engine shape yet (#2643) and
- * always overlay.
+ * Overrides, deferrals and declines have no engine shape yet — tracked internally —
+ * and always overlay.
  */
 
 import type {

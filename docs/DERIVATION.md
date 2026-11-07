@@ -7,9 +7,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 # Attention: needs_person × blocks × moment → rung
 
+All documents and markings in this repo are fictional examples.
+
 Attention lives in the kit, computed from the engine's facts (decision, 16 Oct 2026). Table 1 maps every engine outcome to the contract's three semantic fields; Table 2 is the whole function from those fields plus the host's moment to one of five rungs: Quiet, Noticeable, Advisory, Action required, Blocking. Matrix A says which slots each rung shows; Matrix B what each anchor kind carries. This file is the published spec for that derivation.
 
-_Extracted from the Marque UI kit design canvas (boards: Derive, Matrices), 21 Oct 2026. The canvas is the visual record; this file is the text the kit is built to. Edit here from now on._
+_Design specification for @knitli/marque-kit. Edit here._
 
 
 ---
@@ -19,20 +21,20 @@ Table 1 maps every outcome the engine produces today onto the contract's three s
 
 | Today's outcome | outcome.kind | needs_person | blocks | Rung while drafting → at finalize |
 |---|---|---|---|---|
-| Determined, promoted — severity promote-eligible, confidence at or above threshold | applied | none | never | Quiet. Noticeable when the marking visibly changed, until seen. |
-| Determined, not promoted — severity suggest, or the host chose user-mediated application | available | optional | finalize if severity is error; else never | Advisory → Blocking only when an error was left unapplied. |
-| Ranked — manual_prescribed · page_sibling · authored_token, chosen promoted | chosen_over | optional | never | Noticeable; the runners-up on request. |
-| Ranked — most_restrictive | chosen_over | optional | never | Advisory. The safe reading was taken and intent is unknown — exactly the blue dotted case. |
-| Plural — several lawful readings, none ranked | choices | required | finalize | Action required → Blocking. The JOINT case ships here today. |
-| Withheld(classifier_judgment) with options or a prompt | needs_fact | required | finalize | Action required → Blocking. |
-| Withheld(classifier_judgment) with nothing to choose from | needs_fact | required | finalize | Action required → Blocking. Decide: can the person type a free answer, or only acknowledge? |
-| Withheld(advisory) — acting automatically would be wrong; may be work in progress | withheld | optional | never | Advisory. Never blocks — "the warning stands permanently." |
-| Withheld(caller_edit) — the remedy is an edit outside the engine | withheld | host decides: none if the host performs it, else required | finalize if severity is error | Quiet when the host does the edit; Action required when it can't. |
-| Withheld(policy_hold) · Withheld(capability_disabled) | withheld | none | never | Noticeable (info): kept on purpose · needs a setting an administrator owns. |
-| Withheld(not_built) · Withheld(fail_closed_guard) | withheld | none | never | Noticeable at most. not_built should never reach a person. |
-| Withheld(pathological_marking) — too large to examine | withheld | required | finalize | Noticeable → Action required. Decide: a marking Marque couldn't read should not go out unexamined. |
-| severity critical — a system-policy violation | withheld | required (an administrator) | now | Blocking immediately. Never auto-fixes; stops the fix pass. |
-| sibling_repair — another finding's repair covers this span | covered_by | the owner's | the owner's | Collapsed into the owner's card. One span, one card. |
+| Determined, promoted | applied | none | never | Quiet. Noticeable when the marking visibly changed, until seen. |
+| Determined, not promoted | available | optional | finalize if an error was left unapplied; else never | Advisory → Blocking only when an error was left unapplied. |
+| Ranked — prescribed or chosen promoted | chosen_over | optional | never | Noticeable; the runners-up on request. |
+| Ranked — most restrictive | chosen_over | optional | never | Advisory. The safe reading was taken and intent is unknown — exactly the blue dotted case. |
+| Plural — several lawful readings, none ranked | choices | required | finalize | Action required → Blocking. The JOINT case sits here. |
+| Withheld — needs a fact, with options or a prompt | needs_fact | required | finalize | Action required → Blocking. |
+| Withheld — needs a fact, with nothing to choose from | needs_fact | required | finalize | Action required → Blocking. Decide: can the person type a free answer, or only acknowledge? |
+| Withheld — acting automatically would be wrong; may be work in progress | withheld | optional | never | Advisory. Never blocks — "the warning stands permanently." |
+| Withheld — the remedy is an edit outside the engine | withheld | host decides: none if the host performs it, else required | finalize if an error is unapplied | Quiet when the host does the edit; Action required when it can't. |
+| Withheld — kept on purpose · needs a setting an administrator owns | withheld | none | never | Noticeable (info): kept on purpose · needs a setting an administrator owns. |
+| Withheld — internal guard | withheld | none | never | Noticeable at most. It should never reach a person. |
+| Withheld — too large to examine | withheld | required | finalize | Noticeable → Action required. Decide: a marking Marque couldn't read should not go out unexamined. |
+| Critical system-policy violation | withheld | required (an administrator) | now | Blocking immediately. Never auto-fixes. |
+| Covered — another finding's repair covers this span | covered_by | the owner's | the owner's | Collapsed into the owner's card. One span, one card. |
 | Artifact absent-but-required, fixable — a derived value and a placement exist | available → applied | none once the host places it; optional until then | finalize | Quiet when placed; "before you finalize" when the host can't place it. |
 | Artifact absent-but-required, flag-only — no edge can derive a value | needs_fact | required | finalize | "Before you finalize" → Blocking. The CAB with blanks lives here. |
 | Artifact present-non-canonical | applied / available | none | never | Noticeable. |

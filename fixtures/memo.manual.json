@@ -1,6 +1,6 @@
 {
  "schema": "marque-manual-fixture-1",
- "note": "The CAPCO-2016 sections the memo cites, sliced by page from crates/capco/docs/CAPCO-2016.md by fixtures/extract.py. Every quote the memo uses was found in its section when this was generated.",
+ "note": "The CAPCO-2016 sections the memo cites, sliced by page from the CAPCO-2016 manual (U.S. Government, public domain) by fixtures/extract.py. Every quote the memo uses was found in its section when this was generated. All markings are fictional examples.",
  "source": "capco_2016",
  "sections": [
   {

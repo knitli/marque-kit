@@ -117,7 +117,9 @@
       </aside>
     </div>
 
+    <!-- All documents and markings in this repo are fictional examples. -->
     <script type="module">
+      // All documents and markings in this repo are fictional examples.
       import { render as mark, settle } from '../packages/kit/src/marking.ts';
       import { mount, gate, receipt, derivation, markClass } from '../packages/kit/src/render.ts';
       import { why, explain, passage, lookup, float, tips } from '../packages/kit/src/help.ts';
@@ -326,7 +328,9 @@
         const v = p.view();
         const moment = p.host.moment;
         $('#gate').replaceChildren(moment !== 'editing' ? gate(v, p.host) : '');
-        $('#receipt').replaceChildren(receipt(v, { schema: 'marque-3.44', classifier_id: 'J. Doe, Analyst, DIA/XX' }));
+        $('#receipt').replaceChildren(
+          receipt(v, { schema: '[schema/version]', classifier_id: 'J. Doe, Analyst, EXAMPLE' }),
+        ); // illustrative values
         page(v);
       }
       function setMoment(m) {
