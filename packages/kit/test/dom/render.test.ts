@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-only
 
-// The decided rules (CLAUDE.md, "Fixed, by decision") as they reach the DOM, on the memo.
+// The decided rules (docs/DECISIONS.md) as they reach the DOM, on the memo.
 // `pnpm test` (vp test, happy-dom)
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

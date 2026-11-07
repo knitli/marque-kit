@@ -19,7 +19,7 @@ const https = existsSync(join(certs, 'localhost.crt'))
 // The pane runs inside Word, where its console is out of reach. In dev it posts what it logs to
 // /__log, and this appends it to .dev.log beside the config, one JSON line per call.
 const devLog: Plugin = {
-  name: 'marque-dev-log',
+  name: 'kit-dev-log',
   apply: 'serve',
   configureServer(server) {
     server.middlewares.use('/__log', (req, res) => {

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 // The pure half of src/help.js against the vocabulary fixture, and every
-// citation the memo uses against the manual slices (constitution VIII).
+// citation the memo uses against the manual slices.
 // `node test/help.test.js`
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

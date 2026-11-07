@@ -7,15 +7,17 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 # The components
 
+All documents and markings in this repo are fictional examples.
+
 The inventory in build order, then one section per component: what it is, its rules, its copy rules, and what it reads from the engine. Every component was designed on one memo (see `fixtures/memo.txt`); the expected findings are in `fixtures/memo.findings.json`.
 
-_Extracted from the Marque UI kit design canvas (boards: Inventory, C2-Marking, C3-Finding, C4-Decision, C5-Help, C6-Pane, C8-Inline, C9-Artifact, C10-Gate, C11-Derivation, C12-Receipt, C13-Vocab), 21 Oct 2026. The canvas is the visual record; this file is the text the kit is built to. Edit here from now on._
+_Design specification for @knitli/marque-kit. Edit here._
 
 
 ---
 
 ## The kit's components, in build order
-Ordered by what the first host (a Word-like pane) needs to work end to end, not by size. Each row says what the component reads from the finding contract and what Knitli already provides. Stamp, Button, ConfidenceTag and Arrow are Knitli primitives the kit uses as-is; they are not listed. Status: built names the board where a first full version lives (updated 14 Oct, overnight build); wire means a wireframe only; — means not started.
+Ordered by what the first host (a Word-like pane) needs to work end to end, not by size. Each row says what the component reads from the finding contract and what Knitli already provides. Stamp, Button, ConfidenceTag and Arrow are Knitli primitives the kit uses as-is; they are not listed. Status: built names the version where a first full version lives (updated 14 Oct); wire means a wireframe only; — means not started.
 
 0 · Foundation nothing ships without these
 #
@@ -55,7 +57,7 @@ v1 · C4
 5
 Help, three tiers
 tooltip · Why? · section
-Tier 1: per-token tooltip from help_anchors (what REL TO means, who is in FVEY). Tier 2: the Why? popover — plain reason, the manual's quoted line, the citation, the override link. Tier 3: the section window that opens the manual at the cited passage. Popover and window, never modal.
+Tier 1: per-token tooltip from the engine's vocabulary (what REL TO means, who is in FVEY). Tier 2: the Why? popover — plain reason, the manual's quoted line, the citation, the override link. Tier 3: the section window that opens the manual at the cited passage. Popover and window, never modal.
 says.help[] · says.citation · .caveat
 Callout (base)
 v1 · C5
@@ -128,8 +130,8 @@ DataTable
 15
 Policy & rules settings
 the config author's view
-Which rules are on, severity overrides, aliases and macros — shown as what .marque.toml already says, never as a place to widen what the engine does.
-config, rule catalog
+Which rules are on, severity overrides, aliases and macros — shown as what the host's config file already says, never as a place to widen what the engine does.
+configuration
 Field, DataTable
 —
 Cross-cutting, not components: keyboard focus order and live-region announcements for every rung change (a new Action required is announced; a Quiet change is not); reduced-motion; the color-independent shapes above; copy rules from the message-clarity guide. Not in the kit: the apply/edit step and any format adapter — the kit renders decisions, the host applies them.
@@ -282,7 +284,7 @@ It's British, with some Australian information(//GBR S//FGI AUS//REL TO USA, GBR
 Something else — I'll type it
 I don't know, or it's not my call
 Banner, from what is known so far:SECRET//FGI AUS GBR//NOFORN
-If no one can answer — at a network boundary, say — Marque's most restrictive resolution keeps every stated equity:(S//FGI AUS GBR//NF)The host decides whether to apply it or hold.
+If no one can answer — in an unattended deployment, say — Marque's most restrictive resolution keeps every stated equity:(S//FGI AUS GBR//NF)The host decides whether to apply it or hold.
 Answer
 Save as draft instead
 Why?CAPCO-2016 §H.3 p55
@@ -348,7 +350,7 @@ It's British, with some Australian information(//GBR S//FGI AUS//REL TO USA, GBR
 Something else — I'll type it
 I don't know, or it's not my call
 Banner, from what is known so far:SECRET//FGI AUS GBR//NOFORN
-If no one can answer — at a network boundary, say — Marque's most restrictive resolution keeps every stated equity:(S//FGI AUS GBR//NF)The host decides whether to apply it or hold.
+If no one can answer — in an unattended deployment, say — Marque's most restrictive resolution keeps every stated equity:(S//FGI AUS GBR//NF)The host decides whether to apply it or hold.
 Answer
 Save as draft instead
 Why?CAPCO-2016 §H.3 p55
@@ -384,7 +386,7 @@ Undo
 Why?CAPCO-2016 §H.8 p145
 The person chose this, so Undo is first-class. The card drops to Noticeable, and the banner line shows the consequence: the document is no longer NOFORN.
 
-What stays constant across rungs. The anchor label (¶3), the marking as the primitive, the Why? and citation footer, the plain-sentence headline, and the rule that gold means a person must act and blue means they can. What changes is only how much of the contract is shown — Matrix A on board 1c, made real.
+What stays constant across rungs. The anchor label (¶3), the marking as the primitive, the Why? and citation footer, the plain-sentence headline, and the rule that gold means a person must act and blue means they can. What changes is only how much of the contract is shown — Matrix A in DERIVATION.md, made real.
 Advisory vs Action required. Advisory when the safe reading is one the author wrote (¶5: NOFORN was half of what they typed); Action required when the safe form is one nobody wrote (¶3: the fallback (S//FGI AUS GBR//NF) is a form, not a reading). Decided 16 Oct.
 Copy rules applied. Headlines are sentences about the document, never about Marque. Reasons name the rule in plain words and never the severity. The chosen reading on an Advisory is called safe, never correct. System-ideal findings never use an error voice.
 
@@ -392,7 +394,7 @@ Copy rules applied. Headlines are sentences about the document, never about Marq
 ---
 
 ## Decision prompt — the asks renderer
-Component 4. Lives inside the finding card; this board isolates it. Four shapes a question takes — a choice of readings, a value, a reading of a value, and the person declining — with the commit, deferral and routing the kit adds, in both themes at 400px.
+Component 4. Lives inside the finding card; this section isolates it. Four shapes a question takes — a choice of readings, a value, a reading of a value, and the person declining — with the commit, deferral and routing the kit adds, in both themes at 400px.
 
 Four shapes of a question · lightwhat the engine asks, and how the kit lets a person answer it
 Choices · asks.kind = options · with the commit refused
@@ -460,7 +462,7 @@ Supplied by the host. Marque never stores a name; the audit records only that th
 Hand it on
 Actually, I can answer
 Why?CAPCO-2016 §H.3 p55
-Declining is an answer in its own right, not a deferral: the finding stays Action required for whoever gets it, and Blocking at finalize for everyone. The engine has no shape for this yet (logged).
+Declining is an answer in its own right, not a deferral: the finding stays Action required for whoever gets it, and Blocking at finalize for everyone. The engine has no shape for this yet (tracked internally).
 
 Four shapes of a question · dark
 Choices · asks.kind = options · with the commit refused
@@ -526,17 +528,17 @@ Supplied by the host. Marque never stores a name; the audit records only that th
 Hand it on
 Actually, I can answer
 Why?CAPCO-2016 §H.3 p55
-Declining is an answer in its own right, not a deferral: the finding stays Action required for whoever gets it, and Blocking at finalize for everyone. The engine has no shape for this yet (logged).
+Declining is an answer in its own right, not a deferral: the finding stays Action required for whoever gets it, and Blocking at finalize for everyone. The engine has no shape for this yet (tracked internally).
 
 What the engine supplies
-1asks.kind — options · field · both. Today this is split across Plural, lint_decision.options and prompt (date-discovery only); the kit wants one field.
+1asks.kind — options · field · both. Not yet emitted as one field: options and a date prompt carry the pieces today; the kit wants one field.
 2asks.text — the question, as a sentence a classifier would ask. The kit never composes it from parts.
 3asks.options[] — each with the facts it asserts, the plain reading, and the marking or value it produces. Readings and results travel together.
 4asks.field — type, format, hint, and the artifact that waits on it.
 5depends_on — only when readings differ in roll-up. If every reading rolls up the same way, nothing waits, and the card says so.
 What the kit adds
 ·The commit. Choosing never applies; Answer does. One click undoes a wrong radio; one click cannot undo a wrong marking in a document that has already been sent.
-·Three standing answers on every question: "something else — I'll type it" (a free answer, always — the engine's classifier-judgment cases are mostly things it doesn't handle yet, not things a person can't resolve), "ask me at finalize" (defer — the question comes back, as Blocking) and "not my call" (route — it stays open for someone else).
+·Three standing answers on every question: "something else — I'll type it" (a free answer, always — most cases that need a person are things the engine doesn't handle yet, not things a person can't resolve), "ask me at finalize" (defer — the question comes back, as Blocking) and "not my call" (route — it stays open for someone else).
 ·Validation in one sentence with the right answer in it. Fields the person is checking are set in the mark font.
 ·Focus. Opening a question from the pane puts focus on the first reading; Escape returns it to the row. A screen reader hears the question, then the readings as "1 of 3", each with its spoken marking.
 Copy rules
@@ -622,6 +624,7 @@ Nothing to override: the safe reading is one you wrote. Either choice is yours, 
 Same shape for an advisory. The quoted line is the NOFORN section's own relationship rule. The last line says plainly that there is no override, because both readings are the author's.
 
 Tier 3 · the manual itself
+CAPCO-2016 passages quoted here are U.S. Government work in the public domain.
 Tier 3 · the section · light
 CAPCO-2016 · §H.8 · Dissemination control markingsAuthorized for release to p150–151
 Previous
@@ -1224,7 +1227,7 @@ What the gate is
 The host calls it at the moment that matters — send, save-as-final, publish, submit — with the findings whose blocks is at finalize. The gate is the Needs-you section with defer removed and the answers inline: nothing new to learn at the worst moment. It also shows what Marque will apply on the way out, because that is the last chance to object.
 
 Rules
-1No "send anyway". Blocking is a rung, not a dialog setting. An organization that wants a question to be skippable configures that rule's rung in .marque.toml; the gate never offers to override it.
+1No "send anyway". Blocking is a rung, not a dialog setting. An organization that wants a question to be skippable configures that rule's rung in the host's config file; the gate never offers to override it.
 2Save as draft is always offered. The person is never trapped; the document just doesn't leave.
 3Order is document order, same as the pane. Numbers, not severity.
 4Each item commits on its own. Answering one re-evaluates the rest: an answer that resolves a dependency removes the dependent item, with a one-line note.
@@ -1292,7 +1295,7 @@ Rules
 4The result restates its conditions — what, if it changed, would change the result. That line is why the derivation panel exists: trust comes from knowing what the number depends on.
 5Opens from the banner card's "Show how", the status strip, and a Noticeable card's Why? when the change came from a fold rather than a rule. Window or side panel, never modal.
 Engine fields
-The decision trace is always on (fold, closure, default-fill, supersession, divergence, fail-closed, constraint events). The kit needs each event with: the axis it touched, the inputs as layered markings with their states, the output, the rule or constraint id, and its citation. The per-rule dispatch overlay is not needed here.
+The decision trace is always on. The kit needs each step with: what changed, the inputs as layered markings with their states, the output, the rule, and its citation.
 
 
 
@@ -1303,7 +1306,7 @@ Component 12. The audit for the memo as a person reads it: eleven lines from the
 
 One document · light
 Marque · session receiptMemo · 2 pages · 6 portions · 2026-10-14
-classifierJ. Doe · DIA/XX
+classifierA. Example · Agency/XX
 14:02:11
 ¶2 · comma added (S//REL TO USA FVEY)(S//REL TO USA, FVEY) · applied · CAPCO-2016 §H.8 p151Marque · determined
 14:02:11
@@ -1315,23 +1318,23 @@ banner · generated SECRET//FGI AUS GBR//NOFORN · held for finalize · CAPCO-20
 14:02:12
 ¶5 · (S//NF/REL TO USA, GBR)(S//NF) · safe reading applied · alternative (S//REL TO USA, GBR) offered · CAPCO-2016 §H.8 p145Marque · most restrictive
 14:06:02
-¶2 · kept as written (S//REL TO USA FVEY) · the comma fix reverted · reportedJ. Doe · override
+¶2 · kept as written (S//REL TO USA FVEY) · the comma fix reverted · reportedA. Example · override
 14:09:15
-¶3 · answered: the U.S., the UK and Australia together (//JOINT S AUS GBR USA//REL TO USA, AUS, GBR) · appliedJ. Doe · decision
+¶3 · answered: the U.S., the UK and Australia together (//JOINT S AUS GBR USA//REL TO USA, AUS, GBR) · appliedA. Example · decision
 14:10:02
-¶5 · alternative taken (S//REL TO USA, GBR) · banner now SECRET//FGI AUS GBR//REL TO USA, GBR · appliedJ. Doe · decision
+¶5 · alternative taken (S//REL TO USA, GBR) · banner now SECRET//FGI AUS GBR//REL TO USA, GBR · appliedA. Example · decision
 14:12:00
-¶4 · marked (U) · appliedJ. Doe · decision
+¶4 · marked (U) · appliedA. Example · decision
 14:12:30
-authority block · Classified By, Derived From filled · Declassify On carried 20491231 · appliedJ. Doe · values
+authority block · Classified By, Derived From filled · Declassify On carried 20491231 · appliedA. Example · values
 14:12:45
 finalize · banner applied top and bottom of 2 pages · authority block applied, first page · 1 finding reported · senthost · Word
-session root · blake37f3a9c1e 02b4d6e8 9a1f33c7 5d0e8b2a 4c6f1d93 e7a2b058 1f9c4d7e 6b3a0c25schema marque-3.44 · ISM-v2022-DEC · CAPCO-2016 · interface O (Office) · principal signature verified
+session root · [hash] · [schema/version] · CAPCO-2016 · signature verified
 Verify
 Print
 One document · dark
 Marque · session receiptMemo · 2 pages · 6 portions · 2026-10-14
-classifierJ. Doe · DIA/XX
+classifierA. Example · Agency/XX
 14:02:11
 ¶2 · comma added (S//REL TO USA FVEY)(S//REL TO USA, FVEY) · applied · CAPCO-2016 §H.8 p151Marque · determined
 14:02:11
@@ -1343,18 +1346,18 @@ banner · generated SECRET//FGI AUS GBR//NOFORN · held for finalize · CAPCO-20
 14:02:12
 ¶5 · (S//NF/REL TO USA, GBR)(S//NF) · safe reading applied · alternative (S//REL TO USA, GBR) offered · CAPCO-2016 §H.8 p145Marque · most restrictive
 14:06:02
-¶2 · kept as written (S//REL TO USA FVEY) · the comma fix reverted · reportedJ. Doe · override
+¶2 · kept as written (S//REL TO USA FVEY) · the comma fix reverted · reportedA. Example · override
 14:09:15
-¶3 · answered: the U.S., the UK and Australia together (//JOINT S AUS GBR USA//REL TO USA, AUS, GBR) · appliedJ. Doe · decision
+¶3 · answered: the U.S., the UK and Australia together (//JOINT S AUS GBR USA//REL TO USA, AUS, GBR) · appliedA. Example · decision
 14:10:02
-¶5 · alternative taken (S//REL TO USA, GBR) · banner now SECRET//FGI AUS GBR//REL TO USA, GBR · appliedJ. Doe · decision
+¶5 · alternative taken (S//REL TO USA, GBR) · banner now SECRET//FGI AUS GBR//REL TO USA, GBR · appliedA. Example · decision
 14:12:00
-¶4 · marked (U) · appliedJ. Doe · decision
+¶4 · marked (U) · appliedA. Example · decision
 14:12:30
-authority block · Classified By, Derived From filled · Declassify On carried 20491231 · appliedJ. Doe · values
+authority block · Classified By, Derived From filled · Declassify On carried 20491231 · appliedA. Example · values
 14:12:45
 finalize · banner applied top and bottom of 2 pages · authority block applied, first page · 1 finding reported · senthost · Word
-session root · blake37f3a9c1e 02b4d6e8 9a1f33c7 5d0e8b2a 4c6f1d93 e7a2b058 1f9c4d7e 6b3a0c25schema marque-3.44 · ISM-v2022-DEC · CAPCO-2016 · interface O (Office) · principal signature verified
+session root · [hash] · [schema/version] · CAPCO-2016 · signature verified
 Verify
 Print
 What this is
@@ -1364,10 +1367,10 @@ Rules
 1Markings verbatim, with the arrow drawn in CSS. Masked and concealed regions appear exactly as they do in the pane.
 2Two actors, named plainly. "Marque" for the engine's own determinations; the classifier's id for decisions, values and overrides; "host" for what the host did at finalize. Each line also says the kind of act: determined, derived, decision, override.
 3The override is a first-class line, bold "reported", and it stays in the receipt no matter how quiet the pane was about it.
-4Verifiable. The session root is the stream's blake3; Verify recomputes it and checks the principal signature with no engine and no key custody — the same core the CLI and WASM use. Print is the paper form from T4.
+4Verifiable. The session root is the stream's hash; Verify recomputes it and checks the signature with no engine and no key custody. Print is the paper form.
 5The same component serves a batch: one receipt per document, correlated by the echoed id, with a header row per document and the roots listed.
 Engine fields
-The AppliedFix envelope (rule, recognition, steps with citations, inverse), the session metadata (schema, versions, interface, identity, seal), the decision trace for asked/withheld/declined events, and the verify result. Rendering uses the shared renderer so CLI, WASM and this receipt agree byte for byte on what a line says.
+The AppliedFix envelope (rule, recognition, steps with citations, inverse), the session metadata (schema, versions, interface, identity, seal), the decision trace for asked/withheld/declined events, and the verify result. Rendering uses the shared renderer so every surface agrees on what a line says.
 
 
 
@@ -1445,7 +1448,7 @@ The data API as a surface: the same per-token facts that feed tier-1 tooltips, b
 
 Rules
 1Codes are markings, set in the mark font; names and meanings are prose. Members are chips with the name beside the code, so a person learns the code by seeing it next to the country.
-2Every answer cites its register — Annex A for tetragraphs, Annex B for trigraphs, the manual section for a marking. Vocabulary is build-time data from the pinned ISM/ISMCAT snapshot; the version shows in the footer.
+2Every answer cites its register — Annex A for tetragraphs, Annex B for trigraphs, the manual section for a marking. Vocabulary is build-time data from the pinned vocabulary snapshot; the version shows in the footer.
 3A miss is an answer. It says what was not found and offers the nearest real code. Never a blank list.
 4Nothing here changes the document. Lookup is read-only; a person who wants to use a code goes back to the marking.
 Engine fields

@@ -32,4 +32,4 @@ pnpm test    # every package
 pnpm build   # each package's dist/
 ```
 
-Every file carries an SPDX header (`AGPL-3.0-only`); CI runs `reuse lint`. Commits and PRs end with the attribution lines your session provides.
+Every file carries an SPDX header (`AGPL-3.0-only`); CI runs `reuse lint`.

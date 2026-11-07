@@ -39,12 +39,12 @@ packages/kit/        @knitli/marque-kit: the DOM and the CSS
 packages/web/        @knitli/marque-kit-web: inline marks on a page's own text (placeholder)
 packages/word/       @knitli/marque-kit-word: inline marks as content controls, selection-follow, the Purview label (placeholder)
 packages/outlook/    @knitli/marque-kit-outlook: marks in the compose body, classification headers, the send gate (placeholder)
-apps/office-addin/   the Word and Outlook add-in: manifest, task pane, Office.js ↔ WASM engine ↔ kit; so far the Word pane on the memo
-fixtures/memo.txt            a six-paragraph memo with five things wrong
+apps/office-addin/   the Word and Outlook add-in: manifest, task pane, Office.js ↔ engine ↔ kit; so far the Word pane on the memo
+fixtures/memo.txt            a six-paragraph memo with five things wrong (fictional example; markings are illustrative, not real classified material)
 fixtures/memo.findings.json  what Marque should say about it, in the contract's shape
-fixtures/memo.vocab.json     the engine's vocab and help JSON (ISMCAT + help_anchors.toml), for tiers 1–2 and lookup
+fixtures/memo.vocab.json     the engine's vocab and help JSON, for tiers 1–2 and lookup
 fixtures/memo.manual.json    the CAPCO-2016 sections the memo cites, for tier 3
-fixtures/extract.py          regenerates the two above from a marque-dev checkout; fails if a quote doesn't land
+fixtures/extract.py          regenerates the fixtures from source data; fails if a quote doesn't land
 demo/index.html    the memo on the left, the pane on the right; answer ¶3 and watch the banner move
 docs/              the design, extracted from the canvas: CONTRACT, DERIVATION, MODEL, THEME,
                    COMPONENTS, DECISIONS, ENGINE-ASKS
@@ -86,11 +86,11 @@ Marque emits findings. Each finding says what it found, what it did or needs, wh
 4. [docs/THEME.md](docs/THEME.md): the tokens, the fit rules, the four forms of a long marking, the contrast gate.
 5. [docs/COMPONENTS.md](docs/COMPONENTS.md): every component with its states.
 6. [docs/DECISIONS.md](docs/DECISIONS.md): what the maintainer settled, dated, with the reason.
-7. [docs/ENGINE-ASKS.md](docs/ENGINE-ASKS.md): what the engine doesn't emit yet, as issues on marque-dev.
+7. [docs/ENGINE-ASKS.md](docs/ENGINE-ASKS.md): what the engine doesn't emit yet, as issues.
 
 ## Where it came from
 
-Designed on a canvas, 13–21 Oct 2026: [Marque UI kit — foundations](https://claude.ai/code/artifact/002b5170-ce55-4baf-8f4c-ce58c7e00a2f). The running notes for the engine are in [Marque UI kit — observations for the engine](https://claude.ai/code/artifact/2b6f1a9b-3d06-4fbe-bf45-7bdc3a2cfc8e). The canvas is the record of how the decisions were reached; this repo is where they are kept true.
+Designed on a canvas, 13–21 Oct 2026. Design history is in docs/DECISIONS.md. All documents and markings in this repo are fictional examples.
 
 The kit depends on Knitli's design-system *values* (vendored into `theme.css`), not its component bundle. Where a value departs from Knitli, the CSS says so and why.
 

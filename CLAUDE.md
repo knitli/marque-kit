@@ -6,7 +6,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 # CLAUDE.md
 
-Guidance for working in this repo. The kit is the human-facing half of Marque; the engine is [knitli/marque-dev](https://github.com/knitli/marque-dev). Read that repo's CLAUDE.md, constitution and TENETS when a change touches what the engine emits or what a citation says.
+Guidance for working in this repo. The kit is the human-facing half of Marque; the engine is a separate Knitli project. The kit contract in docs/CONTRACT.md is the public boundary.
 
 ## What this is
 
@@ -33,21 +33,23 @@ These are not style preferences. Each has a dated maintainer decision behind it;
 - If it had to wrap, `settle()` adds `.stacked`: one layer per line, hanging indent .65em. CSS alone wraps greedily and orphans `GBR)`.
 - Never truncate, scroll or shrink below 13px (`--mq-size-sm`). `.xs` is 12px for the receipt only.
 - Four forms: **full** (reference; copy, audit, print; the only one that may scroll, inside a popover), **folded** (`.mq-fold`: heading + first three codes + "+N more", act-ink), **summary** (`.mq-count` first…last · n), **diff** (`.differs` gold tint on the layer that differs between readings).
-- Engine cap is 4096 bytes. Anything past ~1000 bytes is never inline; it goes to the full form in a popover.
-- Masks are typed regions, not characters: `.mq-mask` (unidentified, `_`), `.mq-conceal` (source concealed, `█`). Concealed owner codes are masked everywhere, including before-images and offered alternatives (constitution V, MD-0016 / MD-0030).
-- Until marque-dev#2634 lands, `parse()` derives layers from the string. That is a fallback; don't extend it into a grammar. When the engine emits `layers`, they are used as-is.
+- A marking over 4096 bytes is never inline, and anything past ~1000 bytes goes to the full form in a popover.
+- Masks are typed regions, not characters: `.mq-mask` (unidentified, `_`), `.mq-conceal` (source concealed, `█`). Concealed owner codes are masked everywhere, including before-images and offered alternatives.
+- Until the engine emits `layers`, `parse()` derives layers from the string. That is a fallback; don't extend it into a grammar. When the engine emits `layers`, they are used as-is.
 
 ## Copy rules
 
-- Plain language, for the classifier reading it. The banned-term table is marque-dev's `docs/message-clarity-style-guide.md`; it applies here too. No rule ids, type names or spec numbers in user-facing text.
+- Plain language, for the classifier reading it. No rule ids, type names or spec numbers in user-facing text.
 - A recognized marking is quoted exactly, in the mark font, never paraphrased.
 - Stamps are words ("Needs you", "Changed", "Done"), never icons alone.
-- Citations: `CAPCO §H.8 p151` with the verbatim `short` quote. **Verify every citation against `crates/capco/docs/CAPCO-2016.md` in marque-dev before it lands.** A citation that can't be traced to a real passage is removed, not left pending (constitution VIII). The maintainer's note on §H.3 p57 is in docs/DECISIONS.md.
+- Citations: `CAPCO §H.8 p151` with the verbatim `short` quote. **Verify every citation against the cited manual before it lands.** A citation that can't be traced to a real passage is removed, not left pending. The maintainer's note on §H.3 p57 is in docs/DECISIONS.md.
 - EO 13526 §1.4 has eight categories, (a)–(h).
 
 ## The memo (fixtures/)
 
 Every example in the docs and the demo uses the same six paragraphs. Keep it that way; a new example that needs a different case extends the memo rather than inventing a second document.
+
+All documents and markings in this repo are fictional examples.
 
 | ¶ | As written | Finding | Rung |
 |---|---|---|---|
@@ -78,8 +80,7 @@ Banner derived: `SECRET//FGI AUS GBR//NOFORN`, or `…//REL TO USA, GBR` if ¶5'
 ## Working here
 
 - `pnpm check` (format, lint, typecheck) and `pnpm test` (in each package, node runs `test/*.test.ts` as written; in the kit, `vp test` runs `test/dom/` under happy-dom, DECISIONS #21) before a commit. A rule that shows in the DOM gets a test in `packages/kit/test/dom/render.test.ts`. `pnpm fix` formats. `pnpm build` writes each package's `dist/`. Workspace packages import each other by name; the `source` export condition points them at `src/`, so tests, typecheck and the demo run on source. `pnpm demo` to look. Markdown and the two extracted fixtures aren't formatted: a renumbered list changes what a doc says. CI (`.github/workflows/ci.yml`) runs check, test and build on every PR and push to `main`.
-- Check contrast when a token changes: the pairs and floors are `PAIRS` and `SIZES` in `packages/kit/src/theme.ts`. AA 4.5 on text pairs, 3.0 on lines and focus. `packages/kit/test/theme.test.ts` fails when `kit.css` or `theme.css` paints a pairing that isn't measured there or excused in the test with a reason; a new color use means deciding which.
-- The docs under `docs/` were extracted from the canvas on 21 Oct 2026 and are now the source. Edit them here; the canvas is history.
-- Engine gaps go to marque-dev as issues, labeled `ui-kit` (+ `engine`, `audit`, `office`, `capco/ism` as they apply), and get a row in `docs/ENGINE-ASKS.md`. The Linear triage agent assigns cluster and lineage.
-- Commits and PRs end with the attribution lines the session provides.
+- Check contrast when a token changes: the pairs and floors are `PAIRS` and `SIZES` in `packages/kit/src/theme.ts`, stated at the bottom of `packages/kit/src/theme.css` (`mq.theme.check`). AA 4.5 on text pairs, 3.0 on lines and focus. `packages/kit/test/theme.test.ts` fails when `kit.css` or `theme.css` paints a pairing that isn't measured there or excused in the test with a reason; a new color use means deciding which.
+- The docs under `docs/` are the source of truth. Design specification for `@knitli/marque-kit`. Edit here.
+- Engine gaps are tracked as issues and get a row in `docs/ENGINE-ASKS.md`.
 - SPDX header on every file: `SPDX-FileCopyrightText: 2026 Knitli Inc.` / `SPDX-License-Identifier: AGPL-3.0-only`. A file that can't carry a comment (JSON, lockfiles, `memo.txt`) goes in `REUSE.toml`. CI runs `reuse lint`.

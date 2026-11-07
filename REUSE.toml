@@ -6,6 +6,10 @@ version = 1
 
 # Files that can't carry a header: JSON has no comments, lockfiles are generated,
 # and memo.txt is the document every span in the fixtures is a byte offset into.
+# Public-domain carve-out: fixtures/memo.vocab.json and fixtures/memo.manual.json
+# mix Knitli-authored fixture structure (AGPL-3.0-only, as annotated) with passages
+# from CAPCO-2016, a U.S. Government document in the public domain. That status is
+# recorded in each file's note field; no Knitli copyright is claimed over the manual text.
 [[annotations]]
 path = ["**/package.json", "pnpm-lock.yaml", "mise.lock", "fixtures/memo.txt", "fixtures/*.json"]
 SPDX-FileCopyrightText = "2026 Knitli Inc."
