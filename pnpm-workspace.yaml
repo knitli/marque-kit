@@ -8,7 +8,7 @@ packages:
 
 catalog:
   '@types/node': ^26.6.6
-  '@types/office-js': ^1.0.615
+  '@types/office-js': ^1.0.616
   happy-dom: 21.0.4
   # `vite` is an alias for vite-plus-core and must track `vite-plus` exactly:
   # two core copies break typecheck with duplicate UserConfig identities.
