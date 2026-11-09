@@ -8,7 +8,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 The parts a host shows a person when Marque finds something: the finding card, the decision prompt, the pane, the inline mark in the document, the banner and authority-block cards, the finalize gate, the derivation panel, the audit receipt, and the theme layer under all of them.
 
-TypeScript and plain CSS. No framework, no runtime dependencies; each package's `dist/` is built with `vp pack`. It runs in a web page, a Word or Outlook task pane, and anything else with a DOM.
+TypeScript and plain CSS. No framework, no runtime dependencies; each package's `dist/` is built with `vp pack`. It runs in a web page, a Word or Outlook task pane, and anything else with a DOM. A marking can also be written as an HTML string on a server, for pages that work with no script and a strict Content Security Policy.
 
 It is an embeddable widget, not a box of parts. The model is Stripe Elements: one framework-neutral `mount()` that owns its piece of the page, with thin wrappers per framework when a host needs one. Hosts can theme it freely (`--mq-*` tokens), but they can't rearrange it. The rungs, the free answer, "Not my call" and the override record are fixed by decision, so the kit ships whole surfaces rather than primitives to recompose.
 
@@ -17,18 +17,20 @@ It is an embeddable widget, not a box of parts. The model is Stripe Elements: on
 A pnpm workspace (DECISIONS #22). Packages import each other by name; the `source` export condition points tests, typecheck and the demo at `src/`.
 
 ```
-packages/core/       @knitli/marque-kit-core: the logic with no DOM, so it runs anywhere, Outlook's send handler included
+packages/core/       @knitli/marque-kit-core: the logic with no DOM, so it runs anywhere, a server and Outlook's send handler included
+  src/marking.ts       the marking's structure, parsed and spoken, and html(): a marking as an escaped HTML string
   src/types.ts         the contract as types: findings, artifacts, the state log, the vocabulary, the host
   src/state.ts         the kit's half of the ladder: what the person did (answered, changed, kept as written,
                        deferred, declined), keyed by finding id, append-only, plain JSON the host persists
   src/attention.ts     rung(), sections(), markClass(): which of the five rungs a finding sits on, and the pane's
                        four sections; what Outlook's send gate decides with
-  test/                the fixtures held to the types; the rung table and the state layer, against the memo
+  test/                the fixtures held to the types; the rung table and the state layer, against the memo; html()
 packages/kit/        @knitli/marque-kit: the DOM and the CSS
   src/theme.css        the theme layer: --mq-* tokens (light default, dark, auto), how a marking fits,
                        the four shapes that carry meaning, control states, print, forced colors
   src/kit.css          the components, built only on theme.css
-  src/marking.ts       the marking primitive: layers, tokens, four forms, never breaks inside a token
+  src/marking.ts       the marking primitive: layers, tokens, four forms, never breaks inside a token; render() builds
+                       core's structure as DOM, enhance() brings html() markings from a server to life
   src/render.ts        finding JSON → DOM: card(), row(), pane(), status(), artifact(), gate(), derivation(),
                        receipt(), and mount(): the pane wired to the kit's state, the one call a host needs
   src/help.ts          help in three tiers (tooltip, Why?, the manual section) and the vocabulary lookup;
@@ -73,6 +75,33 @@ p.destroy();                    // when the pane goes away
 `act` is null when only the seen list changed. An answer shows on its card at once but stays in `document.pending`, and the document is not ready, until the host applies it, re-lints and calls `p.update({ doc })`. `@knitli/marque-kit/help` has what a host needs to answer `onHelp` and `onLookup`. The contract's types and the state log are `@knitli/marque-kit-core/types` and `@knitli/marque-kit-core/state`. At mount the kit measures the host's `--mq-*` tokens against the contrast and size floors (`@knitli/marque-kit/theme`); a failing token falls back to the shipped value, and the report is `p.theme` and `onTheme(report)`. Under forced colors the system palette stands and only sizes and the mark font are measured. When the room the host gives the pane is under 240px, the report says `narrow: true` and the kit shows rows only: opening one calls `onOpen(f)` for the host to show it its own way.
 
 The demo runs under `vp dev`, which serves the TypeScript source as modules.
+
+### A marking from a server
+
+A page rendered on a server can show a marking with no script at all. `html()` writes the same structure `render()` builds, as an escaped string with classes and attributes only (DECISIONS #26):
+
+```js
+// on the server (Node 20 or later; no DOM)
+import { html } from '@knitli/marque-kit-core/marking';
+const cell = `<td>${html('(S//REL TO USA, GBR)', { help: ['REL TO', 'GBR'] })}</td>`;
+```
+
+Serve `theme.css` and `kit.css` from your own origin, and put the markings inside `.mq` or an element with `data-mq-theme="light"`. With script off, the marking never breaks inside a token. Where script runs, enhance it:
+
+```js
+// in the browser, from a script file ('self')
+import { enhance } from '@knitli/marque-kit/marking';
+import { tips } from '@knitli/marque-kit/help';
+const table = document.querySelector('#entries');
+enhance(table);      // stack markings that wrap, re-measure on resize, open folds
+tips(table, vocab);  // tier-1 help on each token
+```
+
+### Hosting offline
+
+The kit fetches nothing. `theme.css` names Archivo, Literata, OCR-B and Fira Code but ships no `@font-face`, so an offline or air-gapped host serves the fonts itself: font files and a stylesheet with the `@font-face` rules, both from its own origin, which satisfies `font-src 'self'` and `style-src 'self'`. A font that isn't there falls back (system sans, Georgia, a monospace for markings); nothing breaks. [docs/THEME.md, "Hosting offline"](docs/THEME.md) has the steps, the `--mq-font-*` tokens and the fallbacks. Which OCR-B to use is still an open question.
+
+The published packages need Node 20 or later where they're installed. Node 26 is only for working on this repo.
 
 ## The idea in one paragraph
 
