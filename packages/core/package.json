@@ -20,6 +20,11 @@
       "types": "./dist/attention.d.ts",
       "default": "./dist/attention.js"
     },
+    "./marking": {
+      "source": "./src/marking.ts",
+      "types": "./dist/marking.d.ts",
+      "default": "./dist/marking.js"
+    },
     "./state": {
       "source": "./src/state.ts",
       "types": "./dist/state.d.ts",
