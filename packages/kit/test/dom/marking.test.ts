@@ -149,6 +149,21 @@ describe('server markup, brought to life', () => {
     stop();
   });
 
+  test('a diff fold opens with its differing layers still marked', () => {
+    const m = '(S//REL TO USA, AUS, AUT, BEL, BGR, CAN//NF)';
+    const box = inserted(html(m, { form: 'diff', differs: [2] }));
+    enhance(box);
+    box.querySelector<HTMLElement>('.mq-fold')!.click();
+    const full = box.querySelector('.mq-mark')!;
+    expect(box.querySelector('.mq-fold')).toBeNull();
+    expect([...full.querySelectorAll('.mq-l')].map((l) => l.classList.contains('differs'))).toEqual([
+      false,
+      false,
+      true,
+    ]);
+    expect(full.isEqualNode(render(m, { form: 'full', stacked: true, differs: [2] }))).toBe(true);
+  });
+
   test('Enter opens a fold too; a fold render() made opens itself, once', () => {
     const box = inserted(html(`(S//REL TO USA, ${codes})`, { form: 'folded' }));
     enhance(box);

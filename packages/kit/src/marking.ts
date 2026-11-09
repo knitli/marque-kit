@@ -157,7 +157,11 @@ export function unfold(mark: HTMLElement): HTMLSpanElement | null {
   const cls = [...mark.classList].filter((c) => !FORM.has(c));
   const size = cls.find((c): c is 'xs' | 'lg' => c === 'xs' || c === 'lg');
   const state = cls.filter((c) => c !== size).join(' ') || undefined;
-  const full = render(m, { form: 'full', stacked: true, state, ...(size ? { size } : {}) });
+  // A layer that differs between readings stays marked when the fold opens (the diff form's whole point).
+  const differs = [...mark.querySelectorAll(':scope > .mq-l')].flatMap((l, i) =>
+    l.classList.contains('differs') ? [i] : [],
+  );
+  const full = render(m, { form: 'full', stacked: true, state, differs, ...(size ? { size } : {}) });
   const label = mark.getAttribute('aria-label');
   if (label) full.setAttribute('aria-label', label); // said in the server's vocabulary, as before
   mark.replaceWith(full);
