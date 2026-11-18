@@ -43,6 +43,10 @@ import {
   decision,
   answered,
   canon,
+  sameBasis,
+  effectiveReady,
+  writeConfirmationToken,
+  acceptedReplacements,
   face,
   isArtifact,
 } from '@knitli/marque-kit-core/state';
@@ -564,16 +568,38 @@ export function row(f: Subject, host: Host = {}, doc?: Doc | null): HTMLDivEleme
 /** A required artifact Marque derived and nobody has written: it goes in as the document goes out. */
 const due = (a: ArtifactView): boolean =>
   a.state === 'absent_but_required' && !!a.derived_value && a.fixability === 'fixable';
-/** Read-only, nothing can be written, so a due artifact holds the document up. */
+/** No automatic artifact placement can be confirmed by a read-only host. */
 const unwritable = (doc: Doc, host: Host): number => (host.readOnly ? doc.document.artifacts.filter(due).length : 0);
-const ready = (doc: Doc, host: Host): boolean => doc.document.ready && !unwritable(doc, host);
+/** Read-only, nothing can be written, so a due artifact holds the document up. */
+const unconfirmedWrites = (doc: Doc, host: Host): string[] =>
+  [
+    ...new Set([
+      ...(doc.document.awaitingWrites ?? []),
+      ...(host.requiredWrites ?? []),
+      ...doc.document.artifacts.filter(due).map((a) => a.id),
+    ]),
+  ].filter((token) => {
+    const basis = doc.document.evaluation?.basis;
+    return !basis || !(host.confirmedWrites ?? []).includes(writeConfirmationToken(token, basis));
+  });
+const ready = (doc: Doc, host: Host): boolean =>
+  effectiveReady(doc, {
+    ...host,
+    requiredWrites: [...(host.requiredWrites ?? []), ...doc.document.artifacts.filter(due).map((a) => a.id)],
+  });
 /** What the gate lists: blockers and the writes still waiting, once each. A required
  *  finding that never blocks needs the person but holds nothing up. */
 const holding = (doc: Doc, host: Host = {}): string[] => [
   ...new Set([
     ...doc.document.blocking,
     ...(doc.document.pending || []),
-    ...(host.readOnly ? doc.document.artifacts.filter(due).map((a) => a.id) : []),
+    ...unconfirmedWrites(doc, host),
+    ...(host.requiredAcceptanceChecks ?? [])
+      .filter((id) => {
+        const basis = doc.document.evaluation?.basis;
+        return !basis || host.acceptanceChecks?.[id] !== writeConfirmationToken(id, basis);
+      })
+      .map((id) => `check:${id}`),
   ]),
 ];
 const held = (doc: Doc, host: Host): number => holding(doc, host).length;
@@ -1009,15 +1035,25 @@ export function artifact(a: ArtifactView, host: Host = {}, doc?: Doc | null): HT
     if (a.applying && !a.derived_value && a.state !== 'present_not_required')
       c.append(el('p', 'mq-p', 'Waiting to be written into the document.'));
   }
-  if (a.if_taken) {
+  const joint = a.jointPreview;
+  const evaluation = doc?.document.evaluation;
+  const baseOnly = (basis: Host['currentBasis']) => basis && { ...basis, replacements: {} };
+  const jointIsCurrent =
+    joint &&
+    joint.status === 'complete' &&
+    evaluation?.completion === 'complete' &&
+    evaluation.jointPreview?.status === 'complete' &&
+    sameBasis(evaluation.basis, host.currentBasis) &&
+    sameBasis(baseOnly(joint.basis), baseOnly(evaluation.basis)) &&
+    sameBasis(joint.basis, evaluation.jointPreview.basis) &&
+    canon(joint.basis.replacements) === canon(doc ? acceptedReplacements(doc) : {});
+  if (joint?.status === 'unavailable') {
+    c.append(el('p', 'mq-p', 'Combined preview unavailable. Marque will check the accepted answers together.'));
+  } else if (jointIsCurrent && joint?.result) {
     const dep = el('div', 'mq-dep');
-    for (const [fid, alt] of Object.entries(a.if_taken)) {
-      dep.append(
-        // Named by where the finding is, never by its id: an id is the engine's, not the person's.
-        el('span', null, `If ${alternative(doc?.findings.find((x) => x.id === fid))} is taken:`),
-        placed(mark(alt, { size: 'sm' })),
-      );
-    }
+    dep.append(el('span', null, 'If the accepted answers are taken together:'));
+    if (isMarking(joint.result)) dep.append(placed(mark(joint.result, { size: 'sm' })));
+    else dep.append(el('span', null, 'A combined artifact value is available.'));
     c.append(dep);
   }
   const foot = el('div', 'mq-foot');
@@ -1033,12 +1069,6 @@ export function artifact(a: ArtifactView, host: Host = {}, doc?: Doc | null): HT
   c.append(foot);
   return c;
 }
-
-/** "¶5's alternative", or "the alternative" when the finding isn't in hand. */
-const alternative = (f: Placed | undefined): string => {
-  const at = f ? where(f) : '—';
-  return at === '—' ? 'the alternative' : `${at}'s alternative`;
-};
 
 /* ── C10 · finalize gate ─────────────────────────────────────────────── */
 /** The Needs-you section with defer removed, in the pane's own words, with
@@ -1062,6 +1092,8 @@ export function gate(doc: Doc, host: Host = {}): HTMLDivElement {
     // Overrides too: the last look says which markings will be reported as kept.
     const decided = doc.findings.filter((f) => pend.has(f.id) || answered(f) || f.overridden);
     const stuck = unwritable(doc, host);
+    const isReady = ready(doc, h);
+    const outstanding = holding(doc, host).length;
     g.append(
       el(
         'h3',
@@ -1070,9 +1102,11 @@ export function gate(doc: Doc, host: Host = {}): HTMLDivElement {
           ? `Waiting for ${plural(n, 'answer', 'answers')} to be written into the document.`
           : stuck
             ? `Not ready. The document is read-only, so ${plural(stuck, 'thing', 'things')} can't be written into it.`
-            : will.length
-              ? `Ready. ${plural(will.length, 'thing', 'things')} will be applied as it goes out.`
-              : 'Ready to finalize.',
+            : isReady
+              ? 'Ready to finalize.'
+              : outstanding
+                ? `Not ready. ${plural(outstanding, 'write or check is', 'writes or checks are')} waiting for confirmation.`
+                : 'Not ready. Marque needs to check the current document and confirm that changes were saved.',
       ),
     );
     will.forEach((a) => g.append(artifact(a, h, doc)));

@@ -10,8 +10,15 @@ import { describe, expect, test, vi } from 'vite-plus/test';
 import { render as mark, masked } from '../../src/marking.ts';
 import { artifact, card, gate, mount, pane, receipt, rung, UNDO_MS } from '../../src/render.ts';
 import { why } from '../../src/help.ts';
-import { docView, empty, record, snapshot } from '@knitli/marque-kit-core/state';
-import type { Doc, FindingView, Moment } from '@knitli/marque-kit-core/types';
+import {
+  acceptedReplacements,
+  docView,
+  empty,
+  record,
+  snapshot,
+  writeConfirmationToken,
+} from '@knitli/marque-kit-core/state';
+import type { Doc, EvaluationBasis, FindingView, Moment } from '@knitli/marque-kit-core/types';
 
 // By path: under happy-dom, URL is the page's, and won't open a file.
 const memo = JSON.parse(
@@ -131,13 +138,227 @@ describe('no internal id reaches a person', () => {
     const t = gate(doc, { moment: 'finalize' }).textContent ?? '';
     for (const id of ids) expect(t).not.toContain(id);
   });
-  test("the banner names the alternative's paragraph by where it is, not by its id", () => {
+  test('the gate never claims readiness without current complete evaluation and host confirmation', () => {
+    const b: EvaluationBasis = {
+      sourceRevisions: { document: 'source' },
+      selectionRevision: 'selection',
+      relationshipRevision: 'relations',
+      contextRevision: 'context',
+      policyRevision: 'policy',
+      declarationsRevision: 'declarations',
+      scope: 'document',
+      operation: 'send',
+      evaluationContextRevision: 'send',
+      targetProfile: 'default',
+      questionRevisions: {},
+      artifactRevisions: {},
+      replacements: {},
+    };
+    const readyDoc: Doc = {
+      findings: [],
+      document: {
+        blocking: [],
+        artifacts: [],
+        pending: [],
+        awaitingWrites: [],
+        evaluation: { basis: b, completion: 'complete', requirements: [], snapshotReady: true },
+      },
+    };
+    const host = { moment: 'finalize' as const, currentBasis: b };
+    expect(gate(readyDoc, host).textContent).toContain('Ready to finalize.');
+
+    const incomplete = {
+      ...readyDoc,
+      document: {
+        ...readyDoc.document,
+        evaluation: { ...readyDoc.document.evaluation!, completion: 'incomplete' as const, snapshotReady: false },
+      },
+    };
+    const missing = { ...readyDoc, document: { ...readyDoc.document, evaluation: undefined } };
+    const stale = {
+      ...readyDoc,
+      document: {
+        ...readyDoc.document,
+        evaluation: { ...readyDoc.document.evaluation!, basis: { ...b, contextRevision: 'changed' } },
+      },
+    };
+    const awaitingWrite = { ...readyDoc, document: { ...readyDoc.document, awaitingWrites: ['f-p3@0'] } };
+    const failedCheckHost = {
+      ...host,
+      requiredAcceptanceChecks: ['outgoing-saved'],
+      acceptanceChecks: {
+        'outgoing-saved': writeConfirmationToken('outgoing-saved', { ...b, contextRevision: 'old' }),
+      },
+    };
+    for (const [candidate, candidateHost] of [
+      [incomplete, host],
+      [missing, host],
+      [stale, host],
+      [awaitingWrite, host],
+      [readyDoc, failedCheckHost],
+    ] as const) {
+      const text = gate(candidate, candidateHost).textContent ?? '';
+      expect(text).toContain('Not ready.');
+      expect(text).not.toContain('Ready to finalize.');
+    }
+  });
+  test('the banner shows only a matching joint preview, never per-answer composition', () => {
     const banner = doc.document.artifacts.find((a) => a.kind === 'front_marking')!;
-    expect(artifact(banner, {}, doc).textContent).toContain("If ¶5's alternative is taken:");
-    const opaque = { ...banner, if_taken: { f_a9p12: banner.if_taken![P5]! } };
-    const d = { ...doc, findings: doc.findings.map((x) => (x.id === P5 ? { ...x, id: 'f_a9p12' } : x)) };
-    expect(artifact(opaque, {}, d).textContent).toContain("If ¶5's alternative is taken:");
-    expect(artifact(opaque).textContent).toContain('If the alternative is taken:');
+    const b: EvaluationBasis = {
+      sourceRevisions: { document: 'source' },
+      selectionRevision: 'selection',
+      relationshipRevision: 'relations',
+      contextRevision: 'context',
+      policyRevision: 'policy',
+      declarationsRevision: 'declarations',
+      scope: 'document',
+      operation: 'send',
+      evaluationContextRevision: 'send',
+      targetProfile: 'default',
+      questionRevisions: { [P5]: 'q1' },
+      artifactRevisions: {},
+      replacements: {},
+    };
+    const joint = { ...banner, jointPreview: { status: 'complete' as const, basis: b, result: banner.derived_value! } };
+    const d: Doc = {
+      ...doc,
+      document: {
+        ...doc.document,
+        evaluation: {
+          basis: { ...b, replacements: {} },
+          completion: 'complete',
+          requirements: [],
+          snapshotReady: false,
+          jointPreview: { status: 'complete', basis: b },
+        },
+      },
+    };
+    expect(artifact(joint, { currentBasis: d.document.evaluation!.basis }, d).textContent).toContain(
+      'If the accepted answers are taken together:',
+    );
+    expect(artifact(joint).textContent).not.toContain('If the accepted answers are taken together:');
+    const reading = f(P5).outcome.readings![0]!;
+    const pendingBasis = { ...b, replacements: { [P5]: { kind: 'reading' as const, reading } } };
+    const pendingDoc: Doc = {
+      ...d,
+      document: {
+        ...d.document,
+        artifacts: d.document.artifacts.map((a) =>
+          a.id === 'a-cab'
+            ? {
+                ...a,
+                evaluationBasis: b,
+                fields: Object.fromEntries(
+                  Object.entries(a.fields ?? {}).map(([key, value]) => [key, { ...value, evaluationBasis: b }]),
+                ),
+              }
+            : a,
+        ),
+        evaluation: { ...d.document.evaluation!, jointPreview: { status: 'complete' as const, basis: pendingBasis } },
+      },
+    };
+    const answerState = record(empty(), P5, 'changed', { reading, index: 0 }, 'accepted');
+    const acceptedDoc = docView(pendingDoc, answerState);
+    const pendingJoint = {
+      ...joint,
+      jointPreview: { status: 'complete' as const, basis: pendingBasis, result: banner.derived_value! },
+    };
+    expect(artifact(pendingJoint, { currentBasis: b }, acceptedDoc).textContent).toContain(
+      'If the accepted answers are taken together:',
+    );
+    const cabStart = docView(pendingDoc, answerState).document.artifacts.find((x) => x.id === 'a-cab')!;
+    const firstCabField = record(
+      answerState,
+      'a-cab',
+      'answered',
+      { fields: { derived_from: 'Source A, 20240115' } },
+      'cab-field-1',
+      snapshot(cabStart),
+    );
+    const secondCabField = docView(pendingDoc, firstCabField).document.artifacts.find((x) => x.id === 'a-cab')!;
+    const withCabFields = record(
+      firstCabField,
+      'a-cab',
+      'answered',
+      { fields: { declassify_on: '20490115' } },
+      'cab-field-2',
+      snapshot(secondCabField),
+    );
+    const cabReplacements = {
+      [P5]: { kind: 'reading' as const, reading },
+      'a-cab.derived_from': { kind: 'artifact_field' as const, field: 'derived_from', value: 'Source A, 20240115' },
+      'a-cab.declassify_on': { kind: 'artifact_field' as const, field: 'declassify_on', value: '20490115' },
+    };
+    const cabBasis = { ...b, replacements: cabReplacements };
+    const cabDoc = docView(
+      {
+        ...pendingDoc,
+        document: {
+          ...pendingDoc.document,
+          evaluation: {
+            ...pendingDoc.document.evaluation!,
+            jointPreview: { status: 'complete' as const, basis: cabBasis },
+          },
+        },
+      },
+      withCabFields,
+    );
+    expect(acceptedReplacements(cabDoc)).toEqual(cabReplacements);
+    const cabArtifact = cabDoc.document.artifacts.find((x) => x.id === 'a-cab')!;
+    const cabJoint = {
+      ...cabArtifact,
+      jointPreview: { status: 'complete' as const, basis: cabBasis, result: { fields: cabReplacements } },
+    };
+    expect(artifact(cabJoint, { currentBasis: b }, cabDoc).textContent).toContain(
+      'If the accepted answers are taken together:',
+    );
+    const changedContext = { ...b, contextRevision: 'changed' };
+    const changedCabInput: Doc = {
+      ...pendingDoc,
+      document: {
+        ...pendingDoc.document,
+        artifacts: pendingDoc.document.artifacts.map((a) =>
+          a.id === 'a-cab'
+            ? {
+                ...a,
+                evaluationBasis: changedContext,
+                fields: Object.fromEntries(
+                  Object.entries(a.fields ?? {}).map(([key, value]) => [
+                    key,
+                    { ...value, evaluationBasis: changedContext },
+                  ]),
+                ),
+              }
+            : a,
+        ),
+        evaluation: { ...pendingDoc.document.evaluation!, basis: changedContext },
+      },
+    };
+    const changedCabView = docView(changedCabInput, withCabFields);
+    expect(
+      (changedCabView.document.artifacts.find((x) => x.id === 'a-banner')!.derived_value as { text: string }).text,
+    ).toBe((cabDoc.document.artifacts.find((x) => x.id === 'a-banner')!.derived_value as { text: string }).text);
+    expect(Object.keys(acceptedReplacements(changedCabView)).filter((key) => key.startsWith('a-cab.'))).toEqual([]);
+    const takeBack = record(answerState, P5, 'changed', null, 'take-back');
+    expect(artifact(pendingJoint, { currentBasis: b }, docView(pendingDoc, takeBack)).textContent).not.toContain(
+      'If the accepted answers are taken together:',
+    );
+    const staleBasis = { ...b, contextRevision: 'changed' };
+    const staleJoint = { ...joint, jointPreview: { ...joint.jointPreview!, basis: staleBasis } };
+    const stale = {
+      ...d,
+      document: {
+        ...d.document,
+        evaluation: {
+          ...d.document.evaluation!,
+          basis: staleBasis,
+          jointPreview: { status: 'complete' as const, basis: staleBasis },
+        },
+      },
+    };
+    expect(artifact(staleJoint, { currentBasis: b }, stale).textContent).not.toContain(
+      'If the accepted answers are taken together:',
+    );
   });
 });
 
