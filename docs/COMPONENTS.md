@@ -13,6 +13,8 @@ The inventory in build order, then one section per component: what it is, its ru
 
 _Design specification for @knitli/marque-kit. Edit here._
 
+Readiness and evaluation rows describe the adopted kit consumer target in [CONTRACT.md](CONTRACT.md). Coordinated producer/kit/caller migration remains pending; these component descriptions and mockups do not establish end-to-end integration.
+
 
 ---
 
@@ -66,14 +68,14 @@ v1 · C5
 Findings pane
 the list and its sections
 The container the host mounts. Sections by rung — Needs you, Worth a look, Before you finalize, Done quietly — with the collapsed finding row as the item. Carries empty states ("Nothing needs you"), the fail-closed state, and the engine-unavailable state.
-a list of findings · document.ready
+a list of findings · document.evaluation · document.blocking[]
 —
 v1 · C6
 7
 Document status
 strip or ribbon tile
-One line the host can place anywhere: the count that needs a person, the resolved banner as it stands, and whether the document is ready. The host decides where it lives; the kit decides what it says.
-document.ready · .blocking[] · the banner artifact
+One line the host can place anywhere: the count that needs a person, the resolved banner as it stands, and whether the operation is ready on the current outgoing revision. Readiness requires a complete current evaluation and host confirmation of required writes and checks; the banner is context, not a readiness signal.
+document.evaluation · .blocking[] · pending/awaitingWrites · banner artifact · host current basis and confirmations
 Stamp, Marking
 v1 · C6
 8
@@ -87,14 +89,14 @@ v1 · C8
 Artifact card
 banner · CAB · notice · caveat
 The document-level findings: a banner derived from the portions (with what it waits on), an authority block with per-field blanks a person fills, a notice with its placement guidance. One card, kinds by artifact.kind; it says what is missing, not what is wrong, when there is nothing written yet.
-document.artifacts[] · placement · depends_on
+document.artifacts[] · placement · depends_on · field/artifact evaluation basis
 Card, Field, Marking
 v1 · C9
 10
 Finalize gate
 where Action required becomes Blocking
 The host calls it at the moment that matters — send, save, publish. It lists what is still open, in the pane's own words, and offers the answers inline. Nothing new to learn: it is the Needs-you section with defer removed.
-document.blocking[] · needs_person · blocks
+document.blocking[] · document.evaluation · pending/awaitingWrites · needs_person · blocks · kit effectiveReady(doc, host)
 Button
 v1 · C10
 2 · The trust surface why a classifier believes it
@@ -544,7 +546,8 @@ What the engine supplies
 2asks.text — the question, as a sentence a classifier would ask. The kit never composes it from parts.
 3asks.options[] — each with the facts it asserts, the plain reading, and the marking or value it produces. Readings and results travel together.
 4asks.field — type, format, hint, and the artifact that waits on it.
-5depends_on — only when readings differ in roll-up. If every reading rolls up the same way, nothing waits, and the card says so.
+5depends_on — findings whose reading can change the target value. Artifact and field dependencies are separate: retain them even when every reading leaves the banner unchanged.
+6An optional joint artifact preview — the engine evaluates the complete accepted answer set against a matched basis. The kit never composes an artifact preview by combining individual reading results. If the joint preview is unavailable, say so; the required fresh evaluation still decides what was accepted.
 What the kit adds
 ·The commit. Choosing never applies; Answer does. One click undoes a wrong radio; one click cannot undo a wrong marking in a document that has already been sent.
 ·Three standing answers on every question: "something else — I'll type it" (a free answer, always — most cases that need a person are things the engine doesn't handle yet, not things a person can't resolve), "ask me at finalize" (defer — the question comes back, as Blocking) and "not my call" (route — it stays open for someone else).
@@ -1001,7 +1004,7 @@ The document has no banner. Marque derived one from the portions.
 SECRET//FGI AUS GBR//NOFORN
 Highest classification across 6 portions; FGI for the Australian and British interest in paragraph 3; NOFORN because paragraph 5 is — one NOFORN portion makes the whole document NOFORN.
 
-Paragraph 3's open question doesn't change it. Paragraph 5's alternative does — taken, the banner becomesSECRET//FGI AUS GBR//REL TO USA, GBR
+Paragraph 3's open question doesn't change the banner. A CAB or other artifact field may still depend on it independently; artifact dependencies are not inferred from this banner. Paragraph 5's alternative does — taken, the banner becomesSECRET//FGI AUS GBR//REL TO USA, GBR
 Apply
 Show how Marque got here
 Why?CAPCO-2016 §H.3 p57
@@ -1066,7 +1069,7 @@ The document has no banner. Marque derived one from the portions.
 SECRET//FGI AUS GBR//NOFORN
 Highest classification across 6 portions; FGI for the Australian and British interest in paragraph 3; NOFORN because paragraph 5 is — one NOFORN portion makes the whole document NOFORN.
 
-Paragraph 3's open question doesn't change it. Paragraph 5's alternative does — taken, the banner becomesSECRET//FGI AUS GBR//REL TO USA, GBR
+Paragraph 3's open question doesn't change the banner. A CAB or other artifact field may still depend on it independently; artifact dependencies are not inferred from this banner. Paragraph 5's alternative does — taken, the banner becomesSECRET//FGI AUS GBR//REL TO USA, GBR
 Apply
 Show how Marque got here
 Why?CAPCO-2016 §H.3 p57
@@ -1139,7 +1142,8 @@ Engine fields
 ·document.artifacts[] with kind, scope, state, derivation, placement, and a typed content id or canonical value.
 ·ResolvedArtifact.fixability decides Apply vs fields; derived_value is what Apply writes.
 ·The CAB needs per-field state (known · derived · blank · waiting), not one state for the block. Classified By comes from identity; Declassify On from dates Marque can read; Derived From waits on derivation resolution; Reason, for original classification, from EO 13526 §1.4.
-·depends_on on the banner should be absent when every open reading rolls up the same way — the card above says so because the kit computed it; the engine should.
+·`depends_on` links findings to the result they can change. Keep artifact and field dependencies separately, including a CAB or notice field that changes while the banner stays the same; `artifactRevisions` and each field’s `evaluationBasis` bind that value.
+·An artifact may carry an optional `jointPreview` with the evaluation basis and combined result. Show it only when it agrees with the evaluation-level preview, the complete evaluation, current host basis and exact accepted answer set. Do not add or combine previews from individual readings in the kit; when joint evaluation is unavailable, show the preview as unavailable. An unavailable optional preview does not invalidate a complete base evaluation.
 
 
 ---
@@ -1150,7 +1154,7 @@ Component 10. The host calls it at its real moment. Blocked on the web and in a 
 Blocked · web form · 460px
 BLOCKEDBefore this is sent
 Three things need you before this can go.
-Sending is held until they're answered. Nothing is changed in the document while you decide. The banner is ready and will be applied as it sends — NOFORN, unless you take paragraph 5's alternative first.
+Sending is held while these questions are open. Nothing is written while you decide. The current banner result is NOFORN; after you answer, Marque checks the answers together before saving the required changes.
 
 1
 Paragraph 3 — who produced this information?
@@ -1201,7 +1205,7 @@ Receipt
 Blocked · Word dialog · 340px
 BLOCKEDBefore this is sent
 Three things need you before this can go.
-Sending is held until they're answered. Nothing is changed in the document while you decide. The banner is ready and will be applied as it sends — NOFORN, unless you take paragraph 5's alternative first.
+Sending is held while these questions are open. Nothing is written while you decide. The current banner result is NOFORN; after you answer, Marque checks the answers together before saving the required changes.
 
 1
 Paragraph 3 — who produced this information?
@@ -1243,7 +1247,7 @@ Rules
 5The cleared gate restates what was decided in words and markings, names what will be written and where, and names what was kept as written. Then Send.
 6Hosts. Web: a panel over the form, non-modal, focus inside. Word: an Office dialog, since the pane may be closed. Outlook: the ItemSend handler shows it and holds the message. Batch: the gate is the row that didn't pass.
 Engine fields
-document.blocking[], each finding's asks, document.ready, the artifacts with derived_value and placement. The gate adds nothing of its own; it is the host's moment applied to the kit's findings.
+`document.evaluation` carries completeness, basis, requirements and snapshot readiness; `document.blocking[]` lists blocking findings; an empty list cannot establish readiness. Findings carry their asks; artifacts carry derived values, fields and placement. The kit computes `effectiveReady(doc, host)` only with a matching current host basis, no accepted work pending, and confirmed required writes and host acceptance checks. The host supplies `currentBasis`, required and confirmed write tokens, and named required/confirmed acceptance checks; each write or acceptance-check confirmation is bound to the evaluation basis. The gate adds no policy: it combines the host's operation moment with the kit's evaluated findings and host confirmations.
 
 
 
