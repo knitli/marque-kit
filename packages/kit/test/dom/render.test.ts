@@ -70,7 +70,11 @@ describe('question first', () => {
 });
 
 describe('ordinary lint transformation receipts', () => {
-  const sample = {
+  const sample: NonNullable<Doc['document']['intake']> & {
+    candidates: unknown[];
+    source_occurrences: unknown[];
+    claims: unknown[];
+  } = {
     status: 'complete' as const,
     transformation_count: 1,
     transformations: [{ kind: 'normalized_ascii_case', span: [7, 9] as [number, number], observation: 0 }],
@@ -115,14 +119,75 @@ describe('ordinary lint transformation receipts', () => {
     receipt.open = true;
     expect(receipt.querySelector('summary')?.textContent).toBe('Source transformations · partial · 1 of 500 retained');
     expect(receipt.textContent).toContain('projection stopped at output bytes');
-    expect(d.document.ready).toBe(memo.document.ready);
+    const documentState = d.document;
+    pane(d);
+    expect(d.document).toBe(documentState);
   });
 
-  test.each(['refused', 'unavailable'])('%s receipts do not claim completeness', (status) => {
-    const d: Doc = { ...memo, document: { ...memo.document, intake: { status } } };
+  test.each(['refused', 'unavailable'])('%s receipts do not render stale rows or claim completeness', (status) => {
+    const d: Doc = {
+      ...memo,
+      document: {
+        ...memo.document,
+        intake: {
+          status,
+          transformation_count: 1,
+          transformations: [{ kind: 'normalized_ascii_case', span: [7, 9], observation: 0 }],
+        },
+      },
+    };
     const receipt = pane(d).querySelector('details.mq-transform-receipt')!;
     expect(receipt.querySelector('summary')?.textContent).toBe(`Source transformations · ${status}`);
     expect(receipt.textContent).toContain('A complete transformation receipt was not available.');
+    expect(receipt.querySelector('ul.mq-transforms')).toBeNull();
+    expect(receipt.textContent).not.toContain('Original byte span');
+  });
+
+  test.each([
+    { status: 'complete' },
+    { status: 'complete', transformation_count: 0 },
+    { status: 'complete', transformation_count: 2, transformations: sample.transformations },
+  ])('missing count or rows cannot claim complete-empty or complete receipt (%j)', (input) => {
+    const intake = input as unknown as NonNullable<Doc['document']['intake']>;
+    const d: Doc = { ...memo, document: { ...memo.document, intake } };
+    const summary = pane(d).querySelector('details.mq-transform-receipt summary')?.textContent;
+    expect(summary).not.toBe('Source transformations · none recorded');
+    expect(summary).not.toBe('Source transformations · 2 recorded');
+    expect(summary).toContain('incomplete');
+  });
+
+  test('mounted protected view filters malformed rows and never renders unknown wire strings', () => {
+    const privateValue = 'GRANTED SECRET must never be rendered';
+    const intake = {
+      status: 'complete',
+      transformation_count: 4,
+      transformations: [
+        { kind: 'normalized_ascii_case', span: [5, 5], observation: 1 },
+        { kind: privateValue, span: [0, 2], observation: 0 },
+        { kind: 'missing_opening_delimiter_at_boundary', span: [8, 4], observation: 0 },
+        { kind: 'normalized_ascii_case', span: [0, 1], observation: privateValue },
+      ],
+      projection_cutoff: { resource: privateValue },
+      candidates: [{ private: privateValue }],
+      source_occurrences: [{ value: privateValue }],
+      claims: [{ value: privateValue }],
+    } as unknown as Doc['document']['intake'];
+    const d: Doc = { ...memo, document: { ...memo.document, intake } };
+    const root = document.createElement('div');
+    document.body.append(root);
+    const mounted = mount(root, { doc: d, readOnly: true });
+    const receipt = root.querySelector<HTMLDetailsElement>('details.mq-transform-receipt')!;
+    receipt.open = true;
+    expect(receipt.querySelector('summary')?.textContent).toContain('incomplete');
+    expect(receipt.querySelectorAll('li.mq-transform')).toHaveLength(1);
+    expect(receipt.textContent).toContain('Normalized ASCII case');
+    expect(receipt.textContent).toContain('Original byte span 5–5');
+    expect(receipt.textContent).toContain('Owning observation 1');
+    expect(receipt.textContent).not.toContain(privateValue);
+    expect(receipt.textContent).not.toContain('missing_opening_delimiter_at_boundary');
+    expect(receipt.querySelector('button, input, textarea, select')).toBeNull();
+    mounted.destroy();
+    root.remove();
   });
 });
 

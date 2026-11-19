@@ -452,8 +452,10 @@ export interface DocumentState {
 }
 
 /** A transformation the engine recorded while inspecting source bytes. */
+export type TransformationKind = 'normalized_ascii_case' | 'missing_opening_delimiter_at_boundary';
+
 export interface PerformedTransformation {
-  kind: string;
+  kind: TransformationKind;
   /** Original UTF-8 byte range, including zero-width insertion points. */
   span: [number, number];
   /** Index of the source candidate that owns the operation. */
@@ -461,11 +463,22 @@ export interface PerformedTransformation {
 }
 
 /** The ordinary lint projection's bounded transformation receipt fields. */
+export type IntakeStatus = 'complete' | 'partial' | 'refused' | 'unavailable';
+export type IntakeResource =
+  | 'input_bytes'
+  | 'input_records'
+  | 'input_members'
+  | 'items'
+  | 'support_edges'
+  | 'work'
+  | 'retained_bytes'
+  | 'output_bytes';
+
 export interface DocumentIntake {
-  status: 'complete' | 'partial' | 'unavailable' | (string & {});
+  status: IntakeStatus | (string & {});
   transformation_count?: number;
   transformations?: PerformedTransformation[];
-  projection_cutoff?: { phase?: string | null; resource?: string | null } | null;
+  projection_cutoff?: { phase?: string | null; resource?: IntakeResource | (string & {}) | null } | null;
 }
 
 /** The engine's document, or a view of it (docView). */

@@ -723,30 +723,77 @@ export function status(doc: Doc | null, host: Host = {}): HTMLDivElement {
 }
 
 /** Read-only engine receipts: source text and candidate evidence never enter the view. */
-const transformationName = (kind: string): string =>
-  ({ normalized_ascii_case: 'Normalized ASCII case' } as Record<string, string>)[kind] ?? kind.replace(/_/g, ' ');
+const TRANSFORMATION_NAMES: Readonly<Record<string, string>> = {
+  normalized_ascii_case: 'Normalized ASCII case',
+  missing_opening_delimiter_at_boundary: 'Missing opening delimiter at the boundary',
+};
+const RESOURCE_NAMES: Readonly<Record<string, string>> = {
+  input_bytes: 'input bytes',
+  input_records: 'input records',
+  input_members: 'input members',
+  items: 'items',
+  support_edges: 'support edges',
+  work: 'work',
+  retained_bytes: 'retained bytes',
+  output_bytes: 'output bytes',
+};
+const MAX_SOURCE_BYTES = 262_144;
+const MAX_OBSERVATION_INDEX = 32_767;
+const safeIndex = (value: unknown, max = Number.MAX_SAFE_INTEGER): value is number =>
+  Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= max;
+
+type SafeTransformation = { name: string; start: number; end: number; observation: number };
+function safeTransformation(row: unknown): SafeTransformation | null {
+  if (!row || typeof row !== 'object') return null;
+  const value = row as Record<string, unknown>;
+  const name = typeof value.kind === 'string' ? TRANSFORMATION_NAMES[value.kind] : undefined;
+  const span = value.span;
+  if (
+    !name ||
+    !Array.isArray(span) ||
+    span.length !== 2 ||
+    !safeIndex(span[0], MAX_SOURCE_BYTES) ||
+    !safeIndex(span[1], MAX_SOURCE_BYTES) ||
+    span[0] > span[1] ||
+    !safeIndex(value.observation, MAX_OBSERVATION_INDEX)
+  )
+    return null;
+  return { name, start: span[0], end: span[1], observation: value.observation };
+}
 
 function transformationReceipts(intake: DocumentIntake): HTMLDetailsElement {
-  const rows = intake.transformations || [];
-  const counted = Number.isSafeInteger(intake.transformation_count) && (intake.transformation_count ?? -1) >= 0;
-  const total = counted ? intake.transformation_count! : rows.length;
-  const complete = intake.status === 'complete' && rows.length === total;
-  const refused = intake.status === 'refused' || intake.status === 'unavailable';
+  const status = ['complete', 'partial', 'refused', 'unavailable'].includes(intake.status)
+    ? intake.status
+    : 'unavailable';
+  const refused = status === 'refused' || status === 'unavailable';
+  const suppliedRows = Array.isArray(intake.transformations) ? intake.transformations : null;
+  const rows = refused
+    ? []
+    : (suppliedRows ?? []).map(safeTransformation).filter((row): row is SafeTransformation => row !== null);
+  const counted = safeIndex(intake.transformation_count);
+  const total = counted ? intake.transformation_count! : undefined;
+  const complete =
+    status === 'complete' &&
+    counted &&
+    suppliedRows !== null &&
+    rows.length === suppliedRows.length &&
+    rows.length === total;
   const partial = !complete && !refused;
   const summary = refused
-    ? `Source transformations · ${intake.status}`
+    ? `Source transformations · ${status}`
     : complete && total === 0
       ? 'Source transformations · none recorded'
       : complete
         ? `Source transformations · ${total} recorded`
-        : `Source transformations · ${intake.status === 'partial' ? 'partial' : 'incomplete'} · ${rows.length} of ${counted ? total : '?'} retained`;
+        : `Source transformations · ${status === 'partial' ? 'partial' : 'incomplete'} · ${rows.length} of ${counted ? total : '?'} retained`;
   const details = el('details', 'mq-engine mq-transform-receipt') as HTMLDetailsElement;
   details.append(el('summary', 'mq-h', summary));
 
   const body = el('div', 'mq-txt');
   body.append(el('p', 'mq-p', 'Read-only records from this lint. They do not change the source or affect readiness.'));
   if (partial) {
-    const cutoff = intake.projection_cutoff?.resource?.replace(/_/g, ' ');
+    const resource = intake.projection_cutoff?.resource;
+    const cutoff = typeof resource === 'string' ? RESOURCE_NAMES[resource] : undefined;
     body.append(
       el(
         'p',
@@ -762,8 +809,8 @@ function transformationReceipts(intake: DocumentIntake): HTMLDetailsElement {
     for (const row of rows) {
       const item = el('li', 'mq-transform');
       item.append(
-        el('span', 'mq-h', transformationName(row.kind)),
-        el('span', 'mq-p', `Original byte span ${row.span[0]}–${row.span[1]}`),
+        el('span', 'mq-h', row.name),
+        el('span', 'mq-p', `Original byte span ${row.start}–${row.end}`),
         el('span', 'mq-p', `Owning observation ${row.observation}`),
       );
       list.append(item);
