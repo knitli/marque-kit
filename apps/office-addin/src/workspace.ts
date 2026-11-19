@@ -4,6 +4,7 @@
 
 import type { OfficeSourceMarkingInstallation } from './source-marking.ts';
 import type { NativeCabRequest } from '@knitli/marque-kit-core/native-cab';
+import type { NativeSemanticResultsContext } from '@knitli/marque-kit-core/native-results';
 import type {
   ActAppendRequest,
   AppendActResult,
@@ -23,6 +24,10 @@ export interface OfficeWordHost {
   jump?(subjectId: string, documentId: string): Promise<void>;
   /** The installation guarantees notification for any change to document revision, disclosure, session, or provider before further results may be shown. */
   watchNativeCabInvalidation?(documentId: string, chain: string, invalidate: () => void): () => void;
+  /** Fires before semantic result disclosure, viewer, document, or provider changes can be shown. */
+  watchNativeSemanticResultsInvalidation?(documentId: string, viewerId: string, invalidate: () => void): () => void;
+  /** Independently obtain the current disclosure context for this restricted viewer. */
+  readNativeSemanticResultsContext?(documentId: string, viewerId: string): Promise<NativeSemanticResultsContext | null>;
   /** Independently obtain the current authorized target, profile and evaluation basis. */
   readNativeCabScope?(
     documentId: string,
@@ -67,6 +72,20 @@ export interface OfficeNativeWordSession {
   /** Read-only refresh; must not apply or acknowledge a write. */
   readNativeCab?(): Promise<OfficeNativeCabSnapshot>;
 }
+/** A restricted viewer receives only a sanitized semantic-results projection. */
+export interface OfficeNativeSemanticResultsSnapshot {
+  documentId: string;
+  wire: string;
+  request: import('@knitli/marque-kit-core/native-results').NativeSemanticResultsRequest;
+}
+export interface OfficeNativeSemanticResultsSession {
+  readonly kind: 'native_semantic_results';
+  readonly documentId: string;
+  readonly viewerId: string;
+  readonly nativeSemanticResults: OfficeNativeSemanticResultsSnapshot;
+  /** Fresh sanitized projection and matching host grant; never legacy evaluation or source-marking JSON. */
+  readNativeSemanticResults?(): Promise<OfficeNativeSemanticResultsSnapshot>;
+}
 
 /** One provider-issued document scope. Never use a session with another document or provider. */
 export interface OfficeWordSession {
@@ -96,7 +115,9 @@ export interface OfficeWordSession {
 
 /** Installed by a trusted host integration; no default network or browser-storage implementation exists. */
 export interface OfficeWorkspaceProvider {
-  openWord(host: OfficeWordHost): Promise<OfficeWordSession | OfficeNativeWordSession | null>;
+  openWord(
+    host: OfficeWordHost,
+  ): Promise<OfficeWordSession | OfficeNativeWordSession | OfficeNativeSemanticResultsSession | null>;
 }
 
 declare global {

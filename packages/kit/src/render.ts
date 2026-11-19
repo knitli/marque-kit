@@ -34,7 +34,9 @@
 
 import { readCabSnapshot } from '@knitli/marque-kit-core/native-cab';
 import type { NativeCabRequest } from '@knitli/marque-kit-core/native-cab';
-import type { NativeField } from '@knitli/marque-kit-core/native-wire';
+import { readNativeSemanticResults } from '@knitli/marque-kit-core/native-results';
+import type { NativeSemanticResultsRequest } from '@knitli/marque-kit-core/native-results';
+import type { NativeField, NativeSemanticResultSupportKind } from '@knitli/marque-kit-core/native-wire';
 import { render as mark, settle, resettle, relabel, el, button } from './marking.ts';
 import {
   appendAcknowledgementIssue,
@@ -158,6 +160,8 @@ export interface Update {
   historyDisclosure?: HistoryDisclosure | null;
   /** Replace or revoke the independently supplied native CAB scope. */
   nativeCabRequest?: NativeCabRequest | null;
+  /** Replace or revoke the independently supplied selected-result disclosure. */
+  nativeSemanticResultsRequest?: NativeSemanticResultsRequest | null;
   /** The log length when this lint began. */
   linted?: number | undefined;
   /** The host's request counter. */
@@ -907,6 +911,17 @@ const CAB_FIELD_LABEL: Record<NativeField, string> = {
   classification_reason: 'Classification reason',
   declassify_on: 'Declassify on',
 };
+const RESULT_SUPPORT_LABEL: Record<NativeSemanticResultSupportKind, string> = {
+  authored: 'Author-written material',
+  unresolved_occurrence: 'Unresolved source occurrence',
+  implied_usa: 'Implied by U.S. origin',
+  examined_absence: 'Examined absence',
+  rel_receive_implies_show: 'Foreign release relationship',
+  preview_answer: 'Preview response',
+  cab_proof: 'Classification authority evidence',
+  sci_proof: 'Sensitive compartmented information evidence',
+  default_policy_proof: 'Default policy evidence',
+};
 const words = (value: string): string => value.replaceAll('_', ' ');
 /** A scoped read, not a finding, document readiness verdict, or writable card. */
 function nativeCab(doc: Doc, host: Host): HTMLElement {
@@ -959,6 +974,55 @@ function nativeCab(doc: Doc, host: Host): HTMLElement {
   return section;
 }
 
+/** A bounded read-only projection of only the rows and details the host granted. */
+function nativeSemanticResults(doc: Doc, host: Host): HTMLElement {
+  const section = el('section', 'mq-section');
+  section.append(el('h2', 'mq-label', 'Evaluation results'));
+  const result = readNativeSemanticResults(doc, host.nativeSemanticResultsRequest, host.currentDisclosureRevision);
+  if (!result) {
+    section.append(el('p', 'mq-p', 'The current result disclosure is unavailable.'));
+    return section;
+  }
+  section.append(
+    el(
+      'p',
+      'mq-p',
+      `${plural(result.disclosure.items.length, 'selected result row', 'selected result rows')} are available for this read-only view. Source values and identifiers are not shown.`,
+    ),
+  );
+  if (result.disclosure.coverage)
+    section.append(el('p', 'mq-p', `Result coverage is ${words(result.disclosure.coverage)}.`));
+  const rows = el('ol', 'mq-rows');
+  for (const item of result.disclosure.items) {
+    const row = el('li', 'mq-row-item');
+    const title = item.meaning?.status === 'available' ? CAB_FIELD_LABEL[item.meaning.field] : `Result ${item.ordinal}`;
+    row.append(el('h3', 'mq-label', title));
+    if (!item.meaning || item.meaning.status === 'unavailable')
+      row.append(el('p', 'mq-p', 'Typed meaning is unavailable.'));
+    if (item.support_kinds) {
+      const supportText = item.support_kinds.map((kind) => RESULT_SUPPORT_LABEL[kind]).join('; ');
+      row.append(el('p', 'mq-p', supportText ? `Evidence types: ${supportText}.` : 'No support types were reported.'));
+    }
+    if (item.dependencies) {
+      if (item.dependencies.status === 'unavailable') {
+        row.append(el('p', 'mq-p', 'Dependency information is unavailable.'));
+      } else if (item.dependencies.items.length === 0) {
+        row.append(el('p', 'mq-p', 'No result dependencies were reported.'));
+      } else {
+        const dependencyRows = item.dependencies.items
+          .map((dependency) =>
+            dependency.status === 'resolved' ? `Result ${dependency.row}` : 'An unavailable dependency',
+          )
+          .join('; ');
+        row.append(el('p', 'mq-p', `Depends on: ${dependencyRows}.`));
+      }
+    }
+    rows.append(row);
+  }
+  if (rows.childElementCount) section.append(rows);
+  return section;
+}
+
 export function pane(doc: Doc | null, host: Host = {}): HTMLDivElement {
   const p = el('div', 'mq-pane');
   const head = el('div', 'mq-pane-head');
@@ -982,8 +1046,9 @@ export function pane(doc: Doc | null, host: Host = {}): HTMLDivElement {
     return p;
   }
 
-  if ('native_evaluation' in doc.document) {
-    p.append(nativeCab(doc, host));
+  if ('native_evaluation' in doc.document || 'native_semantic_results' in doc.document) {
+    if ('native_evaluation' in doc.document) p.append(nativeCab(doc, host));
+    if ('native_semantic_results' in doc.document) p.append(nativeSemanticResults(doc, host));
     return p;
   }
 
@@ -1432,6 +1497,7 @@ export function mount(
     currentDisclosureRevision: string | null;
     historyDisclosure: HistoryDisclosure | null;
     nativeCabRequest: NativeCabRequest | null;
+    nativeSemanticResultsRequest: NativeSemanticResultsRequest | null;
     open: string | null;
     tab: Tab;
     seq: number | null;
@@ -1445,6 +1511,7 @@ export function mount(
     currentDisclosureRevision: host.currentDisclosureRevision ?? null,
     historyDisclosure: host.historyDisclosure ?? null,
     nativeCabRequest: host.nativeCabRequest ?? null,
+    nativeSemanticResultsRequest: host.nativeSemanticResultsRequest ?? null,
     open: null,
     tab: 'findings',
     seq: null,
@@ -1529,6 +1596,9 @@ export function mount(
     },
     get nativeCabRequest() {
       return cur.nativeCabRequest ?? undefined;
+    },
+    get nativeSemanticResultsRequest() {
+      return cur.nativeSemanticResultsRequest ?? undefined;
     },
     get open() {
       return cur.open;
@@ -1813,7 +1883,7 @@ export function mount(
     const v = cur.doc && docView(cur.doc, cur.state);
     let say = '';
     const ok = cur.engine === 'ok';
-    const nativeRoute = !!v && 'native_evaluation' in v.document;
+    const nativeRoute = !!v && ('native_evaluation' in v.document || 'native_semantic_results' in v.document);
     if (nativeRoute) recent?.end();
     if (v && !nativeRoute && (ok || cur.engine === 'checking')) {
       const now = sections(v, cur.moment).must;
@@ -1939,7 +2009,11 @@ export function mount(
   }
 
   async function submitAct(f: Subject, act: Act, value: ActValue | null): Promise<void> {
-    if (writeAuthorityRevoked || (cur.doc && 'native_evaluation' in cur.doc.document)) return;
+    if (
+      writeAuthorityRevoked ||
+      (cur.doc && ('native_evaluation' in cur.doc.document || 'native_semantic_results' in cur.doc.document))
+    )
+      return;
     if (appendInFlight) return;
     if (!host.onAppend) {
       appendStatus = 'The host cannot record this action. It has not been applied or added to history.';
@@ -1965,7 +2039,11 @@ export function mount(
   }
 
   async function submitAppend(request: ActAppendRequest, original?: Subject): Promise<void> {
-    if (writeAuthorityRevoked || (cur.doc && 'native_evaluation' in cur.doc.document)) return;
+    if (
+      writeAuthorityRevoked ||
+      (cur.doc && ('native_evaluation' in cur.doc.document || 'native_semantic_results' in cur.doc.document))
+    )
+      return;
     const append = host.onAppend;
     if (!append || appendInFlight) return;
     const ownerBinding = currentAppendBinding();
@@ -1985,7 +2063,7 @@ export function mount(
     const contextIsCurrent = (): boolean =>
       !writeAuthorityRevoked &&
       cur.doc === documentAtRequest &&
-      !(cur.doc && 'native_evaluation' in cur.doc.document) &&
+      !(cur.doc && ('native_evaluation' in cur.doc.document || 'native_semantic_results' in cur.doc.document)) &&
       canon(currentAppendBinding()) === bindingKey &&
       canon(cur.doc?.document.evaluation?.basis ?? null) === documentBasisKey;
     const sameOwner = (): boolean =>
@@ -2138,12 +2216,21 @@ export function mount(
         delete next.currentDisclosureRevision;
         delete next.historyDisclosure;
         delete next.nativeCabRequest;
+        delete next.nativeSemanticResultsRequest;
         actBinding = undefined;
       } else {
         if (lint && seq != null) cur.seq = seq;
         // A new evaluation must explicitly carry a newly obtained native scope.
         if (('doc' in next || ('engine' in next && next.engine !== 'ok')) && !('nativeCabRequest' in next))
           cur.nativeCabRequest = null;
+        if (('doc' in next || ('engine' in next && next.engine !== 'ok')) && !('nativeSemanticResultsRequest' in next))
+          cur.nativeSemanticResultsRequest = null;
+        if (
+          'currentDisclosureRevision' in next &&
+          next.currentDisclosureRevision !== cur.currentDisclosureRevision &&
+          !('nativeSemanticResultsRequest' in next)
+        )
+          cur.nativeSemanticResultsRequest = null;
       }
       if (next.readOnly === true && !cur.readOnly) writeAuthorityRevoked = true;
       if (next.readOnly === false) writeAuthorityRevoked = false;

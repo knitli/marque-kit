@@ -14,6 +14,7 @@ const config: UserConfig = defineConfig({
       'src/types.ts',
       'src/native-wire.ts',
       'src/native-cab.ts',
+      'src/native-results.ts',
     ],
     format: ['esm'],
     // No DOM: core runs in a page, in node, and in Outlook's send handler.
