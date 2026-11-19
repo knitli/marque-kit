@@ -946,6 +946,9 @@ function nativeCab(doc: Doc, host: Host): HTMLElement {
             : 'Finding outcome is unavailable.',
         ),
       );
+      const prompt = finding.question?.prompt ?? finding.requested_action?.requested_fact;
+      if (prompt) row.append(el('span', 'mq-p', prompt));
+      if (finding.identity.status === 'unavailable') row.append(el('span', 'mq-p', 'Finding identity is unavailable.'));
       if (!finding.question) row.append(el('span', 'mq-p', 'Question identity is unavailable.'));
       if (!finding.result || !finding.result_revision)
         row.append(el('span', 'mq-p', 'Result identity is unavailable.'));

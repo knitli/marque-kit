@@ -133,10 +133,12 @@ function validFinding(
   subjects: Set<string>,
   questions: Set<string>,
 ): boolean {
+  const issued = f.identity.status === 'issued' ? f.identity.subject : null;
   if (
-    Number(f.subject.serial) === 0 ||
-    subjects.has(f.subject.serial) ||
-    Number(f.subject.serial) > Number(v.handles.last_subject) ||
+    (issued !== null &&
+      (Number(issued.serial) === 0 ||
+        subjects.has(issued.serial) ||
+        Number(issued.serial) > Number(v.handles.last_subject))) ||
     (f.question &&
       (Number(f.question.serial) === 0 ||
         Number(f.question.revision) === 0 ||
@@ -145,23 +147,27 @@ function validFinding(
         Number(f.question.revision) > Number(v.handles.last_question_revision))) ||
     (f.result_revision !== null &&
       (Number(f.result_revision) === 0 || Number(f.result_revision) > Number(v.handles.last_result_revision))) ||
-    (f.result && Number(f.result.serial) === 0)
+    (f.result && Number(f.result.serial) === 0) ||
+    (issued === null && (f.question !== null || f.result !== null || f.result_revision !== null))
   )
     return false;
   if (
-    f.subject.chain !== v.chain ||
-    (f.result && (f.result.subject_chain !== f.subject.chain || f.result.subject_serial !== f.subject.serial))
+    (issued !== null && issued.chain !== v.chain) ||
+    (issued !== null &&
+      f.result &&
+      (f.result.subject_chain !== issued.chain || f.result.subject_serial !== issued.serial))
   )
     return false;
-  subjects.add(f.subject.serial);
+  if (issued !== null) subjects.add(issued.serial);
   if (f.question) questions.add(f.question.serial);
   if (f.question && f.requested_action) return false;
   const meaning = f.question?.meaning ?? f.requested_action;
   if (
     f.question &&
-    (f.question.chain !== v.chain ||
-      f.question.subject.chain !== f.subject.chain ||
-      f.question.subject.serial !== f.subject.serial ||
+    (issued === null ||
+      f.question.chain !== v.chain ||
+      f.question.subject.chain !== issued.chain ||
+      f.question.subject.serial !== issued.serial ||
       canon(f.question.basis) !== basisKey)
   )
     return false;

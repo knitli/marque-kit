@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, test, vi } from 'vite-plus/test';
 import { parseNativeJson } from '@knitli/marque-kit-core/native-wire';
 import { readCabSnapshot } from '@knitli/marque-kit-core/native-cab';
+import { effectiveReady } from '@knitli/marque-kit-core/state';
 import type { NativeCabRequest } from '@knitli/marque-kit-core/native-cab';
 import type { Doc } from '@knitli/marque-kit-core/types';
 import { mount } from '../../src/render.ts';
@@ -46,7 +47,7 @@ describe('native v2 read-only pane', () => {
     const original = JSON.parse(raw('funded'));
     const mutations = [
       (x: typeof original) => {
-        x.evaluation.findings.items[0].subject.chain = 'wrong';
+        x.evaluation.findings.items[0].identity.subject.chain = 'wrong';
       },
       (x: typeof original) => {
         x.evaluation.findings.items[0].question.subject.serial = '2';
@@ -64,12 +65,13 @@ describe('native v2 read-only pane', () => {
       const { doc, request } = setup(JSON.stringify(x));
       expect(readCabSnapshot(doc, request)).toBeNull();
     }
-    original.evaluation.findings.items[0].subject.serial = '9007199254740992';
+    original.evaluation.findings.items[0].identity.subject.serial = '9007199254740992';
     expect(() => parse(JSON.stringify(original))).toThrow();
   });
   test('Office provider handles actual v2 refresh and revokes mismatched chain without writes', async () => {
     const first = setup(raw('funded'));
     const next = setup(raw('partial'));
+    const unavailable = setup(raw('finding-identity-unavailable'));
     const root = document.createElement('div');
     const write = vi.fn();
     const read = vi.fn();
@@ -102,6 +104,19 @@ describe('native v2 read-only pane', () => {
     });
     await pane.refresh();
     expect(root.textContent).toContain('Source coverage is partial.');
+    read.mockResolvedValueOnce({
+      documentId: session.documentId,
+      chain: session.chain,
+      wire: raw('finding-identity-unavailable'),
+      request: unavailable.request,
+    });
+    await pane.refresh();
+    expect(root.textContent).toContain('Finding identity is unavailable.');
+    expect(Array.from(root.querySelectorAll('button')).map((button) => button.textContent)).toEqual([
+      'Refresh authority block',
+    ]);
+    expect(root.querySelector('.mq-history')).toBeNull();
+    expect(write).not.toHaveBeenCalled();
     read.mockResolvedValueOnce({
       documentId: session.documentId,
       chain: 'wrong',
@@ -153,7 +168,7 @@ describe('native v2 read-only pane', () => {
     wrongSchema.version = 3;
     expect(() => parse(JSON.stringify(wrongSchema))).toThrow();
     const overWatermark = structuredClone(original);
-    overWatermark.evaluation.findings.items[0].subject.serial = '5';
+    overWatermark.evaluation.findings.items[0].identity.subject.serial = '5';
     const { doc, request } = setup(JSON.stringify(overWatermark));
     expect(readCabSnapshot(doc, request)).toBeNull();
   });
@@ -182,17 +197,6 @@ describe('native v2 read-only pane', () => {
       pane.destroy();
     },
   );
-  test('actual fully exhausted subject allocation retains requirements without findings', () => {
-    const { e, doc, request } = setup(raw('subject-exhausted-no-findings'));
-    expect(e.evaluation.findings.items).toHaveLength(0);
-    expect(e.evaluation.requirements).toHaveLength(4);
-    expect(readCabSnapshot(doc, request)).not.toBeNull();
-    const root = document.createElement('div');
-    const pane = mount(root, { doc, nativeCabRequest: request });
-    expect(root.textContent).toContain('Classified by');
-    expect(root.textContent).not.toContain('Additional information is needed.');
-    pane.destroy();
-  });
   test('rejects contradictory requirement states and unbound artifact identities', () => {
     const original = JSON.parse(raw('funded'));
     for (const mutate of [
@@ -229,11 +233,114 @@ describe('native v2 read-only pane', () => {
     expect(root.textContent?.match(/Finding reports: Additional information is needed/g)).toHaveLength(3);
     pane.destroy();
   });
+  test('parses serializer-contract identity reasons and required resource while retaining content', () => {
+    const { e, doc, request } = setup(raw('finding-identity-unavailable'));
+    expect(e.evaluation.findings.items).toHaveLength(20);
+    expect(e.evaluation.findings.items[0]?.identity).toEqual({
+      status: 'unavailable',
+      reason: 'prior_unexamined',
+      resource: 'input_bytes',
+    });
+    expect(e.evaluation.findings.items[0]?.requirement.status).toBe('resolved');
+    expect(e.evaluation.findings.items[0]?.outcome).toBe('needs_fact');
+    const resourceTags = [
+      'input_bytes',
+      'input_records',
+      'input_members',
+      'items',
+      'support_edges',
+      'work',
+      'retained_bytes',
+      'output_bytes',
+    ];
+    for (const reason of ['prior_unexamined', 'resource']) {
+      expect(
+        e.evaluation.findings.items
+          .filter((finding) => finding.identity.status === 'unavailable' && finding.identity.reason === reason)
+          .map((finding) =>
+            finding.identity.status === 'unavailable' && 'resource' in finding.identity
+              ? finding.identity.resource
+              : null,
+          )
+          .sort((a, b) => String(a).localeCompare(String(b))),
+      ).toEqual([...resourceTags].sort((a, b) => a.localeCompare(b)));
+    }
+    expect(readCabSnapshot(doc, request)).not.toBeNull();
+    expect(effectiveReady(doc)).toBe(false);
+    const root = document.createElement('div');
+    const pane = mount(root, { doc, nativeCabRequest: request });
+    expect(root.textContent).toContain('Finding identity is unavailable.');
+    expect(root.textContent).toContain('Additional information is needed.');
+    expect(root.querySelector('button')).toBeNull();
+    expect(root.querySelector('.mq-history')).toBeNull();
+    pane.destroy();
+  });
+  test('consumer preserves a supplied answer action when an identity is unavailable', () => {
+    const x = JSON.parse(raw('finding-identity-unavailable'));
+    const actionOnly = JSON.parse(raw('question-action-fallback-serial'));
+    x.evaluation.findings.items[0].requested_action = actionOnly.evaluation.findings.items[0].requested_action;
+    x.evaluation.findings.items[0].question = null;
+    x.evaluation.findings.items[0].result = null;
+    x.evaluation.findings.items[0].result_revision = null;
+    const { e, doc, request } = setup(JSON.stringify(x));
+    expect(e.evaluation.findings.items[0]?.requested_action).toEqual(
+      actionOnly.evaluation.findings.items[0]?.requested_action,
+    );
+    expect(e.evaluation.findings.items[0]?.identity.status).toBe('unavailable');
+    expect(readCabSnapshot(doc, request)).not.toBeNull();
+    const root = document.createElement('div');
+    const pane = mount(root, { doc, nativeCabRequest: request });
+    expect(root.textContent).toContain('Finding identity is unavailable.');
+    expect(root.textContent).toContain(e.evaluation.findings.items[0]!.requested_action!.requested_fact);
+    expect(root.querySelector('button')).toBeNull();
+    expect(root.querySelector('.mq-history')).toBeNull();
+    pane.destroy();
+  });
+  test('rejects unavailable identity carrying question or result handles', () => {
+    const x = JSON.parse(raw('funded'));
+    x.evaluation.findings.items[0].identity = {
+      status: 'unavailable',
+      reason: 'resource',
+      resource: 'work',
+    };
+    const { doc, request } = setup(JSON.stringify(x));
+    expect(readCabSnapshot(doc, request)).toBeNull();
+  });
+  test('rejects malformed finding identity variants instead of accepting legacy subjects', () => {
+    const original = JSON.parse(raw('finding-identity-unavailable'));
+    const mutations = [
+      (x: typeof original) => {
+        delete x.evaluation.findings.items[0].identity.resource;
+      },
+      (x: typeof original) => {
+        x.evaluation.findings.items[0].identity.reason = 'other';
+      },
+      (x: typeof original) => {
+        x.evaluation.findings.items[0].identity.resource = 'mystery';
+      },
+      (x: typeof original) => {
+        x.evaluation.findings.items[0].identity.extra = 'unexpected';
+      },
+      (x: typeof original) => {
+        x.evaluation.findings.items[16].identity.resource = 'work';
+      },
+      (x: typeof original) => {
+        const finding = x.evaluation.findings.items[0];
+        finding.subject = { chain: 'chain', serial: '1' };
+        delete finding.identity;
+      },
+    ];
+    for (const mutate of mutations) {
+      const x = structuredClone(original);
+      mutate(x);
+      expect(() => parse(JSON.stringify(x))).toThrow(TypeError);
+    }
+  });
   test('rejects zero and reused represented identifiers', () => {
     const original = JSON.parse(raw('funded'));
     for (const mutate of [
       (x: typeof original) => {
-        x.evaluation.findings.items[0].subject.serial = '0';
+        x.evaluation.findings.items[0].identity.subject.serial = '0';
       },
       (x: typeof original) => {
         x.evaluation.findings.items[0].question.serial = '0';
@@ -255,9 +362,9 @@ describe('native v2 read-only pane', () => {
       },
       (x: typeof original) => {
         const a = x.evaluation.findings.items;
-        a[1].subject.serial = a[0].subject.serial;
-        a[1].question.subject.serial = a[0].subject.serial;
-        a[1].result.subject_serial = a[0].subject.serial;
+        a[1].identity.subject.serial = a[0].identity.subject.serial;
+        a[1].question.subject.serial = a[0].identity.subject.serial;
+        a[1].result.subject_serial = a[0].identity.subject.serial;
       },
     ]) {
       const x = structuredClone(original);
@@ -351,8 +458,14 @@ describe('native v2 read-only pane', () => {
     expect(root.textContent).not.toContain('Additional information is needed.');
     pane.destroy();
   });
-  test('actual fresh typed r2 shows satisfied requirement with its resolved finding absent', () => {
-    const { e, doc, request } = setup(raw('post-write'));
+  test('keeps a satisfied requirement separate from remaining native findings', () => {
+    const x = JSON.parse(raw('funded'));
+    x.evaluation.requirements[0].state = 'satisfied';
+    x.evaluation.findings.items = x.evaluation.findings.items.filter(
+      (finding: { requirement: { status: string; index?: string } }) =>
+        finding.requirement.status !== 'resolved' || finding.requirement.index !== '0',
+    );
+    const { e, doc, request } = setup(JSON.stringify(x));
     expect(readCabSnapshot(doc, request)).not.toBeNull();
     expect(e.evaluation.requirements.find((r) => r.field === 'classified_by')?.state).toBe('satisfied');
     expect(e.evaluation.findings.items.some((f) => f.question?.field === 'classified_by')).toBe(false);
