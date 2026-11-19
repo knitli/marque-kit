@@ -546,4 +546,63 @@ describe('native v2 read-only pane', () => {
     pane.destroy();
     expect(root.textContent).toBe('');
   });
+  test('replays the Rust-produced subject-exhaustion fixture through the normal Word consumer', async () => {
+    const wire = raw('subject-serial-exhausted');
+    const { e, doc, request } = setup(wire);
+    const findings = e.evaluation.findings.items;
+    expect(findings).toHaveLength(3);
+    expect(findings.map((finding) => finding.identity)).toEqual(
+      Array.from({ length: 3 }, () => ({ status: 'unavailable', reason: 'subject_serial_exhausted' })),
+    );
+    expect(findings.map((finding) => finding.requirement)).toEqual([
+      { status: 'resolved', index: '0' },
+      { status: 'resolved', index: '1' },
+      { status: 'resolved', index: '2' },
+    ]);
+    expect(findings.map((finding) => finding.requested_action?.requested_fact)).toEqual([
+      'CAB required field ClassifiedBy',
+      'CAB required field ClassificationReason',
+      'CAB required field DeclassifyOn',
+    ]);
+    expect(findings.every((finding) => finding.requested_action !== null)).toBe(true);
+    expect(
+      findings.every(
+        (finding) => finding.question === null && finding.result === null && finding.result_revision === null,
+      ),
+    ).toBe(true);
+    expect(e.evaluation.readiness).toMatchObject({ kind: 'supported', status: 'incomplete' });
+    expect(e.evaluation.host_work).toMatchObject({ coverage: 'unavailable', rows: [] });
+    expect(readCabSnapshot(doc, request)).not.toBeNull();
+    expect(effectiveReady(doc)).toBe(false);
+
+    const root = document.createElement('div');
+    const write = vi.fn();
+    const session = {
+      kind: 'native_cab',
+      documentId: request.target.document_id,
+      chain: e.evaluation.chain!,
+      nativeCab: { documentId: request.target.document_id, chain: e.evaluation.chain!, wire, request },
+      readNativeCab: vi
+        .fn()
+        .mockResolvedValue({ documentId: request.target.document_id, chain: e.evaluation.chain!, wire, request }),
+    } as unknown as OfficeNativeWordSession;
+    const host = {
+      activeDocumentId: async () => session.documentId,
+      applyCommitted: write,
+      watchNativeCabInvalidation: () => () => {},
+      readNativeCabScope: async () => request,
+    } as OfficeWordHost;
+    const pane = mountNativeWorkspace(root, session, host, 1_048_576);
+    await pane.ready;
+    expect(root.textContent).toContain('Finding identity is unavailable.');
+    expect(root.textContent).toContain('Question identity is unavailable.');
+    expect(root.textContent).toContain('Result identity is unavailable.');
+    expect(root.textContent?.match(/Additional information is needed/g)).toHaveLength(3);
+    for (const finding of findings) expect(root.textContent).toContain(finding.requested_action!.requested_fact);
+    expect(root.querySelector('.mq-history')).toBeNull();
+    expect(root.querySelectorAll('button')).toHaveLength(1);
+    expect(root.querySelector('button')?.textContent).toBe('Refresh authority block');
+    expect(write).not.toHaveBeenCalled();
+    pane.destroy();
+  });
 });
