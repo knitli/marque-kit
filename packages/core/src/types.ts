@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import type { NativeEnvelopeV1 } from './native-wire.ts';
+
 /**
  * The shapes the kit reads and keeps (docs/CONTRACT.md): what Marque emits,
  * the person's acts on it (src/state.ts), and what a host hands the kit.
@@ -434,6 +436,8 @@ export interface DocumentState {
   /** Legacy presentation ids are retained for cards; never used as readiness authority. */
   blocking: string[];
   evaluation?: Evaluation;
+  /** A CAB-only native evaluation cannot authorize whole-document readiness. */
+  native_evaluation?: NativeEnvelopeV1;
   artifacts: ArtifactView[];
   pending?: string[];
   /** Accepted physical changes remain host-confirmation obligations after a re-lint. */
