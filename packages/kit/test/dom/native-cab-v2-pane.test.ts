@@ -31,6 +31,38 @@ const setup = (text: string) => {
   return { e, doc, request };
 };
 describe('native v2 read-only pane', () => {
+  test('renders v3 tagged targets and clears a differently tagged scope', () => {
+    const rawV3 = JSON.parse(raw('funded'));
+    rawV3.schema = 'knitli.native-cab-findings.v3';
+    rawV3.version = 3;
+    const encoded = JSON.stringify(rawV3, (key, value) =>
+      key === 'scope_locator' ? { kind: 'typed', value: '1..2' } : value,
+    );
+    const e = parse(encoded);
+    if (e.version !== 3) throw new Error('expected v3');
+    const doc: Doc = { findings: [], document: { blocking: [], artifacts: [], native_evaluation: e } };
+    const request: NativeCabRequest = {
+      kind: 'cab_snapshot',
+      operation: 'base',
+      expectedChain: e.evaluation.chain!,
+      target: structuredClone(e.evaluation.artifacts[0]!.target),
+      profile: e.evaluation.basis!.basis.profile!,
+      currentBasisJson: JSON.stringify(e.evaluation.basis),
+      maxBasisBytes: 1_048_576,
+    };
+    const root = document.createElement('div');
+    const pane = mount(root, { doc, nativeCabRequest: request });
+    expect(root.textContent).toContain('Additional information is needed.');
+    pane.update({
+      nativeCabRequest: {
+        ...request,
+        target: { ...request.target, scope_locator: { kind: 'text', value: { start: '1', end: '2' } } },
+      },
+    });
+    expect(root.textContent).toContain('evaluation is unavailable');
+    expect(root.textContent).not.toContain('Additional information is needed.');
+    pane.destroy();
+  });
   test.each(['funded', 'partial'])('reads actual %s fixture and clears a stale scope', (name) => {
     const { doc, request } = setup(raw(name));
     expect(readCabSnapshot(doc, request)).not.toBeNull();
