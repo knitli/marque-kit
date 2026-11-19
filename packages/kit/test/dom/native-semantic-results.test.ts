@@ -73,13 +73,15 @@ describe('native semantic results read-only pane', () => {
     n.remove();
   });
 
-  test('Office provider route accepts sanitized bytes only and requires an independently current viewer scope', async () => {
+  test('Office route uses the independent current grant and rejects stale same-context bytes', async () => {
     const n = root();
+    let currentRequest = request;
     const session: OfficeNativeSemanticResultsSession = {
       kind: 'native_semantic_results',
       documentId: context.documentId,
       viewerId: context.viewerId,
-      nativeSemanticResults: { documentId: context.documentId, wire: raw, request },
+      nativeSemanticResults: { documentId: context.documentId, wire: raw },
+      readNativeSemanticResults: async () => ({ documentId: context.documentId, wire: raw }),
     };
     const applyCommitted = vi.fn(async () => {
       throw new Error('restricted results route cannot write');
@@ -90,7 +92,7 @@ describe('native semantic results read-only pane', () => {
       applyCommitted,
       readNativeCabScope,
       watchNativeSemanticResultsInvalidation: () => () => {},
-      readNativeSemanticResultsContext: async () => context,
+      readNativeSemanticResultsRequest: async () => currentRequest,
     };
     const workspace = mountNativeSemanticResultsWorkspace(n, session, wordHost, 1_048_576);
     await workspace.ready;
@@ -98,7 +100,16 @@ describe('native semantic results read-only pane', () => {
     expect(n.textContent).toContain('Classified by');
     expect(n.textContent).not.toContain('wire-spike-source');
     expect(n.textContent).not.toContain('host-owned:');
-    expect(n.querySelectorAll('button, input, form')).toHaveLength(0);
+    expect(n.querySelectorAll('button, input, form')).toHaveLength(1);
+    expect(readNativeCabScope).not.toHaveBeenCalled();
+    expect(applyCommitted).not.toHaveBeenCalled();
+    currentRequest = {
+      ...request,
+      grant: { ...request.grant, grantId: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2' },
+    };
+    await workspace.refresh();
+    expect(n.textContent).toContain('current result disclosure is unavailable');
+    expect(n.textContent).not.toContain('Classified by');
     expect(readNativeCabScope).not.toHaveBeenCalled();
     expect(applyCommitted).not.toHaveBeenCalled();
     workspace.destroy();

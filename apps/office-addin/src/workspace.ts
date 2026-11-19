@@ -4,7 +4,7 @@
 
 import type { OfficeSourceMarkingInstallation } from './source-marking.ts';
 import type { NativeCabRequest } from '@knitli/marque-kit-core/native-cab';
-import type { NativeSemanticResultsContext } from '@knitli/marque-kit-core/native-results';
+import type { NativeSemanticResultsRequest } from '@knitli/marque-kit-core/native-results';
 import type {
   ActAppendRequest,
   AppendActResult,
@@ -26,8 +26,8 @@ export interface OfficeWordHost {
   watchNativeCabInvalidation?(documentId: string, chain: string, invalidate: () => void): () => void;
   /** Fires before semantic result disclosure, viewer, document, or provider changes can be shown. */
   watchNativeSemanticResultsInvalidation?(documentId: string, viewerId: string, invalidate: () => void): () => void;
-  /** Independently obtain the current disclosure context for this restricted viewer. */
-  readNativeSemanticResultsContext?(documentId: string, viewerId: string): Promise<NativeSemanticResultsContext | null>;
+  /** Independently obtain the current request, grant token and row permissions for this viewer. */
+  readNativeSemanticResultsRequest?(documentId: string, viewerId: string): Promise<NativeSemanticResultsRequest | null>;
   /** Independently obtain the current authorized target, profile and evaluation basis. */
   readNativeCabScope?(
     documentId: string,
@@ -76,14 +76,13 @@ export interface OfficeNativeWordSession {
 export interface OfficeNativeSemanticResultsSnapshot {
   documentId: string;
   wire: string;
-  request: import('@knitli/marque-kit-core/native-results').NativeSemanticResultsRequest;
 }
 export interface OfficeNativeSemanticResultsSession {
   readonly kind: 'native_semantic_results';
   readonly documentId: string;
   readonly viewerId: string;
   readonly nativeSemanticResults: OfficeNativeSemanticResultsSnapshot;
-  /** Fresh sanitized projection and matching host grant; never legacy evaluation or source-marking JSON. */
+  /** Fresh sanitized bytes only; current grant/context come from OfficeWordHost. */
   readNativeSemanticResults?(): Promise<OfficeNativeSemanticResultsSnapshot>;
 }
 

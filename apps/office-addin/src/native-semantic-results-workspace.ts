@@ -59,11 +59,11 @@ export function mountNativeSemanticResultsWorkspace(
     !!session.documentId &&
     !!session.viewerId &&
     !!wordHost.watchNativeSemanticResultsInvalidation &&
-    !!wordHost.readNativeSemanticResultsContext;
+    !!wordHost.readNativeSemanticResultsRequest;
   async function obtain(initial: boolean): Promise<void> {
     const attempt = ++generation;
     pane.update({ nativeSemanticResultsRequest: null, doc: snapshotDoc(undefined, maxBytes) });
-    if (!eligible || !wordHost.readNativeSemanticResultsContext) return;
+    if (!eligible || !wordHost.readNativeSemanticResultsRequest) return;
     try {
       if (!(await isSameWordDocument(wordHost, session)) || disposed || attempt !== generation) {
         stopWatching();
@@ -87,19 +87,18 @@ export function mountNativeSemanticResultsWorkspace(
         disposed ||
         attempt !== generation ||
         next.documentId !== session.documentId ||
-        next.request.current.documentId !== session.documentId ||
-        next.request.current.viewerId !== session.viewerId
+        !session.documentId ||
+        !session.viewerId
       )
         return;
-      const current = await wordHost.readNativeSemanticResultsContext(session.documentId, session.viewerId);
+      const currentRequest = await wordHost.readNativeSemanticResultsRequest(session.documentId, session.viewerId);
       const stillBound = await isSameWordDocument(wordHost, session);
+      const current = currentRequest?.current;
       if (
+        !currentRequest ||
         !current ||
-        current.documentId !== next.request.current.documentId ||
-        current.revisionId !== next.request.current.revisionId ||
-        current.viewerId !== next.request.current.viewerId ||
-        current.principalRevision !== next.request.current.principalRevision ||
-        current.evaluationId !== next.request.current.evaluationId ||
+        current.documentId !== session.documentId ||
+        current.viewerId !== session.viewerId ||
         !stillBound ||
         disposed ||
         attempt !== generation
@@ -109,7 +108,7 @@ export function mountNativeSemanticResultsWorkspace(
       pane.update({
         doc,
         currentDisclosureRevision: current.principalRevision,
-        nativeSemanticResultsRequest: next.request,
+        nativeSemanticResultsRequest: currentRequest,
       });
     } catch {
       // Missing current context remains revoked until an authorized refresh.

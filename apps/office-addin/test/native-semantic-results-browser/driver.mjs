@@ -94,7 +94,7 @@ if (current.bootError || !current.text.includes('CLASSIFIED BY') || current.cont
   throw Error(`restricted-current: sanitized view failed: ${JSON.stringify(current)}`);
 if (
   current.calls.providerOpenWord !== 1 ||
-  current.calls.currentSemanticContext !== 1 ||
+  current.calls.currentSemanticRequest !== 1 ||
   current.calls.semanticInvalidationWatch !== 1
 )
   throw Error(`restricted-current: expected only the sanitized provider path: ${JSON.stringify(current.calls)}`);
@@ -107,8 +107,7 @@ for (const scenario of ['provider-open-error', 'cross-document-decline']) {
   assertUnavailable(current, scenario);
   if (current.calls.providerOpenWord !== 1)
     throw Error(`${scenario}: provider open count was ${current.calls.providerOpenWord}`);
-  if (current.calls.currentSemanticContext !== 0)
-    throw Error(`${scenario}: stale/unbound session read current context`);
+  if (current.calls.currentSemanticRequest !== 0) throw Error(`${scenario}: stale/unbound session read current grant`);
   outcomes.push({ scenario, result: 'pass', calls: current.calls, pane: 'unavailable', canaries: 'clear' });
 }
 
@@ -118,7 +117,7 @@ current = await snapshot();
 assertNoPrivilegedCalls(current, 'navigation-before-results-read');
 if (
   current.calls.activeDocumentId !== 2 ||
-  current.calls.currentSemanticContext !== 0 ||
+  current.calls.currentSemanticRequest !== 0 ||
   current.calls.semanticInvalidationWatch !== 0
 )
   throw Error(
@@ -134,13 +133,56 @@ outcomes.push({
   canaries: 'clear',
 });
 
+await navigate('same-context-grant-change');
+await waitFor('document.querySelector("#pane")?.innerText.includes("CLASSIFIED BY")');
+const contextBeforeGrantChange = await evaluate('window.publicReversalSmoke.context');
+await evaluate('window.publicReversalSmoke.denyCurrentGrant(); document.querySelector("#pane button")?.click()');
+await waitFor(
+  'window.publicReversalSmoke.calls.semanticRefresh === 1 && document.querySelector("#pane")?.innerText.includes("4 selected result rows")',
+);
+current = await snapshot();
+assertNoPrivilegedCalls(current, 'same-context-denied-grant');
+if (current.text.includes('CLASSIFIED BY')) throw Error('same-context-denied-grant: denied meaning remained visible');
+if (current.text.includes('Classification authority evidence'))
+  throw Error('same-context-denied-grant: denied support kinds remained visible');
+if (current.text.includes('complete')) throw Error('same-context-denied-grant: denied coverage remained visible');
+if (JSON.stringify(await evaluate('window.publicReversalSmoke.context')) !== JSON.stringify(contextBeforeGrantChange))
+  throw Error('same-context-denied-grant: context unexpectedly changed');
+await evaluate('window.publicReversalSmoke.advanceGrantSameContext(); document.querySelector("#pane button")?.click()');
+await waitFor(
+  'window.publicReversalSmoke.calls.semanticRefresh === 2 && document.querySelector("#pane")?.innerText.includes("current result disclosure is unavailable")',
+);
+current = await snapshot();
+assertNoPrivilegedCalls(current, 'same-context-stale-grant-token');
+if (current.text.includes('CLASSIFIED BY'))
+  throw Error('same-context-stale-grant-token: stale-token rows remained visible');
+if (JSON.stringify(await evaluate('window.publicReversalSmoke.context')) !== JSON.stringify(contextBeforeGrantChange))
+  throw Error('same-context-stale-grant-token: context unexpectedly changed');
+await evaluate('document.querySelector("#pane button")?.click()');
+await waitFor(
+  'window.publicReversalSmoke.calls.semanticRefresh === 3 && document.querySelector("#pane")?.innerText.includes("CLASSIFIED BY")',
+);
+current = await snapshot();
+assertNoPrivilegedCalls(current, 'same-context-current-grant');
+if (current.calls.currentSemanticRequest !== 4 || current.controls !== 1)
+  throw Error(`same-context-current-grant: grant binding mismatch: ${JSON.stringify(current.calls)}`);
+outcomes.push({
+  scenario: 'same-context-grant-change',
+  result: 'pass',
+  calls: current.calls,
+  deniedGrantHidden: true,
+  staleGrantRejected: true,
+  currentGrantRestored: true,
+  canaries: 'clear',
+});
+
 await navigate('stale-session-retry');
 await waitFor('document.querySelector("#pane")?.innerText.includes("CLASSIFIED BY")');
 await evaluate('window.publicReversalSmoke.advanceContext(); window.publicReversalSmoke.invalidateSemantic()');
 await waitFor('!document.querySelector("#pane")?.innerText.includes("CLASSIFIED BY")');
 await evaluate('document.querySelector("#pane button")?.click()');
 await waitFor(
-  'window.publicReversalSmoke.calls.semanticRefresh === 1 && window.publicReversalSmoke.calls.currentSemanticContext === 2',
+  'window.publicReversalSmoke.calls.semanticRefresh === 1 && window.publicReversalSmoke.calls.currentSemanticRequest === 2',
 );
 current = await snapshot();
 assertNoPrivilegedCalls(current, 'stale-session-retry-first');
@@ -151,7 +193,7 @@ await waitFor(
 );
 current = await snapshot();
 assertNoPrivilegedCalls(current, 'stale-session-retry-second');
-if (current.calls.currentSemanticContext !== 3 || current.controls !== 1)
+if (current.calls.currentSemanticRequest !== 3 || current.controls !== 1)
   throw Error(`stale-session-retry-second: retry binding mismatch: ${JSON.stringify(current.calls)}`);
 outcomes.push({
   scenario: 'stale-session-retry',

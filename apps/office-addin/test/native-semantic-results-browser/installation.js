@@ -13,24 +13,42 @@
     evaluationId: 'evaluation-token-27',
   };
   let currentContext = { ...initialContext };
-  const requestFor = (context, grantId = initialToken) => ({
+  const fullRows = () => Array.from({ length: 4 }, () => ({ meaning: true, supportKinds: true, dependencies: true }));
+  const deniedRows = () =>
+    Array.from({ length: 4 }, () => ({ meaning: false, supportKinds: false, dependencies: false }));
+  let currentGrantId = initialToken;
+  let currentRows = fullRows();
+  let currentCoverage = true;
+  const requestFor = (context, grantId = currentGrantId, rows = currentRows, coverage = currentCoverage) => ({
     current: { ...context },
     grant: {
       ...context,
       grantId,
-      rows: Array.from({ length: 4 }, () => ({ meaning: true, supportKinds: true, dependencies: true })),
-      coverage: true,
+      rows,
+      coverage,
     },
   });
-  const snapshotFor = (context, grantId = initialToken) => ({
+  const wireFor = (grantId, denied = false) => {
+    const envelope = JSON.parse(wire);
+    envelope.disclosure.grant_id = grantId;
+    if (denied) {
+      envelope.disclosure.coverage = null;
+      for (const row of envelope.disclosure.items) {
+        row.meaning = null;
+        row.support_kinds = null;
+        row.dependencies = null;
+      }
+    }
+    return JSON.stringify(envelope);
+  };
+  const snapshotFor = (context, grantId = initialToken, denied = false) => ({
     documentId: initialContext.documentId,
-    wire: grantId === initialToken ? wire : wire.replace(initialToken, grantId),
-    request: requestFor(context, grantId),
+    wire: grantId === initialToken && !denied ? wire : wireFor(grantId, denied),
   });
   const calls = {
     activeDocumentId: 0,
     providerOpenWord: 0,
-    currentSemanticContext: 0,
+    currentSemanticRequest: 0,
     semanticInvalidationWatch: 0,
     semanticRefresh: 0,
     cabScopeRead: 0,
@@ -66,6 +84,19 @@
         principalRevision: 'principal-revision-5',
         evaluationId: 'evaluation-token-28',
       };
+      currentGrantId = 'a2'.repeat(16);
+      currentRows = fullRows();
+      currentCoverage = true;
+    },
+    denyCurrentGrant() {
+      currentGrantId = 'b2'.repeat(16);
+      currentRows = deniedRows();
+      currentCoverage = false;
+    },
+    advanceGrantSameContext() {
+      currentGrantId = 'c3'.repeat(16);
+      currentRows = fullRows();
+      currentCoverage = true;
     },
   };
   window.publicReversalSmoke = state;
@@ -100,12 +131,17 @@
           documentId: initialContext.documentId,
           viewerId: initialContext.viewerId,
           nativeSemanticResults: snapshotFor(initialContext),
-          ...(scenario === 'stale-session-retry'
+          ...(['stale-session-retry', 'same-context-grant-change'].includes(scenario)
             ? {
                 async readNativeSemanticResults() {
                   calls.semanticRefresh++;
-                  if (calls.semanticRefresh === 1) return snapshotFor(initialContext);
-                  return snapshotFor(currentContext, 'a2'.repeat(16));
+                  if (scenario === 'stale-session-retry') {
+                    if (calls.semanticRefresh === 1) return snapshotFor(initialContext);
+                    return snapshotFor(currentContext, currentGrantId);
+                  }
+                  if (calls.semanticRefresh === 1) return snapshotFor(currentContext, currentGrantId, true);
+                  if (calls.semanticRefresh === 2) return snapshotFor(currentContext, 'b2'.repeat(16), true);
+                  return snapshotFor(currentContext, currentGrantId);
                 },
               }
             : {}),
@@ -119,9 +155,9 @@
         if (scenario === 'navigation-before-results-read' && calls.activeDocumentId > 1) return 'other-document';
         return initialContext.documentId;
       },
-      async readNativeSemanticResultsContext() {
-        calls.currentSemanticContext++;
-        return { ...currentContext };
+      async readNativeSemanticResultsRequest() {
+        calls.currentSemanticRequest++;
+        return requestFor(currentContext);
       },
       watchNativeSemanticResultsInvalidation(_documentId, _viewerId, invalidate) {
         calls.semanticInvalidationWatch++;
