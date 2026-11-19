@@ -929,6 +929,28 @@ function nativeCab(doc: Doc, host: Host): HTMLElement {
     list.append(row);
   }
   if (list.childElementCount) section.append(list);
+  if ('findings' in result) {
+    section.append(el('p', 'mq-p', 'Finding details are partial.'));
+    const findings = el('ul', 'mq-rows');
+    for (const finding of result.findings.items) {
+      const row = el('li', 'mq-row-item');
+      const req =
+        finding.requirement.status === 'resolved' ? result.requirements[Number(finding.requirement.index)] : null;
+      row.append(el('span', 'mq-label', req?.field ? CAB_FIELD_LABEL[req.field] : 'Requirement unavailable'));
+      row.append(
+        el(
+          'span',
+          'mq-p',
+          finding.outcome === 'needs_fact' ? 'Additional information is needed.' : 'Finding outcome is unavailable.',
+        ),
+      );
+      if (!finding.question) row.append(el('span', 'mq-p', 'Question identity is unavailable.'));
+      if (!finding.result || !finding.result_revision)
+        row.append(el('span', 'mq-p', 'Result identity is unavailable.'));
+      findings.append(row);
+    }
+    if (findings.childElementCount) section.append(findings);
+  }
   return section;
 }
 

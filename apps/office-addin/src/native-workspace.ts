@@ -34,7 +34,7 @@ function currentRequest(
     maxBytes! < 1
   )
     return undefined;
-  return { ...snapshot.request, maxBasisBytes: maxBytes! };
+  return { ...snapshot.request, expectedChain: chain, maxBasisBytes: maxBytes! };
 }
 /** Read-only native result. Refresh revokes the prior scope before awaiting the provider. */
 export function mountNativeWorkspace(

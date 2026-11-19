@@ -4,11 +4,13 @@
 import type { Doc } from './types.ts';
 import { canon, sameBasis } from './state.ts';
 import { isParsedNativeEnvelope, parseNativeBasisJson } from './native-wire.ts';
-import type { NativeEvaluation, NativeProfile, NativeTarget } from './native-wire.ts';
+import type { NativeEvaluation, NativeEvaluationV2, NativeProfile, NativeTarget } from './native-wire.ts';
 
 /** Host-supplied scope and currentness: this is a read of one CAB snapshot. */
 export interface NativeCabRequest {
   kind: 'cab_snapshot';
+  /** Independently supplied expected evaluation chain for v2 findings. */
+  expectedChain?: string;
   operation: 'base';
   target: NativeTarget;
   profile: NativeProfile;
@@ -33,7 +35,7 @@ const sameProfile = (a: NativeProfile | null, b: NativeProfile): boolean =>
 
 /** Read native statuses and rows only when the caller's exact CAB scope is current.
  * This is not a document/send readiness verdict and does not apply CAB policy. */
-export function readCabSnapshot(doc: Doc, request: NativeCabRequest): NativeEvaluation | null {
+export function readCabSnapshot(doc: Doc, request: NativeCabRequest): NativeEvaluation | NativeEvaluationV2 | null {
   const envelope = doc.document.native_evaluation;
   if (
     !isParsedNativeEnvelope(envelope) ||
@@ -91,5 +93,48 @@ export function readCabSnapshot(doc: Doc, request: NativeCabRequest): NativeEval
   if (basis.accepted_answers.some((a) => !sameTarget(a.target, request.target))) return null;
   if (e.requirements.some((r) => r.scope && !scopes.get(r.scope.contribution_id)?.has(r.scope.scope_id))) return null;
   if (e.host_work.rows.some((r) => !sameTarget(r.target, request.target))) return null;
+  if (envelope.version === 2) {
+    const v = envelope.evaluation;
+    if (!request.expectedChain || v.chain !== request.expectedChain) return null;
+    for (const f of v.findings.items) {
+      if (
+        Number(f.subject.serial) > Number(v.handles.last_subject) ||
+        (f.question &&
+          (Number(f.question.serial) > Number(v.handles.last_question) ||
+            Number(f.question.revision) > Number(v.handles.last_question_revision))) ||
+        (f.result_revision !== null && Number(f.result_revision) > Number(v.handles.last_result_revision))
+      )
+        return null;
+      if (
+        f.subject.chain !== v.chain ||
+        (f.result && (f.result.subject_chain !== f.subject.chain || f.result.subject_serial !== f.subject.serial))
+      )
+        return null;
+      if (f.question && f.requested_action) return null;
+      const meaning = f.question?.meaning ?? f.requested_action;
+      if (
+        f.question &&
+        (f.question.chain !== v.chain ||
+          f.question.subject.chain !== f.subject.chain ||
+          f.question.subject.serial !== f.subject.serial ||
+          canon(f.question.basis) !== basisKey)
+      )
+        return null;
+      if (meaning?.scope && !scopes.get(meaning.scope.contribution_id)?.has(meaning.scope.scope_id)) return null;
+      if (f.requirement.status === 'resolved') {
+        const req = e.requirements[Number(f.requirement.index)];
+        if (!req) return null;
+        if (
+          meaning &&
+          ((req.scope !== null && canon(meaning.scope) !== canon(req.scope)) ||
+            meaning.answer_kinds.some((k) => k.field !== req.field))
+        )
+          return null;
+        if (f.question && f.question.field !== req.field) return null;
+      }
+      if (f.question && f.question.meaning.answer_kinds.some((k) => k.field !== f.question!.field)) return null;
+    }
+    return v;
+  }
   return e;
 }

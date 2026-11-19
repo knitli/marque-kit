@@ -17,11 +17,14 @@ import type {
   OfficeNativeCabSnapshot,
 } from '../../../../apps/office-addin/src/workspace.ts';
 
-const fixture = (name: string): NativeEnvelopeV1 =>
-  parseNativeJson(
+const fixture = (name: string): NativeEnvelopeV1 => {
+  const parsed = parseNativeJson(
     readFileSync(join(import.meta.dirname, `../../../core/test/fixtures/native-${name}.fixture`), 'utf8'),
     1_048_576,
   );
+  if (parsed.version !== 1) throw new Error('expected v1 fixture');
+  return parsed;
+};
 const documentFor = (envelope: NativeEnvelopeV1): Doc => {
   const doc = JSON.parse(
     readFileSync(join(import.meta.dirname, '../../../../fixtures/memo.findings.json'), 'utf8'),
