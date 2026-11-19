@@ -97,7 +97,11 @@ export function mountNativeWorkspace(
     destroy() {
       disposed = true;
       generation++;
-      unsubscribe?.();
+      try {
+        if (typeof unsubscribe === 'function') unsubscribe();
+      } catch {
+        // A failing host cleanup must not leave the prior view mounted.
+      }
       pane.destroy();
       root.replaceChildren();
     },

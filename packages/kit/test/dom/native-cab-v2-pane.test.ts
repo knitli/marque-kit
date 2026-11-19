@@ -411,4 +411,26 @@ describe('native v2 read-only pane', () => {
     expect(root.textContent).not.toContain('Additional information is needed.');
     pane.destroy();
   });
+  test('failed subscription cleanup still clears the mounted view', async () => {
+    const { request, e } = setup(raw('funded'));
+    const root = document.createElement('div');
+    const session = {
+      kind: 'native_cab',
+      documentId: request.target.document_id,
+      chain: e.evaluation.chain!,
+      nativeCab: { documentId: request.target.document_id, chain: e.evaluation.chain!, wire: raw('funded') },
+    } as unknown as OfficeNativeWordSession;
+    const host = {
+      activeDocumentId: async () => session.documentId,
+      watchNativeCabInvalidation: () => () => {
+        throw Error('cleanup failed');
+      },
+      readNativeCabScope: async () => request,
+    } as unknown as OfficeWordHost;
+    const pane = mountNativeWorkspace(root, session, host, 1_048_576);
+    await pane.ready;
+    expect(root.textContent).toContain('Additional information is needed.');
+    pane.destroy();
+    expect(root.textContent).toBe('');
+  });
 });
