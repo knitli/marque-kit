@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { hasUnpairedSurrogate } from './marking.ts';
+import type { Layer, Marking, Mask, Token } from './types.ts';
 
 export type NativeTarget = { document_id: string; revision_id: string; contribution_id: string; scope_locator: string };
 export type NativeField = 'classified_by' | 'agency_and_office_of_origin' | 'classification_reason' | 'declassify_on';
@@ -162,6 +163,29 @@ export type NativeEnvelopeV2 = Omit<NativeEnvelopeV1, 'schema' | 'version' | 'ev
   evaluation: NativeEvaluationV2;
 };
 export type NativeEnvelope = NativeEnvelopeV1 | NativeEnvelopeV2;
+
+/** A read-only, permission-filtered source view. Mask runs carry no offsets or lengths. */
+export type NativeSourceMarkingBinding = {
+  chain_id: string;
+  source_id: string;
+  revision_id: string;
+  contribution_id: string;
+  scope_id: string;
+  viewer_id: string;
+};
+type SourceMarkingBody = { marking: Marking };
+export type NativeSourceMarkingView = SourceMarkingBody &
+  (
+    | {
+        schema: 'knitli.native-source-marking.v2';
+        binding: NativeSourceMarkingBinding;
+      }
+    | {
+        schema: 'knitli.native-source-marking.v1';
+        authorization: 'synthetic_test_adapter';
+        binding: NativeSourceMarkingBinding;
+      }
+  );
 
 const fail = (where: string): never => {
   throw new TypeError(`invalid native evaluation wire: ${where}`);
@@ -690,6 +714,79 @@ export function parseNativeJson(text: string, maxBytes: number): NativeEnvelope 
     : { ...common, schema: 'knitli.native-evaluation.v1', version: 1, evaluation: base };
   freezeTree(result);
   accepted.add(result);
+  return result;
+}
+
+const acceptedSourceViews = new WeakSet<object>();
+export function isParsedNativeSourceMarkingView(value: unknown): value is NativeSourceMarkingView {
+  return value !== null && typeof value === 'object' && acceptedSourceViews.has(value);
+}
+
+/** Parse a bounded read-only source view; offsets and mask lengths are rejected. */
+export function parseNativeSourceMarkingJson(text: string, maxBytes: number): NativeSourceMarkingView {
+  const raw = object(parseJson(text, maxBytes), 'source marking envelope');
+  const trustedSchema = raw.schema === 'knitli.native-source-marking.v2';
+  const syntheticSchema =
+    raw.schema === 'knitli.native-source-marking.v1' && raw.authorization === 'synthetic_test_adapter';
+  const o = keys(
+    raw,
+    trustedSchema ? ['schema', 'binding', 'marking'] : ['schema', 'authorization', 'binding', 'marking'],
+    'source marking envelope',
+  );
+  if (!trustedSchema && !syntheticSchema) fail('source marking scope');
+  const b = keys(
+    o.binding,
+    ['chain_id', 'source_id', 'revision_id', 'contribution_id', 'scope_id', 'viewer_id'],
+    'source marking binding',
+  );
+  const binding = {
+    chain_id: str(b.chain_id, 'binding.chain_id'),
+    source_id: str(b.source_id, 'binding.source_id'),
+    revision_id: str(b.revision_id, 'binding.revision_id'),
+    contribution_id: str(b.contribution_id, 'binding.contribution_id'),
+    scope_id: safeDecimal(b.scope_id, 'binding.scope_id'),
+    viewer_id: str(b.viewer_id, 'binding.viewer_id'),
+  };
+  if (
+    [binding.chain_id, binding.source_id, binding.revision_id, binding.contribution_id, binding.viewer_id].some(
+      (value) => !value.trim(),
+    )
+  )
+    fail('source marking binding values');
+  const m = keys(o.marking, ['text', 'layers', 'masks'], 'source marking');
+  const visibleText = str(m.text, 'source marking.text');
+  const layersIn = arr(m.layers, 'source marking.layers');
+  if (layersIn.length !== 1 || arr(m.masks, 'source marking.masks').length !== 0) fail('source marking shape');
+  const layerIn = keys(layersIn[0], ['tokens'], 'source marking.layer');
+  const tokens: Token[] = [];
+  const visiblePieces: string[] = [];
+  for (const [index, raw] of arr(layerIn.tokens, 'source marking.tokens').entries()) {
+    const tokenObject = object(raw, `source marking.tokens[${index}]`);
+    if (Object.hasOwn(tokenObject, 'mask')) {
+      const token = keys(raw, ['t', 'mask'], `source marking.tokens[${index}]`);
+      if (str(token.t, `source marking.tokens[${index}].t`) !== '') fail('source marking mask token');
+      const maskObject = keys(token.mask, ['kind'], `source marking.tokens[${index}].mask`);
+      const mask: Mask = { kind: oneOf(maskObject.kind, ['concealed', 'unidentified'] as const, 'mask.kind') };
+      tokens.push({ t: '', mask });
+    } else {
+      const token = keys(raw, ['t'], `source marking.tokens[${index}]`);
+      const value = str(token.t, `source marking.tokens[${index}].t`);
+      if (!value) fail('source marking empty visible token');
+      visiblePieces.push(value);
+      tokens.push({ t: value });
+    }
+  }
+  if (visiblePieces.join('') !== visibleText) fail('source marking visible text');
+  const marking: Marking = {
+    text: visibleText,
+    layers: [{ tokens } as Layer],
+    masks: [],
+  };
+  const result: NativeSourceMarkingView = syntheticSchema
+    ? { schema: 'knitli.native-source-marking.v1', authorization: 'synthetic_test_adapter', binding, marking }
+    : { schema: 'knitli.native-source-marking.v2', binding, marking };
+  freezeTree(result);
+  acceptedSourceViews.add(result);
   return result;
 }
 /** Parse a separately supplied host currentness basis using the same schema. */

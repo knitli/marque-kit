@@ -33,6 +33,8 @@ import {
   type SpokenVocab,
 } from '@knitli/marque-kit-core/marking';
 import type { Layer, Marking, MarkingLike, Mask } from '@knitli/marque-kit-core/types';
+import type { NativeSourceMarkingView } from '@knitli/marque-kit-core/native-wire';
+import { isParsedNativeSourceMarkingView } from '@knitli/marque-kit-core/native-wire';
 
 // The pure half, from core, as this module has always exported it.
 export {
@@ -119,6 +121,51 @@ export function settle(root: HTMLElement): HTMLElement {
   const one = root.getBoundingClientRect().height;
   const line = parseFloat(getComputedStyle(root).lineHeight) || 20;
   if (one > line * 1.5) root.classList.add('stacked');
+  return root;
+}
+
+export type SourceMarkingSessionBinding = NativeSourceMarkingView['binding'];
+export type SourceMarkingSessionCapability = {
+  readonly binding: Readonly<SourceMarkingSessionBinding>;
+  isCurrent(): boolean;
+  revoke(): void;
+};
+const sourceMarkingSessions = new WeakSet<object>();
+
+/** Install-time host hook. Supply a trusted binding and a live currentness check; revoke on host invalidation. */
+export function installSourceMarkingSession(
+  binding: SourceMarkingSessionBinding,
+  isCurrent: () => boolean,
+): SourceMarkingSessionCapability {
+  let active = true;
+  const capability: SourceMarkingSessionCapability = Object.freeze({
+    binding: Object.freeze({ ...binding }),
+    isCurrent: () => active && isCurrent(),
+    revoke: () => {
+      active = false;
+    },
+  });
+  sourceMarkingSessions.add(capability);
+  return capability;
+}
+
+/** Render a parsed source view only in a live, installation-supplied session. */
+export function renderSourceMarkingView(
+  view: NativeSourceMarkingView,
+  session: SourceMarkingSessionCapability,
+): HTMLSpanElement {
+  const bindingKeys = ['chain_id', 'source_id', 'revision_id', 'contribution_id', 'scope_id', 'viewer_id'] as const;
+  if (
+    !isParsedNativeSourceMarkingView(view) ||
+    !sourceMarkingSessions.has(session) ||
+    !session.isCurrent() ||
+    Object.keys(session.binding).length !== bindingKeys.length ||
+    bindingKeys.some((key) => view.binding[key] !== session.binding[key])
+  ) {
+    throw new TypeError('source marking view session mismatch or expired');
+  }
+  const root = render(view.marking);
+  root.setAttribute('aria-label', `Read-only source marking: ${spoken(view.marking)}`);
   return root;
 }
 

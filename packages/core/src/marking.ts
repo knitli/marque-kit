@@ -293,7 +293,14 @@ const maskNode = (mask: Mask): MarkNode => {
   const s = node('span', mask.kind === 'concealed' ? 'mq-conceal' : 'mq-mask', glyphs(mask));
   s.attrs.push(
     ['tabindex', '0'],
-    ['title', mask.kind === 'concealed' ? 'Source concealed.' : `${chars(mask.len ?? 0)} Marque couldn't identify.`],
+    [
+      'title',
+      mask.kind === 'concealed'
+        ? 'Source concealed.'
+        : mask.len === undefined
+          ? 'Marque could not identify this marking token.'
+          : `${chars(mask.len)} Marque could not identify.`,
+    ],
   );
   return s;
 };
@@ -454,7 +461,11 @@ export function spoken(marking: MarkingLike, vocab: SpokenVocab = {}): string {
   const words: string[] = [];
   // Masks are said as what they are, never as what they cover: in place, or at the end for one given by layer.
   const said = (mask: Mask): string =>
-    mask.kind === 'concealed' ? 'source concealed' : `${chars(mask.len ?? 0)} not identified`;
+    mask.kind === 'concealed'
+      ? 'source concealed'
+      : mask.len === undefined
+        ? 'not identified'
+        : `${chars(mask.len)} not identified`;
   for (const layer of m.layers)
     for (const { t, mask } of layer.tokens) {
       if (mask) {
