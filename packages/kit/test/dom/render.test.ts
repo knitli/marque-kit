@@ -1009,7 +1009,11 @@ describe('host-acknowledged append', () => {
       at: 't2',
     });
     expect(newer.status).toBe('committed');
-    Object.assign(p.state, newer.state);
+    const { log, actSequence, actHistoryCoverage } = newer.state;
+    if (actSequence === undefined || !actHistoryCoverage) throw new Error('expected a sequenced host history');
+    p.state.log = log;
+    p.state.actSequence = actSequence;
+    p.state.actHistoryCoverage = actHistoryCoverage;
 
     release();
     await flushAppend();
