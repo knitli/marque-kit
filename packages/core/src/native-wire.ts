@@ -39,16 +39,19 @@ export type NativeAcceptedAnswer = {
   occurrence_locator: NativeLocator;
 };
 export type NativeEvaluationBasis = { basis: NativeBasis; accepted_answers: NativeAcceptedAnswer[] };
+const SUPPORT_KINDS = [
+  'authored',
+  'unresolved_occurrence',
+  'implied_usa',
+  'examined_absence',
+  'rel_receive_implies_show',
+  'preview_answer',
+  'cab_proof',
+  'sci_proof',
+  'default_policy_proof',
+] as const;
 export type NativeSupport = {
-  kind:
-    | 'authored'
-    | 'implied_usa'
-    | 'examined_absence'
-    | 'rel_receive_implies_show'
-    | 'preview_answer'
-    | 'cab_proof'
-    | 'sci_proof'
-    | 'default_policy_proof';
+  kind: (typeof SUPPORT_KINDS)[number];
   index: string;
 };
 export type NativeRequirement = {
@@ -236,20 +239,7 @@ function profile(x: unknown, where: string): NativeProfile {
 function support(x: unknown, where: string): NativeSupport {
   const o = keys(x, ['kind', 'index'], where);
   return {
-    kind: oneOf(
-      o.kind,
-      [
-        'authored',
-        'implied_usa',
-        'examined_absence',
-        'rel_receive_implies_show',
-        'preview_answer',
-        'cab_proof',
-        'sci_proof',
-        'default_policy_proof',
-      ] as const,
-      `${where}.kind`,
-    ),
+    kind: oneOf(o.kind, SUPPORT_KINDS, `${where}.kind`),
     index: safeDecimal(o.index, where),
   };
 }

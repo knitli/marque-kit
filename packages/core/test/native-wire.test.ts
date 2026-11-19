@@ -126,6 +126,16 @@ void test('parser rejects malformed values, unsafe integers, extra fields, and o
   );
 });
 
+void test('wire keeps unresolved occurrence references distinct from authored support', () => {
+  const raw = JSON.parse(text) as NativeEnvelopeV1;
+  const supports = raw.evaluation.requirements[0]!.supports;
+  supports.push({ kind: 'unresolved_occurrence', index: '3' });
+  const parsed = parseNativeJson(JSON.stringify(raw), 1_048_576);
+  assert.deepEqual(parsed.evaluation.requirements[0]!.supports, supports);
+  const unknownTag = JSON.stringify(raw).replace('"unresolved_occurrence"', '"unknown_spelling"');
+  assert.throws(() => parseNativeJson(unknownTag, 1_048_576), TypeError);
+});
+
 void test('wire IDs use canonical unsigned decimal and text supports Unicode scalars', () => {
   const raw = JSON.parse(text) as NativeEnvelopeV1;
   const basis = raw.evaluation.basis!.basis;
