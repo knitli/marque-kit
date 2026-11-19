@@ -917,6 +917,7 @@ const RESULT_SUPPORT_LABEL: Record<NativeSemanticResultSupportKind, string> = {
   implied_usa: 'Implied by U.S. origin',
   examined_absence: 'Examined absence',
   rel_receive_implies_show: 'Foreign release relationship',
+  eyes_receive_implies_show: 'EYES receive implies show',
   preview_answer: 'Preview response',
   cab_proof: 'Classification authority evidence',
   sci_proof: 'Sensitive compartmented information evidence',
