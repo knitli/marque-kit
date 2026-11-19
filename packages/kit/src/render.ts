@@ -77,6 +77,7 @@ import type {
   ArtifactField,
   ArtifactView,
   Doc,
+  DocumentIntake,
   EngineState,
   HistoryDisclosure,
   Finding,
@@ -721,6 +722,58 @@ export function status(doc: Doc | null, host: Host = {}): HTMLDivElement {
   return s;
 }
 
+/** Read-only engine receipts: source text and candidate evidence never enter the view. */
+const transformationName = (kind: string): string =>
+  ({ normalized_ascii_case: 'Normalized ASCII case' } as Record<string, string>)[kind] ?? kind.replace(/_/g, ' ');
+
+function transformationReceipts(intake: DocumentIntake): HTMLDetailsElement {
+  const rows = intake.transformations || [];
+  const counted = Number.isSafeInteger(intake.transformation_count) && (intake.transformation_count ?? -1) >= 0;
+  const total = counted ? intake.transformation_count! : rows.length;
+  const complete = intake.status === 'complete' && rows.length === total;
+  const refused = intake.status === 'refused' || intake.status === 'unavailable';
+  const partial = !complete && !refused;
+  const summary = refused
+    ? `Source transformations · ${intake.status}`
+    : complete && total === 0
+      ? 'Source transformations · none recorded'
+      : complete
+        ? `Source transformations · ${total} recorded`
+        : `Source transformations · ${intake.status === 'partial' ? 'partial' : 'incomplete'} · ${rows.length} of ${counted ? total : '?'} retained`;
+  const details = el('details', 'mq-engine mq-transform-receipt') as HTMLDetailsElement;
+  details.append(el('summary', 'mq-h', summary));
+
+  const body = el('div', 'mq-txt');
+  body.append(el('p', 'mq-p', 'Read-only records from this lint. They do not change the source or affect readiness.'));
+  if (partial) {
+    const cutoff = intake.projection_cutoff?.resource?.replace(/_/g, ' ');
+    body.append(
+      el(
+        'p',
+        'mq-p',
+        `Partial receipt: ${rows.length} of ${counted ? total : 'an unknown number of'} transformations are retained${cutoff ? `; the projection stopped at ${cutoff}` : ''}.`,
+      ),
+    );
+  } else if (refused) {
+    body.append(el('p', 'mq-p', 'A complete transformation receipt was not available.'));
+  }
+  if (rows.length) {
+    const list = el('ul', 'mq-transforms');
+    for (const row of rows) {
+      const item = el('li', 'mq-transform');
+      item.append(
+        el('span', 'mq-h', transformationName(row.kind)),
+        el('span', 'mq-p', `Original byte span ${row.span[0]}–${row.span[1]}`),
+        el('span', 'mq-p', `Owning observation ${row.observation}`),
+      );
+      list.append(item);
+    }
+    body.append(list);
+  }
+  details.append(body);
+  return details;
+}
+
 /* ── C6 · the pane ───────────────────────────────────────────────────── */
 const ENGINE: Record<string, string> = { checking: 'Checking', failed: 'Stopped' };
 const TITLES: Record<keyof Sections, string> = {
@@ -1064,6 +1117,7 @@ export function pane(doc: Doc | null, host: Host = {}): HTMLDivElement {
   );
   p.append(status(doc, host));
   if (partial) p.append(engineState(host));
+  if (doc.document.intake) p.append(transformationReceipts(doc.document.intake));
 
   if (host.readOnly) {
     // The host's state, not Marque's. Findings still show; a reader needs them too.

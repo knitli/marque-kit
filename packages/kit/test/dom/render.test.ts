@@ -69,6 +69,63 @@ describe('question first', () => {
   });
 });
 
+describe('ordinary lint transformation receipts', () => {
+  const sample = {
+    status: 'complete' as const,
+    transformation_count: 1,
+    transformations: [{ kind: 'normalized_ascii_case', span: [7, 9] as [number, number], observation: 0 }],
+    candidates: [{ private: 'candidate evidence must not be rendered' }],
+    source_occurrences: [{ value: 'GRANTED SECRET evidence must stay masked' }],
+    claims: [{ value: 'grant evidence must not be rendered' }],
+  };
+
+  test('shows only the read-only kind, original byte span, and owning observation', () => {
+    const d: Doc = { ...memo, document: { ...memo.document, intake: sample } };
+    const p = pane(d, { readOnly: true });
+    const receipt = p.querySelector<HTMLDetailsElement>('details.mq-transform-receipt')!;
+    receipt.open = true;
+    expect(receipt.querySelector('summary')?.textContent).toBe('Source transformations · 1 recorded');
+    expect(receipt.textContent).toContain('Normalized ASCII case');
+    expect(receipt.textContent).toContain('Original byte span 7–9');
+    expect(receipt.textContent).toContain('Owning observation 0');
+    expect(receipt.textContent).not.toContain('candidate evidence');
+    expect(receipt.textContent).not.toContain('GRANTED SECRET');
+    expect(receipt.textContent).not.toContain('grant evidence');
+    expect(receipt.querySelector('button, input, textarea, select')).toBeNull();
+    expect(buttons(p)).toEqual(buttons(pane(memo, { readOnly: true })));
+    expect(p.querySelector('.mq-stamp')?.textContent).toBe(
+      pane(memo, { readOnly: true }).querySelector('.mq-stamp')?.textContent,
+    );
+  });
+
+  test('reports a bounded projection as partial and preserves the cutoff', () => {
+    const d: Doc = {
+      ...memo,
+      document: {
+        ...memo.document,
+        intake: {
+          status: 'partial',
+          transformation_count: 500,
+          transformations: sample.transformations,
+          projection_cutoff: { phase: 'projection', resource: 'output_bytes' },
+        },
+      },
+    };
+    const receipt = pane(d).querySelector<HTMLDetailsElement>('details.mq-transform-receipt')!;
+    receipt.open = true;
+    expect(receipt.querySelector('summary')?.textContent).toBe('Source transformations · partial · 1 of 500 retained');
+    expect(receipt.textContent).toContain('projection stopped at output bytes');
+    expect(d.document.ready).toBe(memo.document.ready);
+  });
+
+  test.each(['refused', 'unavailable'])('%s receipts do not claim completeness', (status) => {
+    const d: Doc = { ...memo, document: { ...memo.document, intake: { status } } };
+    const receipt = pane(d).querySelector('details.mq-transform-receipt')!;
+    expect(receipt.querySelector('summary')?.textContent).toBe(`Source transformations · ${status}`);
+    expect(receipt.textContent).toContain('A complete transformation receipt was not available.');
+  });
+});
+
 describe('the pane follows the cursor (DECISIONS #8)', () => {
   test('update({ open }) opens that card and leaves focus in the document; null closes it', async () => {
     // happy-dom lays nothing out: give the pane and its parent room for a card (the kit's floor is 240px).

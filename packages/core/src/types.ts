@@ -447,6 +447,25 @@ export interface DocumentState {
   /** Accepted physical changes remain host-confirmation obligations after a re-lint. */
   awaitingWrites?: string[];
   withdrawn?: Withdrawn[];
+  /** Read-only, content-free evidence retained by the ordinary lint projection. */
+  intake?: DocumentIntake;
+}
+
+/** A transformation the engine recorded while inspecting source bytes. */
+export interface PerformedTransformation {
+  kind: string;
+  /** Original UTF-8 byte range, including zero-width insertion points. */
+  span: [number, number];
+  /** Index of the source candidate that owns the operation. */
+  observation: number;
+}
+
+/** The ordinary lint projection's bounded transformation receipt fields. */
+export interface DocumentIntake {
+  status: 'complete' | 'partial' | 'unavailable' | (string & {});
+  transformation_count?: number;
+  transformations?: PerformedTransformation[];
+  projection_cutoff?: { phase?: string | null; resource?: string | null } | null;
 }
 
 /** The engine's document, or a view of it (docView). */
