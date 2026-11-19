@@ -4,7 +4,13 @@
 import type { Doc } from './types.ts';
 import { canon, sameBasis } from './state.ts';
 import { isParsedNativeEnvelope, parseNativeBasisJson } from './native-wire.ts';
-import type { NativeEvaluation, NativeEvaluationV2, NativeProfile, NativeTarget } from './native-wire.ts';
+import type {
+  NativeEvaluation,
+  NativeEvaluationV2,
+  NativeFinding,
+  NativeProfile,
+  NativeTarget,
+} from './native-wire.ts';
 
 /** Host-supplied scope and currentness: this is a read of one CAB snapshot. */
 export interface NativeCabRequest {
@@ -93,71 +99,84 @@ export function readCabSnapshot(doc: Doc, request: NativeCabRequest): NativeEval
   if (basis.accepted_answers.some((a) => !sameTarget(a.target, request.target))) return null;
   if (e.requirements.some((r) => r.scope && !scopes.get(r.scope.contribution_id)?.has(r.scope.scope_id))) return null;
   if (e.host_work.rows.some((r) => !sameTarget(r.target, request.target))) return null;
-  if (envelope.version === 2) {
-    const v = envelope.evaluation;
-    if (!request.expectedChain || v.chain !== request.expectedChain) return null;
-    const artifactIds = new Set<string>();
-    for (const artifact of v.artifacts) {
-      if (!artifact.id) continue;
-      if (
-        artifact.id.chain !== v.chain ||
-        Number(artifact.id.serial) === 0 ||
-        Number(artifact.id.serial) > Number(v.handles.last_artifact) ||
-        artifactIds.has(artifact.id.serial)
-      )
-        return null;
-      artifactIds.add(artifact.id.serial);
-    }
-    const questionIds = new Set<string>();
-    const subjectIds = new Set<string>();
-    for (const f of v.findings.items) {
-      if (
-        Number(f.subject.serial) === 0 ||
-        subjectIds.has(f.subject.serial) ||
-        Number(f.subject.serial) > Number(v.handles.last_subject) ||
-        (f.question &&
-          (Number(f.question.serial) === 0 ||
-            Number(f.question.revision) === 0 ||
-            questionIds.has(f.question.serial) ||
-            Number(f.question.serial) > Number(v.handles.last_question) ||
-            Number(f.question.revision) > Number(v.handles.last_question_revision))) ||
-        (f.result_revision !== null &&
-          (Number(f.result_revision) === 0 || Number(f.result_revision) > Number(v.handles.last_result_revision))) ||
-        (f.result && Number(f.result.serial) === 0)
-      )
-        return null;
-      if (
-        f.subject.chain !== v.chain ||
-        (f.result && (f.result.subject_chain !== f.subject.chain || f.result.subject_serial !== f.subject.serial))
-      )
-        return null;
-      subjectIds.add(f.subject.serial);
-      if (f.question) questionIds.add(f.question.serial);
-      if (f.question && f.requested_action) return null;
-      const meaning = f.question?.meaning ?? f.requested_action;
-      if (
-        f.question &&
-        (f.question.chain !== v.chain ||
-          f.question.subject.chain !== f.subject.chain ||
-          f.question.subject.serial !== f.subject.serial ||
-          canon(f.question.basis) !== basisKey)
-      )
-        return null;
-      if (meaning?.scope && !scopes.get(meaning.scope.contribution_id)?.has(meaning.scope.scope_id)) return null;
-      if (f.requirement.status === 'resolved') {
-        const req = e.requirements[Number(f.requirement.index)];
-        if (!req) return null;
-        if (
-          meaning &&
-          ((req.scope !== null && canon(meaning.scope) !== canon(req.scope)) ||
-            meaning.answer_kinds.some((k) => k.field !== req.field))
-        )
-          return null;
-        if (f.question && f.question.field !== req.field) return null;
-      }
-      if (f.question && f.question.meaning.answer_kinds.some((k) => k.field !== f.question!.field)) return null;
-    }
-    return v;
-  }
+  if (envelope.version === 2 && !validV2(envelope.evaluation, request, scopes, basisKey)) return null;
   return e;
+}
+
+type Scopes = Map<string, Set<string>>;
+function validV2(v: NativeEvaluationV2, request: NativeCabRequest, scopes: Scopes, basisKey: string): boolean {
+  if (!request.expectedChain || v.chain !== request.expectedChain) return false;
+  const artifacts = new Set<string>();
+  for (const artifact of v.artifacts) {
+    if (!artifact.id) continue;
+    if (
+      artifact.id.chain !== v.chain ||
+      Number(artifact.id.serial) === 0 ||
+      Number(artifact.id.serial) > Number(v.handles.last_artifact) ||
+      artifacts.has(artifact.id.serial)
+    )
+      return false;
+    artifacts.add(artifact.id.serial);
+  }
+  const questions = new Set<string>();
+  const subjects = new Set<string>();
+  for (const finding of v.findings.items) {
+    if (!validFinding(v, finding, scopes, basisKey, subjects, questions)) return false;
+  }
+  return true;
+}
+function validFinding(
+  v: NativeEvaluationV2,
+  f: NativeFinding,
+  scopes: Scopes,
+  basisKey: string,
+  subjects: Set<string>,
+  questions: Set<string>,
+): boolean {
+  if (
+    Number(f.subject.serial) === 0 ||
+    subjects.has(f.subject.serial) ||
+    Number(f.subject.serial) > Number(v.handles.last_subject) ||
+    (f.question &&
+      (Number(f.question.serial) === 0 ||
+        Number(f.question.revision) === 0 ||
+        questions.has(f.question.serial) ||
+        Number(f.question.serial) > Number(v.handles.last_question) ||
+        Number(f.question.revision) > Number(v.handles.last_question_revision))) ||
+    (f.result_revision !== null &&
+      (Number(f.result_revision) === 0 || Number(f.result_revision) > Number(v.handles.last_result_revision))) ||
+    (f.result && Number(f.result.serial) === 0)
+  )
+    return false;
+  if (
+    f.subject.chain !== v.chain ||
+    (f.result && (f.result.subject_chain !== f.subject.chain || f.result.subject_serial !== f.subject.serial))
+  )
+    return false;
+  subjects.add(f.subject.serial);
+  if (f.question) questions.add(f.question.serial);
+  if (f.question && f.requested_action) return false;
+  const meaning = f.question?.meaning ?? f.requested_action;
+  if (
+    f.question &&
+    (f.question.chain !== v.chain ||
+      f.question.subject.chain !== f.subject.chain ||
+      f.question.subject.serial !== f.subject.serial ||
+      canon(f.question.basis) !== basisKey)
+  )
+    return false;
+  if (meaning?.scope && !scopes.get(meaning.scope.contribution_id)?.has(meaning.scope.scope_id)) return false;
+  if (f.requirement.status === 'resolved') {
+    const req = v.requirements[Number(f.requirement.index)];
+    if (!req) return false;
+    if (
+      meaning &&
+      ((req.scope !== null && canon(meaning.scope) !== canon(req.scope)) ||
+        meaning.answer_kinds.some((k) => k.field !== req.field))
+    )
+      return false;
+    if (f.question && f.question.field !== req.field) return false;
+  }
+  if (f.question && f.question.meaning.answer_kinds.some((k) => k.field !== f.question!.field)) return false;
+  return true;
 }
