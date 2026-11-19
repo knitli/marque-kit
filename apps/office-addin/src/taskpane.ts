@@ -172,8 +172,8 @@ void Office.onReady(async (info) => {
     }
     // Source markings are privileged provider data. Never mount their binding or
     // capability beside the restricted semantic-results-only route.
-    mountPrivilegedSourceMarking();
     if (session && bound && 'kind' in session && session.kind === 'native_cab') {
+      mountPrivilegedSourceMarking();
       mountNativeWorkspace(
         document.querySelector<HTMLElement>('#pane')!,
         session,
@@ -189,9 +189,17 @@ void Office.onReady(async (info) => {
       isDisclosedState(session.state) &&
       sameBasis(session.doc.document.evaluation?.basis, session.basis)
     ) {
+      mountPrivilegedSourceMarking();
       mountWorkspace(session, installation.wordHost);
       return;
     }
+    // A failed, stale, or cross-document provider session cannot establish
+    // which privileged views belong here. Keep the pane unavailable and do
+    // not fall through to source marking or Word document reads.
+    document
+      .querySelector<HTMLElement>('#pane')
+      ?.replaceChildren(el('p', 'mq-p', 'This Word workspace is unavailable for the current document.'));
+    return;
   }
   mountPrivilegedSourceMarking();
   const doc = (await (await fetch(findingsUrl)).json()) as Doc;

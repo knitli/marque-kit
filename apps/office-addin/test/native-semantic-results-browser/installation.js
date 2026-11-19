@@ -2,28 +2,37 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 (() => {
+  const scenario = new URLSearchParams(location.search).get('scenario') ?? 'restricted-current';
+  const initialToken = 'f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1';
   const wire = window.marqueTestFixture;
-  const context = {
+  const initialContext = {
     documentId: 'word-doc-restricted-7',
     revisionId: 'document-revision-15',
     viewerId: 'restricted-viewer-9',
     principalRevision: 'principal-revision-4',
     evaluationId: 'evaluation-token-27',
   };
-  const request = {
+  let currentContext = { ...initialContext };
+  const requestFor = (context, grantId = initialToken) => ({
     current: { ...context },
     grant: {
       ...context,
-      grantId: 'f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1',
+      grantId,
       rows: Array.from({ length: 4 }, () => ({ meaning: true, supportKinds: true, dependencies: true })),
       coverage: true,
     },
-  };
+  });
+  const snapshotFor = (context, grantId = initialToken) => ({
+    documentId: initialContext.documentId,
+    wire: grantId === initialToken ? wire : wire.replace(initialToken, grantId),
+    request: requestFor(context, grantId),
+  });
   const calls = {
     activeDocumentId: 0,
     providerOpenWord: 0,
     currentSemanticContext: 0,
     semanticInvalidationWatch: 0,
+    semanticRefresh: 0,
     cabScopeRead: 0,
     cabInvalidationWatch: 0,
     applyCommitted: 0,
@@ -43,9 +52,21 @@
     calls,
     canaries,
     wire,
-    context,
+    scenario,
+    get context() {
+      return { ...currentContext };
+    },
     bootComplete: false,
     error: null,
+    invalidateSemantic: null,
+    advanceContext() {
+      currentContext = {
+        ...currentContext,
+        revisionId: 'document-revision-16',
+        principalRevision: 'principal-revision-5',
+        evaluationId: 'evaluation-token-28',
+      };
+    },
   };
   window.publicReversalSmoke = state;
   window.Office = {
@@ -73,25 +94,38 @@
     provider: {
       async openWord() {
         calls.providerOpenWord++;
+        if (scenario === 'provider-open-error') throw new Error('synthetic provider open failure');
         return {
           kind: 'native_semantic_results',
-          documentId: context.documentId,
-          viewerId: context.viewerId,
-          nativeSemanticResults: { documentId: context.documentId, wire, request },
+          documentId: initialContext.documentId,
+          viewerId: initialContext.viewerId,
+          nativeSemanticResults: snapshotFor(initialContext),
+          ...(scenario === 'stale-session-retry'
+            ? {
+                async readNativeSemanticResults() {
+                  calls.semanticRefresh++;
+                  if (calls.semanticRefresh === 1) return snapshotFor(initialContext);
+                  return snapshotFor(currentContext, 'a2'.repeat(16));
+                },
+              }
+            : {}),
         };
       },
     },
     wordHost: {
       async activeDocumentId() {
         calls.activeDocumentId++;
-        return context.documentId;
+        if (scenario === 'cross-document-decline' && calls.activeDocumentId === 1) return 'other-document';
+        if (scenario === 'navigation-before-results-read' && calls.activeDocumentId > 1) return 'other-document';
+        return initialContext.documentId;
       },
       async readNativeSemanticResultsContext() {
         calls.currentSemanticContext++;
-        return { ...context };
+        return { ...currentContext };
       },
-      watchNativeSemanticResultsInvalidation() {
+      watchNativeSemanticResultsInvalidation(_documentId, _viewerId, invalidate) {
         calls.semanticInvalidationWatch++;
+        state.invalidateSemantic = invalidate;
         return () => {};
       },
       async readNativeCabScope() {
@@ -114,19 +148,19 @@
     maxBytes: 4096,
     async activeDocumentId() {
       calls.sourceActiveDocumentId++;
-      return context.documentId;
+      return initialContext.documentId;
     },
     async open() {
       calls.sourceOpen++;
       return {
-        documentId: context.documentId,
+        documentId: initialContext.documentId,
         binding: {
           chain_id: 'secret-chain',
           source_id: 'secret-source',
           revision_id: 'secret-revision',
           contribution_id: 'secret-contribution',
           scope_id: 'secret-scope',
-          viewer_id: context.viewerId,
+          viewer_id: initialContext.viewerId,
         },
         async currentBinding() {
           calls.sourceCurrentBinding++;

@@ -40,6 +40,14 @@ export function mountNativeSemanticResultsWorkspace(
   let generation = 0;
   let disposed = false;
   let unsubscribe: (() => void) | undefined;
+  const stopWatching = (): void => {
+    try {
+      unsubscribe?.();
+    } catch {
+      // A failing host cleanup must not leave the previous view mounted.
+    }
+    unsubscribe = undefined;
+  };
   const invalidate = () => {
     if (disposed) return;
     generation++;
@@ -52,19 +60,27 @@ export function mountNativeSemanticResultsWorkspace(
     !!session.viewerId &&
     !!wordHost.watchNativeSemanticResultsInvalidation &&
     !!wordHost.readNativeSemanticResultsContext;
-  if (eligible) {
-    try {
-      unsubscribe = wordHost.watchNativeSemanticResultsInvalidation!(session.documentId, session.viewerId, invalidate);
-    } catch {
-      unsubscribe = undefined;
-    }
-  }
   async function obtain(initial: boolean): Promise<void> {
     const attempt = ++generation;
     pane.update({ nativeSemanticResultsRequest: null, doc: snapshotDoc(undefined, maxBytes) });
-    if (typeof unsubscribe !== 'function' || !wordHost.readNativeSemanticResultsContext) return;
+    if (!eligible || !wordHost.readNativeSemanticResultsContext) return;
     try {
-      if (!(await isSameWordDocument(wordHost, session)) || disposed || attempt !== generation) return;
+      if (!(await isSameWordDocument(wordHost, session)) || disposed || attempt !== generation) {
+        stopWatching();
+        return;
+      }
+      if (typeof unsubscribe !== 'function') {
+        try {
+          unsubscribe = wordHost.watchNativeSemanticResultsInvalidation!(
+            session.documentId,
+            session.viewerId,
+            invalidate,
+          );
+        } catch {
+          unsubscribe = undefined;
+        }
+      }
+      if (typeof unsubscribe !== 'function') return;
       const next = initial ? session.nativeSemanticResults : await session.readNativeSemanticResults?.();
       if (
         !next ||
@@ -113,12 +129,8 @@ export function mountNativeSemanticResultsWorkspace(
     destroy() {
       disposed = true;
       generation++;
-      try {
-        unsubscribe?.();
-      } catch {
-        // A failing host cleanup must not leave the prior view mounted.
-      }
       pane.destroy();
+      stopWatching();
       root.replaceChildren();
     },
   };
