@@ -90,6 +90,9 @@ Kit/host effective readiness is true only when snapshot readiness is current, re
 Exact field names/layout and revision-token representation remain implementation choices under the selected Fact contract. Artifact rows and blocker reasons come from the same semantic evaluation, not from whether a row happens to be present in a projection.
 _M · U · I_
 
+The ordinary lint's bounded `document.intake` projection may carry candidate classification, scoped typed evidence and explicit coverage. The existing source-receipt view can show the recognized classification and an unresolved-owner state; it never renders source bytes or owner codes. Inventory completeness describes what was projected, not resolved ownership or document readiness. Only the current evaluation authorizes a readiness claim.
+_M · U · I_
+
 ### F · Never on Marque's wire — the kit's state, keyed by id
 **applied**
 **completed**

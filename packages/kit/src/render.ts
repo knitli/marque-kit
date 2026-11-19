@@ -740,6 +740,7 @@ const RESOURCE_NAMES: Readonly<Record<string, string>> = {
 const MAX_SOURCE_BYTES = 262_144;
 // The producer's projection index cap covers receipts and candidate rows together.
 const MAX_INTAKE_INDEX_ITEMS = 8_192;
+const MAX_INTAKE_DISPLAY_CANDIDATES = 64;
 const safeIndex = (value: unknown, max = Number.MAX_SAFE_INTEGER): value is number =>
   Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= max;
 const ownName = (names: Readonly<Record<string, string>>, key: string): string | undefined =>
@@ -761,6 +762,113 @@ function safeTransformation(row: unknown): SafeTransformation | null {
   const span = safeSpan(value.span);
   if (!name || !span || !safeIndex(value.observation)) return null;
   return { name, ...span, observation: value.observation };
+}
+
+type SafeIntakeCandidate = {
+  observation: number;
+  span: SafeSpan;
+  classification?: string;
+  system?: 'FGI' | 'JOINT';
+  ownerUnresolved: boolean;
+};
+const CLASSIFICATION_NAMES: Readonly<Record<string, string>> = {
+  u: 'Unclassified',
+  c: 'Confidential',
+  s: 'Secret',
+  ts: 'Top Secret',
+  r: 'Restricted',
+};
+const FOREIGN_LEVEL_CODES: Readonly<Record<string, string>> = {
+  unclassified: 'u',
+  confidential: 'c',
+  secret: 's',
+  top_secret: 'ts',
+  restricted: 'r',
+};
+
+function safeIntakeCandidate(row: unknown): SafeIntakeCandidate | null {
+  if (!row || typeof row !== 'object') return null;
+  const value = row as Record<string, unknown>;
+  const span = safeSpan(value.span);
+  if (!safeIndex(value.observation) || !span) return null;
+  const hypothesis = value.hypothesis;
+  const classificationCode =
+    hypothesis && typeof hypothesis === 'object' && (hypothesis as Record<string, unknown>).kind === 'classification'
+      ? String((hypothesis as Record<string, unknown>).classification)
+      : undefined;
+  const classification =
+    classificationCode === undefined ? undefined : ownName(CLASSIFICATION_NAMES, classificationCode);
+  const evidence = Array.isArray(value.evidence) ? value.evidence : [];
+  let system: SafeIntakeCandidate['system'];
+  let ownerUnresolved = false;
+  for (const raw of evidence) {
+    if (!raw || typeof raw !== 'object') continue;
+    const item = raw as Record<string, unknown>;
+    if (item.kind === 'known_lexical_token' && item.category === 'classification') {
+      const levelCode = typeof item.level === 'string' ? ownName(FOREIGN_LEVEL_CODES, item.level) : undefined;
+      if (levelCode === classificationCode && item.system === 'fgi') system = 'FGI';
+      else if (levelCode === classificationCode && item.system === 'joint') system = 'JOINT';
+    }
+    if (item.kind === 'unresolved_owner') ownerUnresolved = true;
+  }
+  return {
+    observation: value.observation,
+    span,
+    ...(classification && { classification }),
+    ...(system && { system }),
+    ownerUnresolved,
+  };
+}
+
+function candidateProjection(intake: DocumentIntake): HTMLElement | null {
+  if (intake.status === 'refused' || intake.status === 'unavailable') return null;
+  const supplied = Array.isArray(intake.candidates) ? intake.candidates : null;
+  const emitted = safeIndex(intake.candidate_count_emitted) ? intake.candidate_count_emitted : undefined;
+  const total = safeIndex(intake.candidate_count) ? intake.candidate_count : undefined;
+  if (supplied === null && emitted === undefined && total === undefined) return null;
+
+  const bounded = supplied !== null && supplied.length <= MAX_INTAKE_INDEX_ITEMS && emitted === supplied.length;
+  const candidates = bounded && supplied ? supplied.map(safeIntakeCandidate) : [];
+  const retained = candidates.filter((candidate): candidate is SafeIntakeCandidate => candidate !== null);
+  const full =
+    intake.candidate_inventory_status === 'complete' &&
+    bounded &&
+    total !== undefined &&
+    emitted === total &&
+    retained.length === supplied?.length;
+  const summary = el(
+    'p',
+    'mq-p',
+    full
+      ? `Source candidate details · ${plural(retained.length, 'candidate', 'candidates')} retained`
+      : `Partial source evidence · ${retained.length} of ${total ?? emitted ?? '?'} candidates retained`,
+  );
+  const body = el('div', 'mq-source-evidence');
+  body.append(summary);
+  if (!full) {
+    const resource = intake.projection_cutoff?.resource;
+    const cutoff = typeof resource === 'string' ? ownName(RESOURCE_NAMES, resource) : undefined;
+    body.append(
+      el('p', 'mq-p', `Candidate evidence is incomplete${cutoff ? `; projection stopped at ${cutoff}` : ''}.`),
+    );
+  }
+  if (retained.length) {
+    const list = el('ul', 'mq-transforms');
+    for (const candidate of retained.slice(0, MAX_INTAKE_DISPLAY_CANDIDATES)) {
+      const parts: string[] = [];
+      if (candidate.classification) {
+        parts.push(`${candidate.system ? `${candidate.system} ` : ''}classification: ${candidate.classification}`);
+      }
+      if (candidate.ownerUnresolved) parts.push('Foreign ownership unresolved.');
+      if (!parts.length) continue;
+      list.append(el('li', 'mq-transform', parts.join(' · ')));
+    }
+    if (list.childElementCount) body.append(list);
+    if (retained.length > MAX_INTAKE_DISPLAY_CANDIDATES) {
+      body.append(el('p', 'mq-p', `Showing the first ${MAX_INTAKE_DISPLAY_CANDIDATES} candidate summaries.`));
+    }
+  }
+  return body;
 }
 
 function candidateOwners(candidates: readonly unknown[]): Map<number, SafeSpan | null> {
@@ -861,6 +969,8 @@ function transformationReceipts(intake: DocumentIntake): HTMLDetailsElement {
     }
     body.append(list);
   }
+  const candidateDetails = candidateProjection(intake);
+  if (candidateDetails) body.append(candidateDetails);
   details.append(body);
   return details;
 }
