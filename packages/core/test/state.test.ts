@@ -199,49 +199,47 @@ const doc = JSON.parse(readFileSync(new URL('../../../fixtures/memo.findings.jso
 
 // Raw14 caller control: its act-history lane is complete only through sequence 1,
 // while the separate caller-issued frontier is already MAX_SAFE_INTEGER.
-const rawHandleInputs = JSON.parse(
-  readFileSync(new URL('../../../../replacement/acceptance/joint-handle-inputs/inputs.json', import.meta.url), 'utf8'),
+const rawActControl = JSON.parse(
+  readFileSync(new URL('../../../fixtures/joint-handle-inputs.json', import.meta.url), 'utf8'),
 ) as {
-  successors: Array<{
-    control: string;
-    input: {
-      act_history: { coverage: { state: 'complete' | 'partial' | 'unavailable'; sequence_range: [number, number] } };
-      append_request: { unsequenced_act: Record<string, unknown> };
-      caller_control: { watermarks: { act_sequence: number } };
+  input: {
+    act_history: {
+      coverage: { state: 'complete' | 'partial' | 'unavailable'; sequence_range: [number, number] };
+      ordered_acts: Array<Record<string, unknown>>;
     };
-  }>;
+    append_request: { unsequenced_act: Record<string, unknown> };
+    caller_control: { watermarks: { act_sequence: number } };
+  };
 };
-const rawHandleCases = JSON.parse(
-  readFileSync(new URL('../../../../replacement/acceptance/joint-protocol-v3/cases.json', import.meta.url), 'utf8'),
+const { expected: rawExpected } = JSON.parse(
+  readFileSync(new URL('../../../fixtures/joint-protocol-cases.json', import.meta.url), 'utf8'),
 ) as {
-  handle_integrity_controls: Array<{
-    id: string;
-    expected: { act_sequence: string; wrap_rounding_or_duplicate: boolean };
-  }>;
+  expected: { act_sequence: string; wrap_rounding_or_duplicate: boolean };
 };
-const rawActControl = rawHandleInputs.successors.find((control) => control.control === 'act-sequence-exhausted')!;
 const rawAct = rawActControl.input.append_request.unsequenced_act;
-const rawExpected = rawHandleCases.handle_integrity_controls.find(
-  (control) => control.id === 'act-sequence-exhausted',
-)!.expected;
-// Map the accepted raw14 request without manufacturing an ordered row or losing its bindings.
+// Map the raw handles and bindings into the kit's corresponding act fields.
+const rawBinding = (act: Record<string, unknown>): NonNullable<ActAppendRequest['binding']> => ({
+  chain: act.chain as string,
+  subject: act.subject as { chain: string; serial: number },
+  question: act.question as { chain: string; serial: number },
+  questionRevision: act.question_revision as number,
+  resultRevision: act.result_revision as number,
+  payloadRef: act.payload_ref as string,
+  sourceRevisions: act.source_revisions as string[],
+  basisRef: act.basis as string,
+  supersedes: act.supersedes as null,
+  takesBack: act.takes_back as null,
+});
+const rawId = (act: Record<string, unknown>): string => {
+  const subject = act.subject as { chain: string; serial: number };
+  return `${subject.chain}/${subject.serial}`;
+};
 const raw14Request: ActAppendRequest = {
-  requestId: 'request-unsequenced-append',
-  id: 'chain-A/1',
-  act: 'answered',
+  requestId: `request-${rawAct.row_id as string}`,
+  id: rawId(rawAct),
+  act: rawAct.action as ActAppendRequest['act'],
   value: null,
-  binding: {
-    chain: rawAct.chain as string,
-    subject: rawAct.subject as { chain: string; serial: number },
-    question: rawAct.question as { chain: string; serial: number },
-    questionRevision: rawAct.question_revision as number,
-    resultRevision: rawAct.result_revision as number,
-    payloadRef: rawAct.payload_ref as string,
-    sourceRevisions: rawAct.source_revisions as string[],
-    basisRef: rawAct.basis as string,
-    supersedes: rawAct.supersedes as null,
-    takesBack: rawAct.takes_back as null,
-  },
+  binding: rawBinding(rawAct),
 };
 assert.equal(rawAct.row_id, 'unsequenced-append');
 assert.equal(rawAct.sequence, null);
@@ -261,11 +259,22 @@ assert.deepEqual(raw14Request.binding, {
   takesBack: null,
 });
 {
+  const history = rawActControl.input.act_history;
+  const watermark = rawActControl.input.caller_control.watermarks.act_sequence;
+  assert.equal(watermark, Number.MAX_SAFE_INTEGER);
+  assert.deepEqual(history.coverage.sequence_range, [1, 1]);
   const prior: State = {
     ...empty(),
-    log: [{ sequence: 1, id: 'chain-A/1', act: 'answered', value: null, at: 'prior' }],
-    actSequence: Number.MAX_SAFE_INTEGER,
-    actHistoryCoverage: { state: 'complete', sequenceRange: [1, 1] },
+    log: history.ordered_acts.map((act) => ({
+      sequence: act.sequence as number,
+      id: rawId(act),
+      act: act.action as ActAppendRequest['act'],
+      value: null,
+      at: 'prior',
+      binding: rawBinding(act),
+    })),
+    actSequence: watermark,
+    actHistoryCoverage: { state: history.coverage.state, sequenceRange: history.coverage.sequence_range },
   };
   const refused = appendAct(prior, raw14Request);
   assert.equal(refused.status, 'refused');
