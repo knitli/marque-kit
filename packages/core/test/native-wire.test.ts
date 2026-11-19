@@ -183,6 +183,7 @@ void test('wire keeps unresolved occurrence references distinct from authored su
   const raw = JSON.parse(text) as NativeEnvelopeV1;
   const supports = raw.evaluation.requirements[0]!.supports;
   supports.push({ kind: 'unresolved_occurrence', index: '3' });
+  supports.push({ kind: 'eyes_receive_implies_show', index: '4' });
   const parsed = parseNativeJson(JSON.stringify(raw), 1_048_576);
   assert.deepEqual(parsed.evaluation.requirements[0]!.supports, supports);
   const unknownTag = JSON.stringify(raw).replace('"unresolved_occurrence"', '"unknown_spelling"');
