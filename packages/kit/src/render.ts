@@ -32,9 +32,17 @@
  * engine's document as-is.
  */
 
-import { render as mark, settle, resettle, relabel, masked, el, button } from './marking.ts';
+import { render as mark, settle, resettle, relabel, el, button } from './marking.ts';
 import {
   appendAcknowledgementIssue,
+  disclosedReading,
+  canWriteMarking,
+  hasDefinitiveSourceBasis,
+  disclosedAsks,
+  disclosedBasis,
+  disclosedAppendRequest,
+  isDisclosedState,
+  isDisclosedRequest,
   empty,
   newActRequestId,
   see,
@@ -48,7 +56,6 @@ import {
   effectiveReady,
   writeConfirmationToken,
   acceptedReplacements,
-  face,
   isArtifact,
 } from '@knitli/marque-kit-core/state';
 import { GATE, rung, waits, artRung, artWaits, sections, type Sections } from '@knitli/marque-kit-core/attention';
@@ -66,6 +73,7 @@ import type {
   ArtifactView,
   Doc,
   EngineState,
+  HistoryDisclosure,
   Finding,
   FindingView,
   Host,
@@ -113,8 +121,13 @@ interface Draft {
   radio: boolean;
   focused: boolean;
 }
+export type { HistoryDisclosure } from '@knitli/marque-kit-core/types';
+type HistoryDisclosureHost = Pick<
+  Host,
+  'actBinding' | 'currentBasis' | 'currentDisclosureRevision' | 'historyDisclosure'
+>;
 /** What the receipt is about: the session as the engine will seal it. */
-export interface Session {
+export interface Session extends HistoryDisclosureHost {
   schema?: string;
   classifier_id?: string;
   session_root?: string;
@@ -138,6 +151,8 @@ export interface Update {
   readOnly?: boolean;
   /** The host's latest known document/chain/basis binding; null clears it to unknown. */
   actBinding?: ActAppendBinding | null;
+  currentDisclosureRevision?: string | null;
+  historyDisclosure?: HistoryDisclosure | null;
   /** The log length when this lint began. */
   linted?: number | undefined;
   /** The host's request counter. */
@@ -160,6 +175,8 @@ export interface Mounted {
 /* ── helpers ─────────────────────────────────────────────────────────── */
 /** DOM ids per rendered copy: the gate and the pane can show the same finding at once. */
 let uid = 0;
+// Draft comparison keys are private to the form and never belong in a DOM attribute.
+const draftContext = new WeakMap<HTMLElement, { asked: string; reading?: string }>();
 const placed = <T extends HTMLElement>(m: T): T => {
   queueMicrotask(() => settle(m));
   return m;
@@ -296,6 +313,10 @@ function asks(f: FindingView, host: Host, r: Rung, help: string[]): HTMLElement 
   });
   const options = a.options === 'outcome.readings' ? (f.outcome.readings ?? []) : a.options || [];
 
+  const askedKey = canon({ asked: disclosedAsks(a), basis: f.evaluationBasis && disclosedBasis(f.evaluationBasis) });
+  const maskedQuestion =
+    !canWriteMarking(f.marking?.as_written) || options.some((option) => !canWriteMarking(option.result));
+  const restoreDraft = !maskedQuestion || hasDefinitiveSourceBasis(f.evaluationBasis, f.evaluationBasis);
   const fs = el('fieldset', 'mq-opts');
   fs.append(el('legend', null, a.text));
   options.forEach((o, i) => {
@@ -305,8 +326,7 @@ function asks(f: FindingView, host: Host, r: Rung, help: string[]): HTMLElement 
     inp.name = name;
     inp.value = String(i);
     inp.dataset.draft = `${f.id}:reading`;
-    inp.dataset.asked = canon(a); // a draft is for this question only
-    inp.dataset.reading = canon(o); // a draft is the reading itself, not its place in the list
+    if (restoreDraft) draftContext.set(inp, { asked: askedKey, reading: canon(disclosedReading(o)) });
     inp.addEventListener('change', () => {
       chosen = { reading: o, index: i };
       free.value = '';
@@ -328,7 +348,7 @@ function asks(f: FindingView, host: Host, r: Rung, help: string[]): HTMLElement 
   free.id = `${name}-free`;
   free.type = 'text';
   free.dataset.draft = `${f.id}:free`;
-  free.dataset.asked = canon(a);
+  if (restoreDraft) draftContext.set(free, { asked: askedKey });
   free.placeholder = a.field?.hint || 'Type an answer';
   free.addEventListener('input', () => {
     const t = free.value.trim();
@@ -612,7 +632,8 @@ const unconfirmedWrites = (doc: Doc, host: Host): string[] =>
     ]),
   ].filter((token) => {
     const basis = doc.document.evaluation?.basis;
-    return !basis || !(host.confirmedWrites ?? []).includes(writeConfirmationToken(token, basis));
+    const confirmation = basis && writeConfirmationToken(token, basis);
+    return !confirmation || !(host.confirmedWrites ?? []).includes(confirmation);
   });
 const ready = (doc: Doc, host: Host): boolean =>
   effectiveReady(doc, {
@@ -629,7 +650,8 @@ const holding = (doc: Doc, host: Host = {}): string[] => [
     ...(host.requiredAcceptanceChecks ?? [])
       .filter((id) => {
         const basis = doc.document.evaluation?.basis;
-        return !basis || host.acceptanceChecks?.[id] !== writeConfirmationToken(id, basis);
+        const confirmation = basis && writeConfirmationToken(id, basis);
+        return !confirmation || host.acceptanceChecks?.[id] !== confirmation;
       })
       .map((id) => `check:${id}`),
   ]),
@@ -795,10 +817,53 @@ const did = (e: LogEntry): string =>
           ? 'Filled in'
           : DONE[e.act];
 
-/** Every act, newest first. The answer or override still in force can be taken back, which asks the
- *  question again; an artifact's only until it is written, and a typed field's not yet (core can't).
- *  Only that act shows its marking, from the latest view: a code concealed since is masked there too. */
+type DisclosedHistoryEntry = Extract<HistoryDisclosure['entries'][number], { status: 'available' }>;
+
+/** Index the provider's current display once; conflicting request or sequence identities withhold that act. */
+function historyDisplay(doc: Doc, context: HistoryDisclosureHost): (entry: LogEntry) => DisclosedHistoryEntry | null {
+  const p = context.historyDisclosure;
+  const binding = context.actBinding;
+  if (
+    !p ||
+    !binding?.documentId ||
+    !binding.chain ||
+    !context.currentDisclosureRevision?.trim() ||
+    p.disclosureRevision !== context.currentDisclosureRevision ||
+    p.documentId !== binding.documentId ||
+    p.chain !== binding.chain ||
+    !Array.isArray(p.entries) ||
+    !sameBasis(p.basis, context.currentBasis) ||
+    !sameBasis(binding.basis, context.currentBasis) ||
+    !sameBasis(doc.document.evaluation?.basis, context.currentBasis)
+  )
+    return () => null;
+  const requests = new Set<string>();
+  const repeated = new Set<string>();
+  const rows = new Map<number, HistoryDisclosure['entries'][number] | null>();
+  for (const row of p.entries) {
+    if (requests.has(row.requestId)) repeated.add(row.requestId);
+    requests.add(row.requestId);
+    rows.set(row.sequence, rows.has(row.sequence) ? null : row);
+  }
+  return (entry) => {
+    const row = rows.get(entry.sequence);
+    if (
+      !entry.requestId ||
+      !Number.isSafeInteger(entry.sequence) ||
+      entry.sequence < 1 ||
+      entry.binding?.documentId !== p.documentId ||
+      entry.binding.chain !== p.chain ||
+      row?.status !== 'available' ||
+      row.requestId !== entry.requestId ||
+      row.subjectId !== entry.id ||
+      repeated.has(entry.requestId)
+    )
+      return null;
+    return row;
+  };
+}
 function history(doc: Doc, log: readonly LogEntry[], host: Host): HTMLElement {
+  const display = historyDisplay(doc, host);
   const rows = el('div', 'mq-rows mq-history');
   const all: Subject[] = [...doc.findings, ...doc.document.artifacts];
   [...log].reverse().forEach((e, i, newest) => {
@@ -810,16 +875,11 @@ function history(doc: Doc, log: readonly LogEntry[], host: Host): HTMLElement {
     // In force: the last act on its id, and still the one the finding stands on.
     const last = newest.findIndex((y) => y.id === e.id) === i;
     const force = last && !!x && [x.person, isArtifact(x) ? null : decision(x)].some((d) => d && canon(d) === canon(e));
-    if (force && !isArtifact(x)) {
-      const m =
-        e.act === 'kept_as_written'
-          ? x.marking?.as_written
-          : e.act === 'answered' || e.act === 'changed'
-            ? x.outcome?.result
-            : null;
-      if (m && isMarking(m)) what.append(placed(mark(m, { form: 'folded' })));
-      else if (e.value?.free) what.append(el('span', 'mq-p', `“${e.value.free}”`));
-    }
+    if (force && !isArtifact(x) && e.act === 'kept_as_written' && x.marking?.as_written)
+      what.append(placed(mark(x.marking.as_written, { form: 'folded' })));
+    const disclosed = display(e);
+    if (disclosed?.text) what.append(el('span', 'mq-p', disclosed.text));
+    if (disclosed?.marking) what.append(placed(mark(disclosed.marking, { form: 'folded' })));
     li.append(what);
     // Routing acts (later, not my call) leave the question open: there is nothing to take back.
     const back =
@@ -995,7 +1055,9 @@ export function artifact(a: ArtifactView, host: Host = {}, doc?: Doc | null): HT
       inp.type = 'text';
       inp.id = `${a.id}-${k}-${++uid}`;
       inp.dataset.draft = `${a.id}:${k}`;
-      inp.dataset.asked = canon(fld); // and this field as given
+      draftContext.set(inp, {
+        asked: canon({ ...fld, evaluationBasis: fld.evaluationBasis && disclosedBasis(fld.evaluationBasis) }),
+      });
       key.id = `${inp.id}-k`;
       inp.setAttribute('aria-labelledby', key.id);
       inp.placeholder = fld.format || '';
@@ -1063,7 +1125,9 @@ export function artifact(a: ArtifactView, host: Host = {}, doc?: Doc | null): HT
           i.focus();
         });
         change.dataset.change = `${a.id}:${k}`;
-        change.dataset.asked = canon(fld);
+        draftContext.set(change, {
+          asked: canon({ ...fld, evaluationBasis: fld.evaluationBasis && disclosedBasis(fld.evaluationBasis) }),
+        });
         v.append(' ', change);
       }
       dl.append(v);
@@ -1200,84 +1264,29 @@ export function receipt(doc: Doc, session: Session = {}): HTMLDivElement {
     el('span', 'who', session.classifier_id || 'classifier id not set'),
   );
   r.append(hd);
-  // Each act with what was said and when, so a changed answer keeps the one it replaced.
-  // A reading by its words and its marking: two readings can write the same marking.
-  const said = (v: ActValue | null): string =>
-    (v?.reading ? `${v.reading.result ? masked(v.reading.result) : ''} (${v.reading.reading})`.trim() : null) ??
-    v?.free ??
-    (v?.fields
-      ? Object.entries(v.fields)
-          .map(([k, t]) => `${k.replace(/_/g, ' ')} ${t}`)
-          .join(', ')
-      : '');
-  // Typed notice content by its identity, so the receipt says which version was approved.
-  const content = (c: string): string => {
-    try {
-      return Object.entries(JSON.parse(c) as Record<string, unknown>)
-        .map(([k, v]) => `${k.replace(/_/g, ' ')} ${String(v)}`)
-        .join(', ');
-    } catch {
-      return c;
-    }
+  // Private log payload is not a disclosure grant. Only host-projected text/markings are displayable.
+  const display = historyDisplay(doc, session);
+  const acts = (x: Receiptable): HTMLElement => {
+    const out = el('span');
+    (x.history || []).forEach((e, i) => {
+      if (i) out.append(document.createTextNode(' → '));
+      out.append(document.createTextNode([e.act.replace(/_/g, ' '), e.at].filter(Boolean).join(' ')));
+      const safe = display(e);
+      if (safe?.text) out.append(document.createTextNode(` ${safe.text}`));
+      if (safe?.marking) out.append(document.createTextNode(' '), placed(mark(safe.marking, { size: 'xs' })));
+    });
+    return out;
   };
-  // A snapshot's markings as drawn, masks and all: a concealed code never prints as text.
-  const result = (a: Partial<Snapshot> | undefined): string => {
-    const m = a?.result_marking ?? a?.result;
-    return m ? masked(m) : '';
-  };
-  const written = (a: Partial<Snapshot>): string => {
-    const m = a.marking ?? a.as_written;
-    return m ? masked(m) : '';
-  };
-  const op = (e: LogEntry): string =>
-    e.act === 'changed' && e.value == null
-      ? 'back to Marque\u2019s result'
-      : e.act === 'kept_as_written'
-        ? result(e.about)
-          ? `instead of ${result(e.about)}`
-          : ''
-        : e.value?.apply
-          ? `apply${result(e.about) ? ` ${result(e.about)}` : e.about?.content ? ` ${content(e.about.content)}` : ''}`
-          : e.value?.remove
-            ? 'remove'
-            : said(e.value);
-  // An act taken on another rule or marking under this id says which, from its own snapshot.
-  const about = (e: LogEntry, x: Receiptable): string => {
-    const rule = x.rule ? `${x.rule.scheme}:${x.rule.predicate}` : x.kind;
-    if (!e.about) return '';
-    // Taken at another paragraph or page under this id: the receipt says where it was.
-    const was = 'anchor' in e.about ? where({ ...x, anchor: e.about.anchor }) : null;
-    const at = was && was !== where(x) ? `at ${was}` : '';
-    const asked = written(e.about);
-    if (e.about.rule && e.about.rule !== rule)
-      return [`on ${e.about.rule}${asked ? ` ${asked}` : ''}`, at].filter(Boolean).join(' ');
-    return [
-      asked && face(e.about.marking ?? e.about.as_written) !== face(x.marking?.as_written ?? null)
-        ? `asked of ${asked}`
-        : '',
-      at,
-    ]
-      .filter(Boolean)
-      .join(' ');
-  };
-  const acts = (x: Receiptable): string =>
-    (x.history || [])
-      .map((e) => [e.act.replace(/_/g, ' '), op(e), about(e, x), e.at].filter(Boolean).join(' '))
-      .join(' → ');
   for (const f of doc.findings) {
     const ln = el('div', 'ln');
     ln.append(el('span', 't', where(f)));
     const b = el('div', 'b');
     const did = acts(f);
-    b.append(
-      el(
-        'span',
-        null,
-        `${f.rule.scheme}:${f.rule.predicate} · ${f.outcome.kind.replace(/_/g, ' ')}${did ? ` · ${did}` : ''}`,
-      ),
-    );
+    b.append(el('span', null, `${f.rule.scheme}:${f.rule.predicate} · ${f.outcome.kind.replace(/_/g, ' ')}`));
+    if (did.hasChildNodes()) b.append(document.createTextNode(' · '), did);
     if (f.marking?.as_written) b.append(placed(mark(f.marking.as_written, { size: 'xs' })));
-    if (f.outcome?.result) b.append(placed(mark(f.outcome.result, { size: 'xs', state: 'changed' })));
+    // A pending answer's overlaid result is historical until the engine evaluates it.
+    if (!f.person && f.outcome?.result) b.append(placed(mark(f.outcome.result, { size: 'xs', state: 'changed' })));
     ln.append(b);
     r.append(ln);
   }
@@ -1286,7 +1295,8 @@ export function receipt(doc: Doc, session: Session = {}): HTMLDivElement {
     const ln = el('div', 'ln');
     const did = acts(a);
     const b = el('div', 'b');
-    b.append(el('span', null, `${a.kind} · ${a.state.replace(/_/g, ' ')}${did ? ` · ${did}` : ''}`));
+    b.append(el('span', null, `${a.kind} · ${a.state.replace(/_/g, ' ')}`));
+    if (did.hasChildNodes()) b.append(document.createTextNode(' · '), did);
     if (isMarking(a.derived_value)) b.append(placed(mark(a.derived_value, { size: 'xs', state: 'changed' })));
     ln.append(el('span', 't', where(a)), b);
     r.append(ln);
@@ -1297,9 +1307,9 @@ export function receipt(doc: Doc, session: Session = {}): HTMLDivElement {
     const a: Partial<Snapshot> = x.about || {};
     ln.append(el('span', 't', a.anchor || a.kind ? where(a) : '—'));
     const b = el('div', 'b');
-    b.append(el('span', null, `${a.rule ? `${a.rule} · ` : ''}no longer reported · ${acts(x)}`));
-    // From the act's own marking where it has one: its masks stay masks.
-    if (a.marking || a.as_written) b.append(placed(mark(a.marking || { text: a.as_written ?? '' }, { size: 'xs' })));
+    b.append(el('span', null, `${a.rule ? `${a.rule} · ` : ''}no longer reported`));
+    const did = acts(x);
+    if (did.hasChildNodes()) b.append(document.createTextNode(' · '), did);
     ln.append(b);
     r.append(ln);
   }
@@ -1342,6 +1352,8 @@ export function mount(
   root: HTMLElement,
   { doc = null, state = empty(), moment = 'editing', engine = 'ok', readOnly = false, ...host }: MountOptions = {},
 ): Mounted {
+  if (!isDisclosedState(state))
+    throw new TypeError('The workspace must supply disclosed action history to open the pane.');
   const cur: {
     doc: Doc | null;
     state: State;
@@ -1349,6 +1361,8 @@ export function mount(
     engine: EngineState;
     readOnly: boolean;
     actBinding: ActAppendBinding | null;
+    currentDisclosureRevision: string | null;
+    historyDisclosure: HistoryDisclosure | null;
     open: string | null;
     tab: Tab;
     seq: number | null;
@@ -1359,6 +1373,8 @@ export function mount(
     engine,
     readOnly,
     actBinding: host.actBinding ?? null,
+    currentDisclosureRevision: host.currentDisclosureRevision ?? null,
+    historyDisclosure: host.historyDisclosure ?? null,
     open: null,
     tab: 'findings',
     seq: null,
@@ -1434,6 +1450,12 @@ export function mount(
     },
     get actBinding() {
       return cur.actBinding ?? undefined;
+    },
+    get currentDisclosureRevision() {
+      return cur.currentDisclosureRevision ?? undefined;
+    },
+    get historyDisclosure() {
+      return cur.historyDisclosure ?? undefined;
     },
     get open() {
       return cur.open;
@@ -1662,32 +1684,34 @@ export function mount(
   let appendInFlight: string | null = null;
   const drafts = (): Draft[] =>
     [...body.querySelectorAll<HTMLInputElement>('[data-draft]')]
-      .filter((x) => !acting || !x.dataset.draft?.startsWith(`${acting}:`))
+      .filter((x) => draftContext.has(x) && (!acting || !x.dataset.draft?.startsWith(`${acting}:`)))
       // An opened correction counts as soon as it's open, typed in or not.
       .filter((x) =>
         x.type === 'radio' ? x.checked : x.dataset.opened || (x.value.trim() && x.value !== x.defaultValue),
       )
       .map((x) => ({
         key: x.dataset.draft ?? '',
-        asked: x.dataset.asked,
-        value: x.type === 'radio' ? x.dataset.reading : x.value,
+        asked: draftContext.get(x)?.asked,
+        value: x.type === 'radio' ? draftContext.get(x)?.reading : x.value,
         radio: x.type === 'radio',
         focused: x === document.activeElement,
       }));
   function restore(list: Draft[]): void {
-    const find = (d: Draft) =>
-      [...body.querySelectorAll<HTMLInputElement>('[data-draft]')].find(
+    const find = (d: Draft): HTMLInputElement | undefined => {
+      const matches = [...body.querySelectorAll<HTMLInputElement>('[data-draft]')].filter(
         (x) =>
           x.dataset.draft === d.key &&
-          x.dataset.asked === d.asked &&
-          (d.radio ? x.type === 'radio' && x.dataset.reading === d.value : x.type !== 'radio'),
+          draftContext.get(x)?.asked === d.asked &&
+          (d.radio ? x.type === 'radio' && draftContext.get(x)?.reading === d.value : x.type !== 'radio'),
       );
+      return matches.length === 1 ? matches[0] : undefined;
+    };
     for (const d of list) {
       let n = find(d);
       // A correction under way to a filled field: open it again for the person.
       if (!n && !d.radio) {
         [...body.querySelectorAll<HTMLElement>('[data-change]')]
-          .find((x) => x.dataset.change === d.key && x.dataset.asked === d.asked)
+          .find((x) => x.dataset.change === d.key && draftContext.get(x)?.asked === d.asked)
           ?.click();
         n = find(d);
       }
@@ -1718,7 +1742,7 @@ export function mount(
     if (v && (ok || cur.engine === 'checking')) {
       const now = sections(v, cur.moment).must;
       // Keyed by the question too: one asked again under the same id is news.
-      const key = (f: Subject): string => `${f.id} ${canon(f.asks ?? null)}`;
+      const key = (f: Subject): string => `${f.id} ${canon(f.asks ? disclosedAsks(f.asks) : null)}`;
       const before = said;
       if (before && ok)
         say = now
@@ -1814,6 +1838,8 @@ export function mount(
         return 'The host history position or ordered rows are invalid. This action remains pending outside history.';
       case 'missing-target':
         return 'The host could not bind this action to a finding. It remains pending and has not been applied.';
+      case 'undisclosed-marking':
+        return 'This action or its history contains undisclosed marking content. It was not recorded or applied.';
       case 'request-id-conflict':
         return 'This request key conflicts with a stored request. Resolve the conflict before retrying; no write was dispatched.';
     }
@@ -1849,7 +1875,7 @@ export function mount(
       return;
     }
     const binding = currentAppendBinding() ?? undefined;
-    const request: ActAppendRequest = {
+    const request = disclosedAppendRequest({
       requestId: newActRequestId(),
       id: f.id,
       act,
@@ -1857,7 +1883,7 @@ export function mount(
       at: new Date().toISOString(),
       about: snapshot(f),
       ...(binding && { binding }),
-    };
+    });
     await submitAppend(request, f);
   }
 
@@ -1905,6 +1931,12 @@ export function mount(
     if (dead) return;
     appendInFlight = null;
     if (result.status === 'refused') {
+      if (!isDisclosedState(result.state) || (result.pending && !isDisclosedRequest(result.pending))) {
+        appendRetryable = true;
+        appendStatus = 'The workspace must return disclosed action history before this request can continue.';
+        draw(focusId);
+        return;
+      }
       if (sameOwner() && contextIsCurrent()) adoptHostState(result.state);
       const storedRequest = nextPendingRequest(cur.state);
       pendingRequest = storedRequest ?? (result.reason === 'sequence-exhausted' ? null : (result.pending ?? request));
@@ -2020,6 +2052,9 @@ export function mount(
       ) {
         delete next.doc;
         delete next.engine;
+        delete next.currentDisclosureRevision;
+        delete next.historyDisclosure;
+        actBinding = undefined;
       } else if (lint && seq != null) cur.seq = seq;
       Object.assign(cur, next);
       if (actBinding !== undefined) cur.actBinding = actBinding;

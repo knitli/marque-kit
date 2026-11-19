@@ -684,9 +684,9 @@ const readyEvaluation = (b = basis()) => ({
     effectiveReady(fresh, {
       ...current,
       requiredWrites: ['a-cab'],
-      confirmedWrites: [writeConfirmationToken('a-cab', b)],
+      confirmedWrites: [writeConfirmationToken('a-cab', b)!],
       requiredAcceptanceChecks: ['outgoing-document'],
-      acceptanceChecks: { 'outgoing-document': writeConfirmationToken('outgoing-document', b) },
+      acceptanceChecks: { 'outgoing-document': writeConfirmationToken('outgoing-document', b)! },
     }),
   );
 
@@ -774,9 +774,9 @@ const readyEvaluation = (b = basis()) => ({
       effectiveReady(resolvedRequirement, {
         ...current,
         requiredWrites: ['a-cab'],
-        confirmedWrites: [writeConfirmationToken('a-cab', b)],
+        confirmedWrites: [writeConfirmationToken('a-cab', b)!],
         requiredAcceptanceChecks: ['outgoing-document'],
-        acceptanceChecks: { 'outgoing-document': writeConfirmationToken('outgoing-document', b) },
+        acceptanceChecks: { 'outgoing-document': writeConfirmationToken('outgoing-document', b)! },
       }),
       `mandatory ${status} requirement passes with current basis and confirmed host work`,
     );
@@ -789,7 +789,7 @@ const readyEvaluation = (b = basis()) => ({
     !effectiveReady(nextEvaluation, {
       currentBasis: nextBasis,
       ...requiredCheck,
-      acceptanceChecks: { 'outgoing-document': writeConfirmationToken('outgoing-document', b) },
+      acceptanceChecks: { 'outgoing-document': writeConfirmationToken('outgoing-document', b)! },
     }),
     'a passed check at the previous context basis cannot carry forward',
   );
@@ -797,7 +797,7 @@ const readyEvaluation = (b = basis()) => ({
     effectiveReady(nextEvaluation, {
       currentBasis: nextBasis,
       ...requiredCheck,
-      acceptanceChecks: { 'outgoing-document': writeConfirmationToken('outgoing-document', nextBasis) },
+      acceptanceChecks: { 'outgoing-document': writeConfirmationToken('outgoing-document', nextBasis)! },
     }),
     'the same named check passes when confirmed against the current basis',
   );
@@ -928,7 +928,7 @@ assert.ok(
 assert.ok(
   effectiveReady(done, {
     currentBasis: basis(),
-    confirmedWrites: done.document.awaitingWrites!.map((token) => writeConfirmationToken(token, basis())),
+    confirmedWrites: done.document.awaitingWrites!.map((token) => writeConfirmationToken(token, basis())!),
   }),
   'the host confirms each accepted write against the same evaluation basis',
 );

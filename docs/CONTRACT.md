@@ -44,6 +44,8 @@ _M · I_
 The recognized marking, in full; a masked shape where parts are unrecognized. Marque says it, so every surface shows the same thing. Not yet emitted: today the host reads the span itself.
 _M · U_
 
+The host supplies concealment as typed masks. A span covers UTF-8 bytes in the supplied marking text. An inline mask occupies a position among already disclosed tokens and carries no source characters. The renderer and action snapshots use the same disclosure projection. If inline masks cannot be bound to the supplied text, the kit displays the supplied mask types and withholds the ambiguous text.
+
 ### B · What Marque says
 **says.text**
 **says.template**
@@ -113,6 +115,8 @@ _K · U_
 
 The kit captures; the host transaction appends and writes; Marque re-lints. `packages/core/src/state.ts` and `mount()` in `packages/kit/src/render.ts` implement the interaction loop; `packages/core/test/state.test.ts` records its examples. Readiness migration is pending as stated above.
 
+**Historical markings and answers.** History and receipts show the act and its time. An installation can supply a current display for its details through `historyDisclosure`. Each display belongs to one request, sequence and subject in the active document and chain. Its evaluation basis and viewer disclosure revision must match the host’s current values. The kit withholds the payload on missing, stale or conflicting evidence, including for withdrawn findings. The authenticated workspace keeps the original audit record.
+
 **The state.** Plain JSON persisted by the trusted host workspace: `{ log, seen, linted, actSequence, actHistoryCoverage, pendingAppends }`. This is private interaction history. It does not go into document metadata, a seal, or a portable sidecar.
 - `log` is append-only: `{ sequence, requestId, id, act, value, at, about, binding? }`. `sequence` is a checked, one-based protocol sequence; `actSequence` is the last issued sequence, not a count inferred from `log.length`. The first append after `empty()` is sequence 1. Each request has a stable `requestId`; retrying it after a lost acknowledgement returns its existing entry, while reusing the key for different request content is refused. `act` is one of `answered`, `changed`, `kept_as_written`, `deferred` or `declined`. A `changed` with a null value takes the last decision back to Marque's result. `about` snapshots what the act concerned: rule, place, marking as written, Marque's outcome and question. `binding` carries known subject/question/revision/payload/source/basis references. These store no document body text.
 - `actHistoryCoverage` describes the ordered history lane independently of the issuance watermark. Before issuing a new sequence, the core verifies that a `complete` declaration matches every retained row in order; a declaration cannot hide a missing, duplicate or out-of-order row. Legacy state with no watermark or coverage remains unknown; partial/unavailable history, or coverage that stops before the watermark, cannot prove an absent request key was never committed. The kit replays an exact key it can uniquely prove from a retained valid row within the known frontier, even when other history is incomplete. For a new key, it retains the exact request in `pendingAppends`, outside `log` and outside the engine's ordered history, until the trusted store can establish complete authoritative request history.
@@ -138,6 +142,8 @@ The kit captures; the host transaction appends and writes; Marque re-lints. `pac
 - Overrides, deferrals and declines may continue to overlay presentation state where the engine has no corresponding act shape; they never erase a semantic blocker or count as a permitted disposition by themselves.
 - An override holds only while the as-written marking and Marque's result still match its snapshot.
 - Acts on ids the lint no longer lists move to `document.withdrawn` for the receipt, with their snapshots. They are never pending.
+
+A write-confirmation token is unavailable (`null`) when its evaluation basis contains a masked reading. In that case a required write or named acceptance check stays unconfirmed. The Word adapter also holds physical edits that would use a masked display as replacement text.
 
 **Effective readiness** requires an affirmative complete/current engine snapshot with no mandatory blocker, the host's confirmation that required and accepted writes/placements match the outgoing document, no accepted work awaiting application or re-evaluation, and any named host acceptance check passing. An unaccepted optional proposal does not count as pending work. The host may place a derived artifact at its finalize/send gate when the contract allows it, but it is not shown as written before success.
 

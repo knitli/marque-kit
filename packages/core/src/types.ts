@@ -314,7 +314,8 @@ export type ActAppendRefusal =
   | 'history-incomplete'
   | 'invalid-frontier'
   | 'missing-target'
-  | 'request-id-conflict';
+  | 'request-id-conflict'
+  | 'undisclosed-marking';
 
 /** A rejected append remains outside the ordered log, with the original request intact. */
 export interface PendingAct extends ActAppendRequest {
@@ -522,7 +523,23 @@ export type Tab = 'findings' | 'history';
 export type EngineState = 'ok' | 'checking' | 'failed' | (string & {});
 
 /** The thing the kit never decides. Every callback is optional; a missing one makes its control inert, not absent. */
+/** Host-issued display for one act at a particular current disclosure revision. */
+export interface HistoryDisclosure {
+  documentId: string;
+  chain: string;
+  basis: EvaluationBasis;
+  disclosureRevision: string;
+  entries: Array<
+    { requestId: string; sequence: number; subjectId: string } & (
+      | { status: 'unavailable' }
+      | { status: 'available'; text?: string; marking?: MarkingLike }
+    )
+  >;
+}
 export interface Host {
+  /** The host's current viewer/disclosure revision, independently of any historical payload. */
+  currentDisclosureRevision?: string | undefined;
+  historyDisclosure?: HistoryDisclosure | undefined;
   moment?: Moment | undefined;
   engine?: EngineState | undefined;
   readOnly?: boolean | undefined;

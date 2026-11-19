@@ -34,6 +34,11 @@
  */
 
 import type {
+  Reading,
+  EvaluationBasis,
+  Outcome,
+  Asks,
+  MarkingInput,
   Act,
   ActAppendRequest,
   ActValue,
@@ -49,11 +54,13 @@ import type {
   HypotheticalReplacement,
   LogEntry,
   MarkingLike,
+  Mask,
   PendingAct,
   Snapshot,
   State,
   Subject,
 } from './types.ts';
+import { disclosedMarking } from './marking.ts';
 
 export const ACTS: readonly Act[] = Object.freeze([
   'answered',
@@ -73,6 +80,66 @@ export const empty = (): State => ({
 
 /** A transport key for retrying the same host-owned append; it is not a semantic identity. */
 export const newActRequestId = (): string => globalThis.crypto.randomUUID();
+
+/** Copy only disclosed marking projections into host-owned interaction state. */
+export const disclosedReading = (reading: Reading): Reading => ({
+  ...reading,
+  ...(reading.result != null && { result: disclosedMarking(reading.result) }),
+});
+export const disclosedBasis = (basis: EvaluationBasis): EvaluationBasis => ({
+  ...basis,
+  replacements: Object.fromEntries(
+    Object.entries(basis.replacements).map(([key, replacement]) => [
+      key,
+      replacement.kind === 'reading' ? { ...replacement, reading: disclosedReading(replacement.reading) } : replacement,
+    ]),
+  ),
+});
+export const disclosedActValue = (value: ActValue | null): ActValue | null =>
+  value?.reading ? { ...value, reading: disclosedReading(value.reading) } : value;
+const disclosedOutcome = (outcome: Outcome): Outcome => ({
+  ...outcome,
+  ...(outcome.result != null && { result: disclosedMarking(outcome.result) }),
+  ...(outcome.readings && { readings: outcome.readings.map(disclosedReading) }),
+  ...(outcome.fallback && { fallback: { ...outcome.fallback, result: disclosedMarking(outcome.fallback.result) } }),
+});
+export const disclosedAsks = (asks: Asks | null | undefined): Asks | null | undefined =>
+  asks && Array.isArray(asks.options) ? { ...asks, options: asks.options.map(disclosedReading) } : asks;
+const disclosedSnapshot = (about: Snapshot): Snapshot => {
+  const marking = about.marking && disclosedMarking(about.marking);
+  const result =
+    typeof about.result_marking === 'string'
+      ? about.result_marking
+      : about.result_marking && disclosedMarking(about.result_marking);
+  return {
+    ...about,
+    ...(marking && { marking, as_written: marking.text }),
+    ...(result && { result_marking: result, result: typeof result === 'string' ? result : result.text }),
+    ...(about.outcome && { outcome: disclosedOutcome(about.outcome) }),
+    ...(about.asks !== undefined && { asks: disclosedAsks(about.asks) }),
+    ...(about.evaluationBasis && { evaluationBasis: disclosedBasis(about.evaluationBasis) }),
+    ...(about.fields && {
+      fields: Object.fromEntries(
+        Object.entries(about.fields).map(([key, field]) => [
+          key,
+          field.evaluationBasis ? { ...field, evaluationBasis: disclosedBasis(field.evaluationBasis) } : field,
+        ]),
+      ),
+    }),
+  };
+};
+export const disclosedAppendRequest = (request: ActAppendRequest): ActAppendRequest => ({
+  ...request,
+  value: disclosedActValue(request.value),
+  ...(request.about && { about: disclosedSnapshot(request.about) }),
+  ...(request.binding?.basis && { binding: { ...request.binding, basis: disclosedBasis(request.binding.basis) } }),
+});
+/** A concealed or unknown reading is not physical write text. */
+export const canWriteMarking = (marking: MarkingLike | null | undefined): boolean =>
+  marking == null ||
+  typeof marking === 'string' ||
+  !((marking.masks?.length ?? 0) || marking.layers?.some((layer) => layer.tokens.some((token) => token.mask)));
+export const canWriteAct = (value: ActValue | null): boolean => canWriteMarking(value?.reading?.result);
 
 const appendRequestValue = (request: ActAppendRequest) => ({
   requestId: request.requestId,
@@ -175,6 +242,58 @@ const requestFromEntry = (entry: LogEntry): ActAppendRequest => ({
   ...(entry.binding !== undefined && { binding: entry.binding }),
 });
 
+/** Check only typed marking-bearing paths; never canonicalize whole histories here. */
+const isDisclosedMarking = (m: MarkingLike | null | undefined): boolean => {
+  if (m == null || typeof m === 'string') return true;
+  try {
+    return typeof m.text === 'string' && canon(m) === canon(disclosedMarking(m));
+  } catch {
+    return false;
+  }
+};
+const isDisclosedReading = (reading: Reading): boolean => isDisclosedMarking(reading.result);
+const isDisclosedBasis = (basis: EvaluationBasis | undefined): boolean => {
+  if (!basis) return true;
+  try {
+    return Object.values(basis.replacements).every(
+      (item) => item.kind !== 'reading' || isDisclosedReading(item.reading),
+    );
+  } catch {
+    return false;
+  }
+};
+const isDisclosedSnapshot = (about: Snapshot | undefined): boolean => {
+  if (!about) return true;
+  if (!isDisclosedMarking(about.marking) || !isDisclosedMarking(about.result_marking)) return false;
+  if (about.marking && about.as_written !== about.marking.text) return false;
+  if (
+    about.result_marking &&
+    about.result !== (typeof about.result_marking === 'string' ? about.result_marking : about.result_marking.text)
+  )
+    return false;
+  const outcome = about.outcome;
+  if (
+    outcome &&
+    (!isDisclosedMarking(outcome.result) ||
+      !isDisclosedMarking(outcome.fallback?.result) ||
+      (outcome.readings && !outcome.readings.every(isDisclosedReading)))
+  )
+    return false;
+  if (Array.isArray(about.asks?.options) && !about.asks.options.every(isDisclosedReading)) return false;
+  return (
+    isDisclosedBasis(about.evaluationBasis) &&
+    Object.values(about.fields ?? {}).every((field) => isDisclosedBasis(field.evaluationBasis))
+  );
+};
+export const isDisclosedRequest = (request: ActAppendRequest): boolean =>
+  (!request.value?.reading || isDisclosedReading(request.value.reading)) &&
+  isDisclosedSnapshot(request.about) &&
+  isDisclosedBasis(request.binding?.basis);
+/** Check marking-bearing rows before adopting any host state, including refusals. */
+export const isDisclosedState = (state: State): boolean =>
+  state.log.every((row) => isDisclosedRequest(requestFromEntry(row))) &&
+  (state.pendingAppends ?? []).every(isDisclosedRequest);
+
 function knownRequestIssue(
   state: State,
   request: ActAppendRequest,
@@ -200,7 +319,15 @@ export function appendAcknowledgementIssue(
   request: ActAppendRequest,
   result: AppendActResult,
   current?: State,
-): 'request-id-conflict' | 'missing-frontier' | 'invalid-frontier' | 'missing-coverage' | 'history-incomplete' | null {
+):
+  | 'undisclosed-marking'
+  | 'request-id-conflict'
+  | 'missing-frontier'
+  | 'invalid-frontier'
+  | 'missing-coverage'
+  | 'history-incomplete'
+  | null {
+  if (!isDisclosedRequest(request) || !isDisclosedState(result.state)) return 'undisclosed-marking';
   if (result.status !== 'committed') return null;
   const { entry, state } = result;
   if (entry.requestId !== request.requestId || !sameAppendRequest(requestFromEntry(entry), request))
@@ -235,6 +362,9 @@ export function appendAcknowledgementIssue(
  * The frontier is the last issued one-based sequence; it is never inferred from log length.
  */
 export function appendAct(state: State, request: ActAppendRequest): AppendActResult {
+  // Reject non-disclosed requests before retry comparison; do not alias distinct raw requests.
+  if (!isDisclosedRequest(request) || !isDisclosedState(state))
+    return { status: 'refused', reason: 'undisclosed-marking', state };
   if (!ACTS.includes(request.act)) throw new Error(`Unknown act "${request.act}"; expected one of ${ACTS.join(', ')}`);
 
   if (typeof request.requestId !== 'string' || request.requestId.length === 0) {
@@ -346,8 +476,20 @@ const textOf = (v: unknown): string | null => {
   return typeof t === 'string' ? t : null;
 };
 /** A marking by what it shows: its text and its typed masks. A snapshot's bare text has none. */
-export const face = (m: MarkingLike | null | undefined): string | null =>
-  m == null ? null : canon({ text: textOf(m), masks: (typeof m === 'string' ? undefined : m.masks) ?? [] });
+export function face(m: MarkingLike | null | undefined): string | null {
+  if (m == null) return null;
+  const safe = typeof m === 'string' ? { text: m } : disclosedMarking(m);
+  const masks: Array<{ offset: number; mask: Mask }> = [];
+  let offset = 0;
+  const encoder = new TextEncoder();
+  for (const layer of safe.layers ?? []) {
+    for (const token of layer.tokens) {
+      if (token.mask) masks.push({ offset, mask: token.mask });
+      offset += encoder.encode(token.t).length;
+    }
+  }
+  return canon({ text: safe.text, masks });
+}
 const sameAsWritten = (about: Snapshot, f: Subject): boolean =>
   face(about.marking ?? about.as_written) === face(f.marking?.as_written ?? null);
 const sameResult = (about: Snapshot, r: MarkingLike | null | undefined): boolean =>
@@ -357,39 +499,47 @@ const typed = (v: unknown): string | null => (v && textOf(v) == null ? canon(v) 
 export const isArtifact = (x: Subject): x is ArtifactView => !!x.kind;
 const ruleOf = (f: Subject): string | null => (f.rule ? `${f.rule.scheme}:${f.rule.predicate}` : (f.kind ?? null));
 export const snapshot = (f: Subject): Snapshot =>
-  structuredClone<Snapshot>({
-    // a record, not a view of a document that may change in place
-    rule: ruleOf(f),
-    anchor: f.anchor,
-    kind: f.kind,
-    as_written: f.marking?.as_written?.text ?? null,
-    result: f.outcome?.result?.text ?? textOf(f.derived_value),
-    // The marking whole, layers and typed masks with it, so the receipt redraws it masked.
-    ...(f.marking?.as_written && { marking: f.marking.as_written }),
-    // The result whole too: a mask added under the same text is another marking.
-    ...((f.outcome?.result ?? (textOf(f.derived_value) != null ? f.derived_value : null)) && {
-      result_marking: (f.outcome?.result ?? f.derived_value) as MarkingLike,
+  disclosedSnapshot(
+    structuredClone<Snapshot>({
+      // a record, not a view of a document that may change in place
+      rule: ruleOf(f),
+      anchor: f.anchor,
+      kind: f.kind,
+      as_written: f.marking?.as_written?.text ?? null,
+      result: f.outcome?.result?.text ?? textOf(f.derived_value),
+      // The marking whole, layers and typed masks with it, so the receipt redraws it masked.
+      ...(f.marking?.as_written && { marking: f.marking.as_written }),
+      // The result whole too: a mask added under the same text is another marking.
+      ...((f.outcome?.result ?? (textOf(f.derived_value) != null ? f.derived_value : null)) && {
+        result_marking: (f.outcome?.result ?? f.derived_value) as MarkingLike,
+      }),
+      // A typed derived value (a notice's content) isn't text: kept whole, so an apply is of this one.
+      ...(typed(f.derived_value) && { content: typed(f.derived_value) as string }),
+      // Where an artifact goes: an apply was approved for this place.
+      ...(f.kind && { placement: f.placement ?? null, scope: f.scope ?? null }),
+      // What taking the act back restores, whole (fallback, because and all): Marque's own words, never body text.
+      ...(f.outcome && { outcome: f.outcome }),
+      ...(f.asks && { asks: f.asks }),
+      needs_person: f.needs_person,
+      blocks: f.blocks,
+      ...(f.state && { state: f.state }),
+      ...(f.fields && { fields: f.fields }),
+      ...(f.evaluationBasis && { evaluationBasis: f.evaluationBasis }),
     }),
-    // A typed derived value (a notice's content) isn't text: kept whole, so an apply is of this one.
-    ...(typed(f.derived_value) && { content: typed(f.derived_value) as string }),
-    // Where an artifact goes: an apply was approved for this place.
-    ...(f.kind && { placement: f.placement ?? null, scope: f.scope ?? null }),
-    // What taking the act back restores, whole (fallback, because and all): Marque's own words, never body text.
-    ...(f.outcome && { outcome: f.outcome }),
-    ...(f.asks && { asks: f.asks }),
-    needs_person: f.needs_person,
-    blocks: f.blocks,
-    ...(f.state && { state: f.state }),
-    ...(f.fields && { fields: f.fields }),
-    ...(f.evaluationBasis && { evaluationBasis: f.evaluationBasis }),
-  });
+  );
 
 /** Seen only quiets (docs/DERIVATION.md): a Noticeable becomes Quiet; nothing else moves. */
 /** Seen is of a result, not an id: ids survive re-lints, so a new result
  *  under the same id is unseen again. */
 const shown = (f: Subject): string | null => {
   const r = f.outcome?.result ?? f.derived_value;
-  return r == null ? null : typeof r === 'string' ? r : canon(r);
+  return r == null
+    ? null
+    : typeof r === 'string'
+      ? r
+      : textOf(r) != null
+        ? canon(disclosedMarking(r as MarkingInput))
+        : canon(r);
 }; // whole: masks and layers too // typed content by its whole value
 const wasSeen = (state: State, f: Subject): boolean => state.seen.some((s) => s.id === f.id && s.result === shown(f));
 export function see(state: State, f: Subject): State {
@@ -436,7 +586,38 @@ function writeIntent(state: State, id: string): LogEntry | null {
 /** A token is unique within the host-persisted append-only state. */
 export const writeToken = (e: LogEntry): string => `${e.id}@${e.sequence}`;
 /** Bind host acknowledgement to the exact evaluated source/context/policy basis. */
-export const writeConfirmationToken = (token: string, basis: unknown): string => `${token}#${canon(basis)}`;
+export function writeConfirmationToken(token: string, basis: unknown): string | null {
+  // A masked reading has no content-independent confirmation identity in this contract.
+  if (basis && typeof basis === 'object' && 'replacements' in basis) {
+    const replacements = (basis as { replacements?: unknown }).replacements;
+    if (!replacements || typeof replacements !== 'object' || Array.isArray(replacements)) return null;
+    for (const item of Object.values(replacements)) {
+      if (!item || typeof item !== 'object' || !('kind' in item)) return null;
+      const replacement = item as { kind: unknown; reading?: unknown };
+      if (replacement.kind !== 'reading') {
+        if (!['free_answer', 'artifact_field', 'artifact'].includes(String(replacement.kind))) return null;
+        continue;
+      }
+      if (!replacement.reading || typeof replacement.reading !== 'object') return null;
+      const result = (replacement.reading as { result?: unknown }).result;
+      if (result == null) continue;
+      if (typeof result !== 'object' || Array.isArray(result)) return null;
+      const marking = result as { text?: unknown; masks?: unknown; layers?: unknown };
+      if (typeof marking.text !== 'string') return null;
+      if (marking.masks !== undefined && (!Array.isArray(marking.masks) || marking.masks.length > 0)) return null;
+      if (marking.layers !== undefined) {
+        if (!Array.isArray(marking.layers)) return null;
+        for (const layer of marking.layers) {
+          if (!layer || typeof layer !== 'object' || !Array.isArray(layer.tokens)) return null;
+          for (const part of layer.tokens) {
+            if (!part || typeof part !== 'object' || typeof part.t !== 'string' || part.mask != null) return null;
+          }
+        }
+      }
+    }
+  }
+  return `${token}#${canon(basis)}`;
+}
 
 /** The written answer or override a null `changed` since the lint takes back, if any. */
 function reversed(state: State, id: string, e: LogEntry | null = last(state, id)): LogEntry | null {
@@ -482,27 +663,78 @@ export function effectiveReady(doc: Doc, host: Host = {}): boolean {
   const writeTokens = [...(doc.document.awaitingWrites ?? []), ...(host.requiredWrites ?? [])].map((token) =>
     writeConfirmationToken(token, evaluation.basis),
   );
-  if (writeTokens.some((token) => !(host.confirmedWrites ?? []).includes(token))) return false;
+  if (writeTokens.some((token) => token === null || !(host.confirmedWrites ?? []).includes(token))) return false;
   if (
-    (host.requiredAcceptanceChecks ?? []).some(
-      (id) => host.acceptanceChecks?.[id] !== writeConfirmationToken(id, evaluation.basis),
-    )
+    (host.requiredAcceptanceChecks ?? []).some((id) => {
+      const token = writeConfirmationToken(id, evaluation.basis);
+      return token === null || host.acceptanceChecks?.[id] !== token;
+    })
   )
     return false;
   return true;
 }
+/** A content-free, unambiguous source/evaluation binding for a masked disposition. */
+export const hasDefinitiveSourceBasis = (
+  prior: EvaluationBasis | null | undefined,
+  current: EvaluationBasis | null | undefined,
+): boolean => {
+  if (
+    !prior ||
+    !current ||
+    writeConfirmationToken('', prior) === null ||
+    writeConfirmationToken('', current) === null ||
+    !sameBasis(prior, current)
+  )
+    return false;
+  if (!prior.sourceRevisions || typeof prior.sourceRevisions !== 'object' || Array.isArray(prior.sourceRevisions))
+    return false;
+  const sources = Object.entries(prior.sourceRevisions);
+  // Until the subject carries an explicit source binding, a multi-source basis is ambiguous.
+  return (
+    sources.length === 1 &&
+    !!sources[0]![0].trim() &&
+    typeof sources[0]![1] === 'string' &&
+    !!sources[0]![1].trim() &&
+    [
+      prior.selectionRevision,
+      prior.relationshipRevision,
+      prior.contextRevision,
+      prior.policyRevision,
+      prior.declarationsRevision,
+      prior.scope,
+      prior.operation,
+      prior.evaluationContextRevision,
+      prior.targetProfile,
+    ].every((part) => typeof part === 'string' && !!part.trim())
+  );
+};
+/** Masked displays are not evidence that their hidden sources are the same. */
+const maskedCurrentnessKnown = (entry: LogEntry, subject: Subject): boolean => {
+  const markings: (MarkingLike | null | undefined)[] = [
+    entry.about?.marking,
+    entry.about?.result_marking,
+    entry.value?.reading?.result,
+    subject.marking?.as_written,
+    subject.outcome?.result,
+    textOf(subject.derived_value) != null ? (subject.derived_value as MarkingLike) : undefined,
+  ];
+  return (
+    markings.every(canWriteMarking) || hasDefinitiveSourceBasis(entry.about?.evaluationBasis, subject.evaluationBasis)
+  );
+};
 /** The finding isn't the one the act was taken on: another marking or question under the same id. */
 const moved = (e: LogEntry, f: Subject): boolean =>
-  !!e.about &&
-  // The whole question, not only its words: a new field type or format changes what an answer means.
-  // Another rule under the same id is another finding, whatever it says.
-  ((e.about.rule ?? null) !== ruleOf(f) ||
-    !sameAsWritten(e.about, f) ||
-    canon(e.about.asks ?? null) !== canon(f.asks ?? null) ||
-    !sameResult(e.about, f.outcome?.result) ||
-    canon(e.about.evaluationBasis ?? null) !== canon(f.evaluationBasis ?? null) ||
-    // Another place is another finding; a span moves with edits above it, so only the paragraph or page counts.
-    ('anchor' in e.about && place(e.about.anchor) !== place(f.anchor)));
+  !maskedCurrentnessKnown(e, f) ||
+  (!!e.about &&
+    // The whole question, not only its words: a new field type or format changes what an answer means.
+    // Another rule under the same id is another finding, whatever it says.
+    ((e.about.rule ?? null) !== ruleOf(f) ||
+      !sameAsWritten(e.about, f) ||
+      canon(e.about.asks ?? null) !== canon(disclosedAsks(f.asks) ?? null) ||
+      !sameResult(e.about, f.outcome?.result) ||
+      canon(e.about.evaluationBasis ?? null) !== canon(f.evaluationBasis ?? null) ||
+      // Another place is another finding; a span moves with edits above it, so only the paragraph or page counts.
+      ('anchor' in e.about && place(e.about.anchor) !== place(f.anchor))));
 const place = (a: Anchor | null | undefined): string =>
   canon({ kind: a?.kind ?? null, portion: a?.portion ?? null, page: a?.page ?? null });
 const stale = (e: LogEntry, f: Subject): boolean =>
@@ -510,7 +742,9 @@ const stale = (e: LogEntry, f: Subject): boolean =>
   // A reading picked is stale once the finding no longer offers it, from the readings or the question's own options.
   // The whole reading, not only its marking: what it asserts is what gets applied and audited.
   (!!e.value?.reading &&
-    ![...(f.outcome?.readings || []), ...optionsOf(f)].some((r) => canon(r) === canon(e.value?.reading)));
+    ![...(f.outcome?.readings || []), ...optionsOf(f)].some(
+      (r) => canon(disclosedReading(r)) === canon(e.value?.reading),
+    ));
 const optionsOf = (f: Subject) => {
   const o = f.asks?.options;
   return Array.isArray(o) ? o : [];
@@ -534,26 +768,28 @@ function answeredOn(state: State, f: FindingView, e: LogEntry): FindingView {
 }
 /** An artifact op is stale once the artifact isn't the one it was taken on. */
 const staleOp = (e: LogEntry, a: ArtifactView): boolean =>
-  !!e.about &&
-  (e.about.state !== a.state ||
-    canon(e.about.evaluationBasis ?? null) !== canon(a.evaluationBasis ?? null) ||
-    !sameResult(e.about, textOf(a.derived_value) != null ? (a.derived_value as MarkingLike) : null) ||
-    (e.about.content ?? null) !== typed(a.derived_value) ||
-    ('placement' in e.about && (e.about.placement !== (a.placement ?? null) || e.about.scope !== (a.scope ?? null))) ||
-    // A typed field is stale once the field is gone, asks for something else, or the lint now gives it another
-    // value than the one the person edited: not the source (under any earlier local act, by `from`), not the
-    // field as the person saw it, and not the person's own value written in.
-    Object.keys(e.value?.fields || {}).some((k) => {
-      const was = e.about?.fields?.[k],
-        now = a.fields?.[k];
-      return (
-        !now ||
-        (was &&
-          (schema(was) !== schema(now) ||
-            canon(was.evaluationBasis ?? null) !== canon(now.evaluationBasis ?? null) ||
-            (![was.from, source(was)].includes(source(now)) && now.value !== e.value?.fields?.[k])))
-      );
-    }));
+  !maskedCurrentnessKnown(e, a) ||
+  (!!e.about &&
+    (e.about.state !== a.state ||
+      canon(e.about.evaluationBasis ?? null) !== canon(a.evaluationBasis ?? null) ||
+      !sameResult(e.about, textOf(a.derived_value) != null ? (a.derived_value as MarkingLike) : null) ||
+      (e.about.content ?? null) !== typed(a.derived_value) ||
+      ('placement' in e.about &&
+        (e.about.placement !== (a.placement ?? null) || e.about.scope !== (a.scope ?? null))) ||
+      // A typed field is stale once the field is gone, asks for something else, or the lint now gives it another
+      // value than the one the person edited: not the source (under any earlier local act, by `from`), not the
+      // field as the person saw it, and not the person's own value written in.
+      Object.keys(e.value?.fields || {}).some((k) => {
+        const was = e.about?.fields?.[k],
+          now = a.fields?.[k];
+        return (
+          !now ||
+          (was &&
+            (schema(was) !== schema(now) ||
+              canon(was.evaluationBasis ?? null) !== canon(now.evaluationBasis ?? null) ||
+              (![was.from, source(was)].includes(source(now)) && now.value !== e.value?.fields?.[k])))
+        );
+      })));
 // oxlint-disable-next-line no-unused-vars -- the named slots are what's dropped
 const schema = ({ state, value, source, from, ...fl }: ArtifactField): string => canon(fl);
 const source = (fl: ArtifactField): string =>
@@ -565,6 +801,7 @@ const edited = (e: LogEntry | null | undefined): LogEntry | null => (edits(e) ? 
  *  view has no decision: the lint dropped the person's last one. Nor is a
  *  written answer whose marking the engine has since moved off. */
 const holds = (e: LogEntry | null, f: Subject): LogEntry | null => {
+  if (e && !maskedCurrentnessKnown(e, f)) return null;
   // A prose answer becomes a marking only once the engine derives one; only a typed marking compares.
   const r = e?.value?.reading?.result?.text ?? (e?.about?.asks?.field?.type === 'marking' ? e.value?.free : null);
   const norm = (t: string | null | undefined): string => (t ?? '').replace(/\s+/g, ' ').trim();
@@ -758,8 +995,9 @@ export function acceptedReplacements(doc: Doc): Record<string, HypotheticalRepla
   const replacements: Record<string, HypotheticalReplacement> = {};
   for (const finding of doc.findings) {
     const value = finding.person?.value;
-    if (value?.reading) replacements[finding.id] = { kind: 'reading', reading: value.reading };
-    else if (value?.free != null) replacements[finding.id] = { kind: 'free_answer', value: value.free };
+    if (value?.reading) {
+      if (canWriteAct(value)) replacements[finding.id] = { kind: 'reading', reading: value.reading };
+    } else if (value?.free != null) replacements[finding.id] = { kind: 'free_answer', value: value.free };
   }
   for (const artifact of doc.document.artifacts) {
     for (const [field, item] of Object.entries(artifact.fields ?? {})) {
