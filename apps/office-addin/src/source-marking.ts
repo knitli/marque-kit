@@ -44,10 +44,8 @@ export function mountOfficeSourceMarking(
     display.replaceChildren();
     status.textContent = 'Source marking unavailable.';
   };
-  const invalidate = () => {
-    if (!disposed) clear();
-  };
   async function refresh(): Promise<void> {
+    if (disposed) return;
     clear();
     try {
       unwatch?.();
@@ -63,7 +61,9 @@ export function mountOfficeSourceMarking(
       if (!valid() || !session || !session.documentId || !session.isCurrent()) return;
       const binding = { ...session.binding };
       if (!sameBinding(binding, binding)) return;
-      const stop = session.watchInvalidation(invalidate);
+      const stop = session.watchInvalidation(() => {
+        if (valid()) clear();
+      });
       if (typeof stop !== 'function') return;
       if (!valid()) {
         stop();

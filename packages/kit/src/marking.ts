@@ -140,7 +140,14 @@ type SourceMarkingSessionRecord = {
   active: boolean;
 };
 const sourceMarkingSessions = new WeakMap<object, SourceMarkingSessionRecord>();
-const sourceMarkingBindingKeys = ['chain_id', 'source_id', 'revision_id', 'contribution_id', 'scope_id', 'viewer_id'] as const;
+const sourceMarkingBindingKeys = [
+  'chain_id',
+  'source_id',
+  'revision_id',
+  'contribution_id',
+  'scope_id',
+  'viewer_id',
+] as const;
 
 /** Install-time host hook. Its loader must return the engine's current, trusted response for this binding. */
 export function installSourceMarkingSession(
@@ -173,7 +180,9 @@ export function installSourceMarkingSession(
         return false;
       }
     },
-    revoke: () => { record.active = false; },
+    revoke: () => {
+      record.active = false;
+    },
   });
   sourceMarkingSessions.set(capability, record);
   return capability;
@@ -182,11 +191,7 @@ export function installSourceMarkingSession(
 /** Load through the installed host provider and render only its exact live response. */
 export async function renderSourceMarkingView(session: SourceMarkingSessionCapability): Promise<HTMLSpanElement> {
   const record = sourceMarkingSessions.get(session);
-  if (
-    !record ||
-    !(await session.isCurrent()) ||
-    !record.active
-  ) {
+  if (!record || !(await session.isCurrent()) || !record.active) {
     throw new TypeError('source marking view session mismatch or expired');
   }
   let json: string | null;

@@ -20,7 +20,11 @@ const provider = (load: () => Promise<string | null>, isCurrent: () => boolean |
 
 describe('read-only source marking session', () => {
   test('loads the provider response and renders only permitted tokens and typed masks', async () => {
-    const session = installSourceMarkingSession(binding, 4096, provider(async () => payload));
+    const session = installSourceMarkingSession(
+      binding,
+      4096,
+      provider(async () => payload),
+    );
     const mark = await renderSourceMarkingView(session);
     expect(mark.textContent).toContain('S');
     expect(mark.textContent).not.toContain('CANARY');
@@ -52,14 +56,27 @@ describe('read-only source marking session', () => {
       { ...binding, scope_id: '1' },
       { ...binding, viewer_id: 'other-viewer' },
     ]) {
-      const session = installSourceMarkingSession(expected, 4096, provider(async () => payload));
+      const session = installSourceMarkingSession(
+        expected,
+        4096,
+        provider(async () => payload),
+      );
       await expect(renderSourceMarkingView(session)).rejects.toThrow('source marking view session mismatch or expired');
     }
-    expect(() => installSourceMarkingSession({ scope_id: binding.scope_id } as never, 4096, provider(async () => payload)))
-      .toThrow('source marking session binding');
-    await expect(renderSourceMarkingView(view as never)).rejects.toThrow('source marking view session mismatch or expired');
+    expect(() =>
+      installSourceMarkingSession(
+        { scope_id: binding.scope_id } as never,
+        4096,
+        provider(async () => payload),
+      ),
+    ).toThrow('source marking session binding');
+    await expect(renderSourceMarkingView(view as never)).rejects.toThrow(
+      'source marking view session mismatch or expired',
+    );
     const independent = JSON.stringify({ ...view, marking: { ...view.marking, text: 'S SECRET' } });
-    await expect(renderSourceMarkingView(independent as never)).rejects.toThrow('source marking view session mismatch or expired');
+    await expect(renderSourceMarkingView(independent as never)).rejects.toThrow(
+      'source marking view session mismatch or expired',
+    );
   });
 
   test('rejects stale, revoked and invalidated sessions after an asynchronous load', async () => {
@@ -67,12 +84,17 @@ describe('read-only source marking session', () => {
     const staleAfterRead = installSourceMarkingSession(
       binding,
       4096,
-      provider(async () => {
-        current = false;
-        return payload;
-      }, () => current),
+      provider(
+        async () => {
+          current = false;
+          return payload;
+        },
+        () => current,
+      ),
     );
-    await expect(renderSourceMarkingView(staleAfterRead)).rejects.toThrow('source marking view session mismatch or expired');
+    await expect(renderSourceMarkingView(staleAfterRead)).rejects.toThrow(
+      'source marking view session mismatch or expired',
+    );
 
     let revoked!: ReturnType<typeof installSourceMarkingSession>;
     revoked = installSourceMarkingSession(
@@ -88,7 +110,10 @@ describe('read-only source marking session', () => {
     let resolveCurrent!: (value: boolean) => void;
     let loads = 0;
     const pendingCurrent = installSourceMarkingSession(binding, 4096, {
-      isCurrent: () => new Promise<boolean>((resolve) => { resolveCurrent = resolve; }),
+      isCurrent: () =>
+        new Promise<boolean>((resolve) => {
+          resolveCurrent = resolve;
+        }),
       load: async () => {
         loads += 1;
         return payload;
@@ -102,11 +127,24 @@ describe('read-only source marking session', () => {
   });
 
   test('rejects synthetic v1 and enforces the install-time byte cap', async () => {
-    const synthetic = readFileSync(join(import.meta.dirname, '../fixtures/native-source-marking-synthetic-v1.fixture'), 'utf8');
-    const session = installSourceMarkingSession(binding, 4096, provider(async () => synthetic));
-    await expect(renderSourceMarkingView(session)).rejects.toThrow('invalid native evaluation wire: source marking envelope keys');
-    expect(() => installSourceMarkingSession(binding, 32_769, provider(async () => payload))).toThrow(
-      'source marking byte cap',
+    const synthetic = readFileSync(
+      join(import.meta.dirname, '../fixtures/native-source-marking-synthetic-v1.fixture'),
+      'utf8',
     );
+    const session = installSourceMarkingSession(
+      binding,
+      4096,
+      provider(async () => synthetic),
+    );
+    await expect(renderSourceMarkingView(session)).rejects.toThrow(
+      'invalid native evaluation wire: source marking envelope keys',
+    );
+    expect(() =>
+      installSourceMarkingSession(
+        binding,
+        32_769,
+        provider(async () => payload),
+      ),
+    ).toThrow('source marking byte cap');
   });
 });

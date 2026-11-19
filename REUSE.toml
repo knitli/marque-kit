@@ -18,6 +18,7 @@ path = [
   "fixtures/memo.txt",
   "fixtures/*.json",
   "packages/core/test/fixtures/*.fixture",
+  "packages/kit/test/fixtures/*.fixture",
 ]
 SPDX-FileCopyrightText = "2026 Knitli Inc."
 SPDX-License-Identifier = "AGPL-3.0-only"

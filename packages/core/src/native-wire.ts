@@ -716,11 +716,7 @@ export function isParsedNativeSourceMarkingView(value: unknown): value is Native
 
 /** Parse a bounded read-only source view; offsets and mask lengths are rejected. */
 export function parseNativeSourceMarkingJson(text: string, maxBytes: number): NativeSourceMarkingView {
-  const o = keys(
-    parseJson(text, maxBytes),
-    ['schema', 'binding', 'marking'],
-    'source marking envelope',
-  );
+  const o = keys(parseJson(text, maxBytes), ['schema', 'binding', 'marking'], 'source marking envelope');
   if (o.schema !== 'knitli.native-source-marking.v2') fail('source marking scope');
   const b = keys(
     o.binding,
