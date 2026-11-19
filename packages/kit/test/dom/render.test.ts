@@ -71,14 +71,15 @@ describe('question first', () => {
 
 describe('ordinary lint transformation receipts', () => {
   const sample: NonNullable<Doc['document']['intake']> & {
-    candidates: unknown[];
+    candidates: Array<{ observation: number; span: [number, number]; private: string }>;
     source_occurrences: unknown[];
     claims: unknown[];
   } = {
     status: 'complete' as const,
     transformation_count: 1,
     transformations: [{ kind: 'normalized_ascii_case', span: [7, 9] as [number, number], observation: 0 }],
-    candidates: [{ private: 'candidate evidence must not be rendered' }],
+    candidate_count_emitted: 1,
+    candidates: [{ observation: 0, span: [6, 17], private: 'candidate evidence must not be rendered' }],
     source_occurrences: [{ value: 'GRANTED SECRET evidence must stay masked' }],
     claims: [{ value: 'grant evidence must not be rendered' }],
   };
@@ -111,6 +112,8 @@ describe('ordinary lint transformation receipts', () => {
           status: 'partial',
           transformation_count: 500,
           transformations: sample.transformations,
+          candidate_count_emitted: 1,
+          candidates: sample.candidates,
           projection_cutoff: { phase: 'projection', resource: 'output_bytes' },
         },
       },
@@ -125,17 +128,19 @@ describe('ordinary lint transformation receipts', () => {
   });
 
   test.each(['refused', 'unavailable'])('%s receipts do not render stale rows or claim completeness', (status) => {
-    const d: Doc = {
-      ...memo,
-      document: {
-        ...memo.document,
-        intake: {
-          status,
-          transformation_count: 1,
-          transformations: [{ kind: 'normalized_ascii_case', span: [7, 9], observation: 0 }],
-        },
+    const intake = {
+      status,
+      get transformation_count() {
+        throw new Error('refused receipts must be handled before reading stale counts');
       },
-    };
+      get transformations() {
+        throw new Error('refused receipts must be handled before reading stale rows');
+      },
+      get candidates() {
+        throw new Error('refused receipts must be handled before reading candidate references');
+      },
+    } as unknown as NonNullable<Doc['document']['intake']>;
+    const d: Doc = { ...memo, document: { ...memo.document, intake } };
     const receipt = pane(d).querySelector('details.mq-transform-receipt')!;
     expect(receipt.querySelector('summary')?.textContent).toBe(`Source transformations · ${status}`);
     expect(receipt.textContent).toContain('A complete transformation receipt was not available.');
@@ -166,9 +171,13 @@ describe('ordinary lint transformation receipts', () => {
         { kind: privateValue, span: [0, 2], observation: 0 },
         { kind: 'missing_opening_delimiter_at_boundary', span: [8, 4], observation: 0 },
         { kind: 'normalized_ascii_case', span: [0, 1], observation: privateValue },
+        { kind: 'toString', span: [6, 7], observation: 1 },
+        { kind: 'constructor', span: [6, 7], observation: 1 },
+        { kind: '__proto__', span: [6, 7], observation: 1 },
       ],
-      projection_cutoff: { resource: privateValue },
-      candidates: [{ private: privateValue }],
+      candidate_count_emitted: 1,
+      projection_cutoff: { resource: 'toString' },
+      candidates: [{ observation: 1, span: [5, 10], private: privateValue }],
       source_occurrences: [{ value: privateValue }],
       claims: [{ value: privateValue }],
     } as unknown as Doc['document']['intake'];
@@ -185,9 +194,51 @@ describe('ordinary lint transformation receipts', () => {
     expect(receipt.textContent).toContain('Owning observation 1');
     expect(receipt.textContent).not.toContain(privateValue);
     expect(receipt.textContent).not.toContain('missing_opening_delimiter_at_boundary');
+    expect(receipt.textContent).not.toContain('toString');
+    expect(receipt.textContent).not.toContain('constructor');
+    expect(receipt.textContent).not.toContain('__proto__');
     expect(receipt.querySelector('button, input, textarea, select')).toBeNull();
     mounted.destroy();
     root.remove();
+  });
+
+  test('missing and invented owners cannot be shown as transformation receipts', () => {
+    const intake = {
+      status: 'complete',
+      transformation_count: 3,
+      candidate_count_emitted: 1,
+      transformations: [
+        { kind: 'normalized_ascii_case', span: [6, 7], observation: 0 },
+        { kind: 'normalized_ascii_case', span: [6, 7] },
+        { kind: 'normalized_ascii_case', span: [6, 7], observation: 99 },
+      ],
+      candidates: [{ observation: 0, span: [5, 10] }],
+    } as unknown as NonNullable<Doc['document']['intake']>;
+    const d: Doc = { ...memo, document: { ...memo.document, intake } };
+    const receipt = pane(d).querySelector<HTMLDetailsElement>('details.mq-transform-receipt')!;
+    receipt.open = true;
+    expect(receipt.querySelector('summary')?.textContent).toBe('Source transformations · incomplete · 1 of 3 retained');
+    expect(receipt.textContent).toContain('Owning observation 0');
+    expect(receipt.textContent).not.toContain('Owning observation 99');
+  });
+
+  test('over-bound receipt arrays are not traversed', () => {
+    const rows = Array.from({ length: 8_192 });
+    Object.defineProperty(rows, '0', {
+      get() {
+        throw new Error('over-bound rows must not be read');
+      },
+    });
+    const intake = {
+      status: 'complete',
+      transformation_count: 8_192,
+      candidate_count_emitted: 1,
+      transformations: rows,
+      candidates: [{ observation: 0, span: [0, 1] }],
+    } as unknown as NonNullable<Doc['document']['intake']>;
+    const d: Doc = { ...memo, document: { ...memo.document, intake } };
+    const summary = pane(d).querySelector('details.mq-transform-receipt summary')?.textContent;
+    expect(summary).toBe('Source transformations · incomplete · 0 of 8192 retained');
   });
 });
 

@@ -738,27 +738,46 @@ const RESOURCE_NAMES: Readonly<Record<string, string>> = {
   output_bytes: 'output bytes',
 };
 const MAX_SOURCE_BYTES = 262_144;
-const MAX_OBSERVATION_INDEX = 32_767;
+// The producer's projection index cap covers receipts and candidate rows together.
+const MAX_INTAKE_INDEX_ITEMS = 8_192;
 const safeIndex = (value: unknown, max = Number.MAX_SAFE_INTEGER): value is number =>
   Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= max;
+const ownName = (names: Readonly<Record<string, string>>, key: string): string | undefined =>
+  Object.prototype.hasOwnProperty.call(names, key) ? names[key] : undefined;
+
+type SafeSpan = { start: number; end: number };
+function safeSpan(value: unknown): SafeSpan | null {
+  if (!Array.isArray(value) || value.length !== 2) return null;
+  const [start, end] = value;
+  if (!safeIndex(start, MAX_SOURCE_BYTES) || !safeIndex(end, MAX_SOURCE_BYTES) || start > end) return null;
+  return { start, end };
+}
 
 type SafeTransformation = { name: string; start: number; end: number; observation: number };
 function safeTransformation(row: unknown): SafeTransformation | null {
   if (!row || typeof row !== 'object') return null;
   const value = row as Record<string, unknown>;
-  const name = typeof value.kind === 'string' ? TRANSFORMATION_NAMES[value.kind] : undefined;
-  const span = value.span;
-  if (
-    !name ||
-    !Array.isArray(span) ||
-    span.length !== 2 ||
-    !safeIndex(span[0], MAX_SOURCE_BYTES) ||
-    !safeIndex(span[1], MAX_SOURCE_BYTES) ||
-    span[0] > span[1] ||
-    !safeIndex(value.observation, MAX_OBSERVATION_INDEX)
-  )
-    return null;
-  return { name, start: span[0], end: span[1], observation: value.observation };
+  const name = typeof value.kind === 'string' ? ownName(TRANSFORMATION_NAMES, value.kind) : undefined;
+  const span = safeSpan(value.span);
+  if (!name || !span || !safeIndex(value.observation)) return null;
+  return { name, ...span, observation: value.observation };
+}
+
+function candidateOwners(candidates: readonly unknown[]): Map<number, SafeSpan | null> {
+  const owners = new Map<number, SafeSpan | null>();
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'object') continue;
+    const value = candidate as Record<string, unknown>;
+    const observation = value.observation;
+    if (!safeIndex(observation)) continue;
+    const span = safeSpan(value.span);
+    if (owners.has(observation)) {
+      owners.set(observation, null);
+    } else {
+      owners.set(observation, span);
+    }
+  }
+  return owners;
 }
 
 function transformationReceipts(intake: DocumentIntake): HTMLDetailsElement {
@@ -766,16 +785,41 @@ function transformationReceipts(intake: DocumentIntake): HTMLDetailsElement {
     ? intake.status
     : 'unavailable';
   const refused = status === 'refused' || status === 'unavailable';
-  const suppliedRows = Array.isArray(intake.transformations) ? intake.transformations : null;
-  const rows = refused
-    ? []
-    : (suppliedRows ?? []).map(safeTransformation).filter((row): row is SafeTransformation => row !== null);
-  const counted = safeIndex(intake.transformation_count);
-  const total = counted ? intake.transformation_count! : undefined;
+  let suppliedRows: unknown[] | null = null;
+  let rows: SafeTransformation[] = [];
+  let counted = false;
+  let total: number | undefined;
+  let ownerReferencesComplete = false;
+  if (!refused) {
+    const inputRows = intake.transformations;
+    const inputCandidates = intake.candidates;
+    const emittedCandidateCount = intake.candidate_count_emitted;
+    suppliedRows = Array.isArray(inputRows) ? inputRows : null;
+    const candidates = Array.isArray(inputCandidates) ? inputCandidates : null;
+    counted = safeIndex(intake.transformation_count);
+    total = counted ? intake.transformation_count : undefined;
+    const bounded =
+      suppliedRows !== null &&
+      candidates !== null &&
+      safeIndex(emittedCandidateCount) &&
+      emittedCandidateCount === candidates.length &&
+      suppliedRows.length + candidates.length <= MAX_INTAKE_INDEX_ITEMS;
+    if (bounded && suppliedRows !== null && candidates !== null) {
+      const owners = candidateOwners(candidates);
+      for (const raw of suppliedRows) {
+        const row = safeTransformation(raw);
+        if (!row) continue;
+        const owner = owners.get(row.observation);
+        if (owner && owner.start <= row.start && row.end <= owner.end) rows.push(row);
+      }
+      ownerReferencesComplete = true;
+    }
+  }
   const complete =
     status === 'complete' &&
     counted &&
     suppliedRows !== null &&
+    ownerReferencesComplete &&
     rows.length === suppliedRows.length &&
     rows.length === total;
   const partial = !complete && !refused;
@@ -793,7 +837,7 @@ function transformationReceipts(intake: DocumentIntake): HTMLDetailsElement {
   body.append(el('p', 'mq-p', 'Read-only records from this lint. They do not change the source or affect readiness.'));
   if (partial) {
     const resource = intake.projection_cutoff?.resource;
-    const cutoff = typeof resource === 'string' ? RESOURCE_NAMES[resource] : undefined;
+    const cutoff = typeof resource === 'string' ? ownName(RESOURCE_NAMES, resource) : undefined;
     body.append(
       el(
         'p',

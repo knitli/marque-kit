@@ -474,10 +474,18 @@ export type IntakeResource =
   | 'retained_bytes'
   | 'output_bytes';
 
+/** Minimal candidate ownership reference used to validate read-only receipts. */
+export interface IntakeCandidateReference {
+  observation: number;
+  span: [number, number];
+}
+
 export interface DocumentIntake {
   status: IntakeStatus | (string & {});
   transformation_count?: number;
   transformations?: PerformedTransformation[];
+  candidate_count_emitted?: number;
+  candidates?: IntakeCandidateReference[];
   projection_cutoff?: { phase?: string | null; resource?: IntakeResource | (string & {}) | null } | null;
 }
 
