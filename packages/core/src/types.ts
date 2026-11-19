@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type { NativeEnvelopeV1 } from './native-wire.ts';
+import type { NativeCabRequest } from './native-cab.ts';
 
 /**
  * The shapes the kit reads and keeps (docs/CONTRACT.md): what Marque emits,
@@ -437,7 +438,7 @@ export interface DocumentState {
   blocking: string[];
   evaluation?: Evaluation;
   /** A CAB-only native evaluation cannot authorize whole-document readiness. */
-  native_evaluation?: NativeEnvelopeV1;
+  native_evaluation?: NativeEnvelopeV1 | undefined;
   artifacts: ArtifactView[];
   pending?: string[];
   /** Accepted physical changes remain host-confirmation obligations after a re-lint. */
@@ -541,6 +542,8 @@ export interface HistoryDisclosure {
   >;
 }
 export interface Host {
+  /** Independently supplied current scope for the read-only native CAB result. */
+  nativeCabRequest?: NativeCabRequest | undefined;
   /** The host's current viewer/disclosure revision, independently of any historical payload. */
   currentDisclosureRevision?: string | undefined;
   historyDisclosure?: HistoryDisclosure | undefined;

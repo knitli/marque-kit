@@ -149,6 +149,8 @@ A write-confirmation token is unavailable (`null`) when its evaluation basis con
 
 For a native Classification Authority Block (CAB) snapshot, the host calls `parseNativeJson(text, maxBytes)` from the core package's `native-wire` export and places the returned envelope in `document.native_evaluation`. The `native-cab` export's `readCabSnapshot` requires the requested target, profile and an independently obtained current evaluation basis. It returns the engine's scoped requirements, artifacts and host-work status, or `null` when the binding cannot be established. The caller sets a UTF-8 byte limit for each JSON input. This route covers one CAB evaluation. Whole-document finalize and send require a wider evaluation.
 
+In Word, the installation can return a `native_cab` session for the active document. It supplies the wire JSON, document and chain, a separate scope request, and the installation’s `nativeMaxBytes` limit. The pane displays the CAB field states and source coverage read-only. An optional `readNativeCab()` refresh clears the previous scope immediately. A late reply, a document switch, or a missing current binding leaves those details unavailable.
+
 Who supplies each slot
 M — Marque emits it
 K — the kit derives or keeps it

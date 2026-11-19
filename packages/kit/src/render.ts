@@ -32,6 +32,9 @@
  * engine's document as-is.
  */
 
+import { readCabSnapshot } from '@knitli/marque-kit-core/native-cab';
+import type { NativeCabRequest } from '@knitli/marque-kit-core/native-cab';
+import type { NativeField } from '@knitli/marque-kit-core/native-wire';
 import { render as mark, settle, resettle, relabel, el, button } from './marking.ts';
 import {
   appendAcknowledgementIssue,
@@ -153,6 +156,8 @@ export interface Update {
   actBinding?: ActAppendBinding | null;
   currentDisclosureRevision?: string | null;
   historyDisclosure?: HistoryDisclosure | null;
+  /** Replace or revoke the independently supplied native CAB scope. */
+  nativeCabRequest?: NativeCabRequest | null;
   /** The log length when this lint began. */
   linted?: number | undefined;
   /** The host's request counter. */
@@ -896,6 +901,37 @@ function history(doc: Doc, log: readonly LogEntry[], host: Host): HTMLElement {
   return rows;
 }
 
+const CAB_FIELD_LABEL: Record<NativeField, string> = {
+  classified_by: 'Classified by',
+  agency_and_office_of_origin: 'Agency and office of origin',
+  classification_reason: 'Classification reason',
+  declassify_on: 'Declassify on',
+};
+const words = (value: string): string => value.replaceAll('_', ' ');
+/** A scoped read, not a finding, document readiness verdict, or writable card. */
+function nativeCab(doc: Doc, host: Host): HTMLElement {
+  const section = el('section', 'mq-section');
+  const heading = el('h2', 'mq-label', 'Classification Authority Block');
+  section.append(heading);
+  const result = host.nativeCabRequest && readCabSnapshot(doc, host.nativeCabRequest);
+  if (!result) {
+    section.append(el('p', 'mq-p', 'The current authority block evaluation is unavailable.'));
+    return section;
+  }
+  const ready = result.readiness.kind === 'supported' ? words(result.readiness.status) : words(result.readiness.kind);
+  section.append(el('p', 'mq-p', `Authority block evaluation is ${ready}.`));
+  section.append(el('p', 'mq-p', `Source coverage is ${words(result.coverage.status)}.`));
+  const list = el('dl', 'mq-rows');
+  for (const req of result.requirements) {
+    if (!req.field) continue;
+    const row = el('div', 'mq-row-item');
+    row.append(el('dt', 'mq-label', CAB_FIELD_LABEL[req.field]), el('dd', 'mq-p', words(req.state)));
+    list.append(row);
+  }
+  if (list.childElementCount) section.append(list);
+  return section;
+}
+
 export function pane(doc: Doc | null, host: Host = {}): HTMLDivElement {
   const p = el('div', 'mq-pane');
   const head = el('div', 'mq-pane-head');
@@ -916,6 +952,11 @@ export function pane(doc: Doc | null, host: Host = {}): HTMLDivElement {
       ),
     );
     p.append(status(null, host), engineState(host));
+    return p;
+  }
+
+  if ('native_evaluation' in doc.document) {
+    p.append(nativeCab(doc, host));
     return p;
   }
 
@@ -1363,6 +1404,7 @@ export function mount(
     actBinding: ActAppendBinding | null;
     currentDisclosureRevision: string | null;
     historyDisclosure: HistoryDisclosure | null;
+    nativeCabRequest: NativeCabRequest | null;
     open: string | null;
     tab: Tab;
     seq: number | null;
@@ -1375,6 +1417,7 @@ export function mount(
     actBinding: host.actBinding ?? null,
     currentDisclosureRevision: host.currentDisclosureRevision ?? null,
     historyDisclosure: host.historyDisclosure ?? null,
+    nativeCabRequest: host.nativeCabRequest ?? null,
     open: null,
     tab: 'findings',
     seq: null,
@@ -1456,6 +1499,9 @@ export function mount(
     },
     get historyDisclosure() {
       return cur.historyDisclosure ?? undefined;
+    },
+    get nativeCabRequest() {
+      return cur.nativeCabRequest ?? undefined;
     },
     get open() {
       return cur.open;
@@ -1729,6 +1775,7 @@ export function mount(
 
   // `fresh`: the person just acted, so what they had in the form went with it.
   let parked: Draft[] = [];
+  let writeAuthorityRevoked = false;
   let dead = false; // destroyed: a draw queued before it (onOpen, a resize) draws nothing
   function draw(focusId?: string | null, { fresh = false }: { fresh?: boolean } = {}): void {
     if (dead) return;
@@ -1739,7 +1786,9 @@ export function mount(
     const v = cur.doc && docView(cur.doc, cur.state);
     let say = '';
     const ok = cur.engine === 'ok';
-    if (v && (ok || cur.engine === 'checking')) {
+    const nativeRoute = !!v && 'native_evaluation' in v.document;
+    if (nativeRoute) recent?.end();
+    if (v && !nativeRoute && (ok || cur.engine === 'checking')) {
       const now = sections(v, cur.moment).must;
       // Keyed by the question too: one asked again under the same id is news.
       const key = (f: Subject): string => `${f.id} ${canon(f.asks ? disclosedAsks(f.asks) : null)}`;
@@ -1761,7 +1810,7 @@ export function mount(
     if (recent) recent.focused = recent.strip.contains(document.activeElement);
     const onTab = body.contains(document.activeElement) && document.activeElement?.closest<HTMLElement>('.mq-tab');
     const view = pane(v, h);
-    if (appendStatus) {
+    if (appendStatus && !nativeRoute && !writeAuthorityRevoked) {
       const notice = el('div', 'mq-pane-foot');
       notice.setAttribute('role', 'status');
       notice.append(el('p', 'mq-p', appendStatus));
@@ -1863,6 +1912,7 @@ export function mount(
   }
 
   async function submitAct(f: Subject, act: Act, value: ActValue | null): Promise<void> {
+    if (writeAuthorityRevoked || (cur.doc && 'native_evaluation' in cur.doc.document)) return;
     if (appendInFlight) return;
     if (!host.onAppend) {
       appendStatus = 'The host cannot record this action. It has not been applied or added to history.';
@@ -1888,6 +1938,7 @@ export function mount(
   }
 
   async function submitAppend(request: ActAppendRequest, original?: Subject): Promise<void> {
+    if (writeAuthorityRevoked || (cur.doc && 'native_evaluation' in cur.doc.document)) return;
     const append = host.onAppend;
     if (!append || appendInFlight) return;
     const ownerBinding = currentAppendBinding();
@@ -1905,7 +1956,9 @@ export function mount(
       return;
     }
     const contextIsCurrent = (): boolean =>
+      !writeAuthorityRevoked &&
       cur.doc === documentAtRequest &&
+      !(cur.doc && 'native_evaluation' in cur.doc.document) &&
       canon(currentAppendBinding()) === bindingKey &&
       canon(cur.doc?.document.evaluation?.basis ?? null) === documentBasisKey;
     const sameOwner = (): boolean =>
@@ -1965,6 +2018,9 @@ export function mount(
 
     const { entry, replayed } = result;
     if (!sameOwner() || !contextIsCurrent()) {
+      // A committed acknowledgement remains history for the same owner, but
+      // it must not trigger a write after the view loses write authority.
+      if (sameOwner()) adoptHostState(result.state, request.requestId);
       appendStatus =
         'The action was recorded, but the document or chain changed before it could be applied. The same request remains pending; retry it after restoring its document.';
       appendRetryable = true;
@@ -2054,8 +2110,16 @@ export function mount(
         delete next.engine;
         delete next.currentDisclosureRevision;
         delete next.historyDisclosure;
+        delete next.nativeCabRequest;
         actBinding = undefined;
-      } else if (lint && seq != null) cur.seq = seq;
+      } else {
+        if (lint && seq != null) cur.seq = seq;
+        // A new evaluation must explicitly carry a newly obtained native scope.
+        if (('doc' in next || ('engine' in next && next.engine !== 'ok')) && !('nativeCabRequest' in next))
+          cur.nativeCabRequest = null;
+      }
+      if (next.readOnly === true && !cur.readOnly) writeAuthorityRevoked = true;
+      if (next.readOnly === false) writeAuthorityRevoked = false;
       Object.assign(cur, next);
       if (actBinding !== undefined) cur.actBinding = actBinding;
       if (open !== undefined) {
