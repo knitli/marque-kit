@@ -3,7 +3,6 @@
 
 import { mount } from '@knitli/marque-kit';
 import { parseNativeJson } from '@knitli/marque-kit-core/native-wire';
-import type { NativeCabRequest } from '@knitli/marque-kit-core/native-cab';
 import type { Doc } from '@knitli/marque-kit-core/types';
 import { isSameWordDocument } from './workspace.ts';
 import type { OfficeNativeCabSnapshot, OfficeNativeWordSession, OfficeWordHost } from './workspace.ts';
@@ -19,23 +18,6 @@ function snapshotDoc(snapshot: OfficeNativeCabSnapshot | undefined, maxBytes: nu
   }
   return { findings: [], document: { blocking: [], artifacts: [], native_evaluation: native } };
 }
-function currentRequest(
-  snapshot: OfficeNativeCabSnapshot | undefined,
-  documentId: string,
-  chain: string,
-  maxBytes: number | undefined,
-): NativeCabRequest | undefined {
-  if (
-    !snapshot ||
-    snapshot.documentId !== documentId ||
-    snapshot.chain !== chain ||
-    snapshot.request?.target?.document_id !== documentId ||
-    !Number.isSafeInteger(maxBytes) ||
-    maxBytes! < 1
-  )
-    return undefined;
-  return { ...snapshot.request, expectedChain: chain, maxBasisBytes: maxBytes! };
-}
 /** Read-only native result. Refresh revokes the prior scope before awaiting the provider. */
 export function mountNativeWorkspace(
   root: HTMLElement,
@@ -47,30 +29,61 @@ export function mountNativeWorkspace(
   const controls = document.createElement('div');
   root.replaceChildren(container, controls);
   const pane = mount(container, {
-    doc: snapshotDoc(session.nativeCab, maxBytes),
-    nativeCabRequest: currentRequest(session.nativeCab, session.documentId, session.chain, maxBytes),
+    doc: snapshotDoc(undefined, maxBytes),
+    nativeCabRequest: undefined,
     readOnly: true,
   });
   let generation = 0;
   let disposed = false;
-  async function refresh(): Promise<void> {
-    const attempt = ++generation;
+  let unsubscribe: (() => void) | undefined;
+  const invalidate = () => {
+    if (disposed) return;
+    generation++;
     pane.update({ nativeCabRequest: null });
-    if (!session.readNativeCab) return;
+  };
+  const eligible =
+    Number.isSafeInteger(maxBytes) &&
+    maxBytes! > 0 &&
+    !!wordHost.watchNativeCabInvalidation &&
+    !!wordHost.readNativeCabScope;
+  if (eligible) {
     try {
-      if (!(await isSameWordDocument(wordHost, session)) || disposed || attempt !== generation) return;
-      const next = await session.readNativeCab();
-      const stillBound = await isSameWordDocument(wordHost, session);
-      if (!stillBound || disposed || attempt !== generation) return;
-      if (next.documentId !== session.documentId || next.chain !== session.chain) return;
-      pane.update({
-        doc: snapshotDoc(next, maxBytes),
-        nativeCabRequest: currentRequest(next, session.documentId, session.chain, maxBytes) ?? null,
-      });
+      unsubscribe = wordHost.watchNativeCabInvalidation!(session.documentId, session.chain, invalidate);
     } catch {
-      // The old scope was revoked before the failed read; a later refresh may restore it.
+      unsubscribe = undefined;
     }
   }
+  async function obtain(initial: boolean): Promise<void> {
+    const attempt = ++generation;
+    pane.update({ nativeCabRequest: null });
+    if (typeof unsubscribe !== 'function' || !wordHost.readNativeCabScope || (!initial && !session.readNativeCab))
+      return;
+    try {
+      if (!(await isSameWordDocument(wordHost, session)) || disposed || attempt !== generation) return;
+      const next = initial ? session.nativeCab : await session.readNativeCab!();
+      if (disposed || attempt !== generation || next.documentId !== session.documentId || next.chain !== session.chain)
+        return;
+      const scope = await wordHost.readNativeCabScope(session.documentId, session.chain);
+      const stillBound = await isSameWordDocument(wordHost, session);
+      if (
+        !scope ||
+        scope.target?.document_id !== session.documentId ||
+        !stillBound ||
+        disposed ||
+        attempt !== generation
+      )
+        return;
+      pane.update({
+        doc: snapshotDoc(next, maxBytes),
+        nativeCabRequest: { ...scope, expectedChain: session.chain, maxBasisBytes: maxBytes! },
+      });
+    } catch {
+      // Unavailable scope remains revoked until a later authorized read.
+    }
+  }
+  const ready = obtain(true);
+  const refresh = () => obtain(false);
+
   if (session.readNativeCab) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -79,10 +92,12 @@ export function mountNativeWorkspace(
     controls.append(button);
   }
   return {
+    ready,
     refresh,
     destroy() {
       disposed = true;
       generation++;
+      unsubscribe?.();
       pane.destroy();
       root.replaceChildren();
     },

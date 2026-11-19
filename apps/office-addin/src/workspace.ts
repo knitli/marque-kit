@@ -20,6 +20,13 @@ export interface OfficeWordHost {
   /** Must bind the write to entry.binding and revalidate target/destination before touching Word. */
   applyCommitted(entry: LogEntry, documentId: string): Promise<OfficeWriteAck>;
   jump?(subjectId: string, documentId: string): Promise<void>;
+  /** The installation guarantees notification for any change to document revision, disclosure, session, or provider before further results may be shown. */
+  watchNativeCabInvalidation?(documentId: string, chain: string, invalidate: () => void): () => void;
+  /** Independently obtain the current authorized target, profile and evaluation basis. */
+  readNativeCabScope?(
+    documentId: string,
+    chain: string,
+  ): Promise<Omit<NativeCabRequest, 'maxBasisBytes' | 'expectedChain'> | null>;
 }
 
 export interface OfficeWriteAck {
@@ -48,6 +55,7 @@ export interface OfficeNativeCabSnapshot {
   documentId: string;
   chain: string;
   wire: string;
+  /** Legacy provider claim; ignored for currentness. The installation supplies scope independently. */
   request?: Omit<NativeCabRequest, 'maxBasisBytes'>;
 }
 export interface OfficeNativeWordSession {
