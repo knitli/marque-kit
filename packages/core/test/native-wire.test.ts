@@ -126,6 +126,20 @@ void test('parser rejects malformed values, unsafe integers, extra fields, and o
   );
 });
 
+void test('wire IDs use canonical unsigned decimal and text supports Unicode scalars', () => {
+  const raw = JSON.parse(text) as NativeEnvelopeV1;
+  const basis = raw.evaluation.basis!.basis;
+  basis.source_revisions[0]!.source_id = 'doc-🌍';
+  for (const id of ['0', '9007199254740991']) {
+    basis.scopes[0]!.scope_id = id;
+    assert.equal(parseNativeJson(JSON.stringify(raw), 1_048_576).evaluation.basis!.basis.scopes[0]!.scope_id, id);
+  }
+  for (const id of ['', '00', '-0', '-1', ' 1', '+1', '1e1', '1.0', '0x10', '9007199254740992']) {
+    basis.scopes[0]!.scope_id = id;
+    assert.throws(() => parseNativeJson(JSON.stringify(raw), 1_048_576), TypeError);
+  }
+});
+
 void test('partial reads require a producer-bound target and matching source scope', () => {
   const partial = JSON.parse(text) as NativeEnvelopeV1;
   partial.evaluation.coverage.status = 'partial';

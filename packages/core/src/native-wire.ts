@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { hasUnpairedSurrogate } from './marking.ts';
+
 export type NativeTarget = { document_id: string; revision_id: string; contribution_id: string; scope_locator: string };
 export type NativeField = 'classified_by' | 'agency_and_office_of_origin' | 'classification_reason' | 'declassify_on';
 export type NativeProfile = {
@@ -122,18 +124,16 @@ const keys = (value: unknown, expected: string[], where: string): Record<string,
   return x;
 };
 const str = (x: unknown, where: string): string =>
-  typeof x === 'string' && !/[\uD800-\uDFFF]/u.test(x) ? x : fail(where);
+  typeof x === 'string' && !hasUnpairedSurrogate(x) ? x : fail(where);
 const nullableString = (x: unknown, where: string): string | null => (x === null ? null : str(x, where));
 const arr = (x: unknown, where: string): unknown[] => (Array.isArray(x) ? x : fail(where));
 const oneOf = <T extends string>(x: unknown, choices: readonly T[], where: string): T =>
   choices.includes(x as T) ? (x as T) : fail(`${where} tag`);
 const safeDecimal = (x: unknown, where: string): string => {
-  if (typeof x !== 'string' || !/^(0|[1-9][0-9]*)$/.test(x)) fail(`${where} decimal`);
-  const decimal = x as string;
-  if (decimal.length > 16) fail(`${where} exceeds JavaScript safe integer`);
-  const n = BigInt(decimal);
-  if (n > 9007199254740991n) fail(`${where} exceeds JavaScript safe integer`);
-  return decimal;
+  if (typeof x !== 'string' || x.length > 16) return fail(`${where} decimal`);
+  const n = Number(x);
+  if (!Number.isSafeInteger(n) || n < 0 || String(n) !== x) return fail(`${where} decimal`);
+  return x;
 };
 const FIELD = ['classified_by', 'agency_and_office_of_origin', 'classification_reason', 'declassify_on'] as const;
 const field = (x: unknown, where: string) => oneOf(x, FIELD, where);
