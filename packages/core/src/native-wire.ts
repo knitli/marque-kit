@@ -813,7 +813,7 @@ export function parseNativeSemanticResultsJson(text: string, maxBytes: number): 
     fail('semantic results scope or version');
   const disclosure = keys(envelope.disclosure, ['grant_id', 'coverage', 'items'], 'semantic disclosure');
   const grantId = str(disclosure.grant_id, 'semantic grant id');
-  if (!grantId || grantId.length > 128) fail('semantic grant id');
+  if (!/^[0-9a-f]{32}$/.test(grantId)) fail('semantic grant id');
   const coverage =
     disclosure.coverage === null
       ? null

@@ -83,6 +83,7 @@ export function mountNativeSemanticResultsWorkspace(
         current.revisionId !== next.request.current.revisionId ||
         current.viewerId !== next.request.current.viewerId ||
         current.principalRevision !== next.request.current.principalRevision ||
+        current.evaluationId !== next.request.current.evaluationId ||
         !stillBound ||
         disposed ||
         attempt !== generation

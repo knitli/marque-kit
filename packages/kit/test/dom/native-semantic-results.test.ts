@@ -21,12 +21,13 @@ const context = {
   revisionId: 'revision-42',
   viewerId: 'principal-5',
   principalRevision: 'principal-revision-8',
+  evaluationId: 'evaluation-revision-21',
 };
 const request: NativeSemanticResultsRequest = {
   current: context,
   grant: {
     ...context,
-    grantId: 'fixture-grant-001',
+    grantId: 'f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1',
     rows: Array.from({ length: 4 }, () => ({ meaning: true, supportKinds: true, dependencies: true })),
     coverage: true,
   },
@@ -80,11 +81,14 @@ describe('native semantic results read-only pane', () => {
       viewerId: context.viewerId,
       nativeSemanticResults: { documentId: context.documentId, wire: raw, request },
     };
+    const applyCommitted = vi.fn(async () => {
+      throw new Error('restricted results route cannot write');
+    });
+    const readNativeCabScope = vi.fn(async () => null);
     const wordHost: OfficeWordHost = {
       activeDocumentId: async () => context.documentId,
-      applyCommitted: async () => {
-        throw new Error('restricted results route cannot write');
-      },
+      applyCommitted,
+      readNativeCabScope,
       watchNativeSemanticResultsInvalidation: () => () => {},
       readNativeSemanticResultsContext: async () => context,
     };
@@ -95,6 +99,8 @@ describe('native semantic results read-only pane', () => {
     expect(n.textContent).not.toContain('wire-spike-source');
     expect(n.textContent).not.toContain('host-owned:');
     expect(n.querySelectorAll('button, input, form')).toHaveLength(0);
+    expect(readNativeCabScope).not.toHaveBeenCalled();
+    expect(applyCommitted).not.toHaveBeenCalled();
     workspace.destroy();
     n.remove();
   });

@@ -13,12 +13,13 @@ const current = {
   revisionId: 'revision-9',
   viewerId: 'viewer-7',
   principalRevision: 'principal-revision-3',
+  evaluationId: 'evaluation-revision-21',
 };
 const request = {
   current,
   grant: {
     ...current,
-    grantId: 'fixture-grant-001',
+    grantId: 'f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1',
     rows: Array.from({ length: 4 }, () => ({ meaning: true, supportKinds: true, dependencies: true })),
     coverage: true,
   },
@@ -46,7 +47,7 @@ void test('parses actual native bytes as a strict compact selected-results envel
   assert.equal(readNativeSemanticResults(doc, undefined, current.principalRevision), null);
 });
 
-void test('grant must match current host document, principal revision, rows, and every disclosed aspect', () => {
+void test('grant must match current host document, evaluation, principal revision, rows, and every disclosed aspect', () => {
   const doc = docFrom(fixture);
   assert.equal(
     readNativeSemanticResults(
@@ -57,6 +58,14 @@ void test('grant must match current host document, principal revision, rows, and
     null,
   );
   assert.equal(readNativeSemanticResults(doc, request, 'older-principal'), null);
+  assert.equal(
+    readNativeSemanticResults(
+      doc,
+      { ...request, current: { ...current, evaluationId: 'next-evaluation' } },
+      current.principalRevision,
+    ),
+    null,
+  );
   assert.equal(
     readNativeSemanticResults(
       doc,
@@ -93,6 +102,7 @@ void test('parser rejects hidden gaps, raw reference fields, unsafe edges, and u
   const cases = [
     fixture.replace('"ordinal":"2"', '"ordinal":"3"'),
     fixture.replace('"ordinal":"2"', '"ordinal":"2","source_id":"secret"'),
+    fixture.replace('f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1', 'fixture-grant-001'),
     fixture.replace(
       '"dependencies":{"status":"available","items":[]}',
       '"dependencies":{"status":"available","items":[{"status":"resolved","row":"9"}]}',

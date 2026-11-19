@@ -10,6 +10,8 @@ export interface NativeSemanticResultsContext {
   revisionId: string;
   viewerId: string;
   principalRevision: string;
+  /** Opaque current-evaluation token issued by the trusted provider. */
+  evaluationId: string;
 }
 export interface NativeSemanticResultGrantRow {
   meaning: boolean;
@@ -40,7 +42,10 @@ const sameContext = (a: NativeSemanticResultsContext, b: NativeSemanticResultsCo
   a.viewerId === b.viewerId &&
   typeof a.principalRevision === 'string' &&
   a.principalRevision.length > 0 &&
-  a.principalRevision === b.principalRevision;
+  a.principalRevision === b.principalRevision &&
+  typeof a.evaluationId === 'string' &&
+  a.evaluationId.length > 0 &&
+  a.evaluationId === b.evaluationId;
 
 /**
  * A result disclosure is accepted only with a fresh host context and a
@@ -58,7 +63,7 @@ export function readNativeSemanticResults(
     !sameContext(request.current, request.grant) ||
     currentPrincipalRevision !== request.current.principalRevision ||
     typeof request.grant.grantId !== 'string' ||
-    request.grant.grantId.length === 0 ||
+    !/^[0-9a-f]{32}$/.test(request.grant.grantId) ||
     request.grant.grantId !== envelope.disclosure.grant_id ||
     request.grant.rows.length !== envelope.disclosure.items.length ||
     request.grant.rows.length > 2048 ||
