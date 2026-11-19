@@ -20,8 +20,7 @@ A pnpm workspace (DECISIONS #22). Packages import each other by name; the `sourc
 packages/core/       @knitli/marque-kit-core: the logic with no DOM, so it runs anywhere, a server and Outlook's send handler included
   src/marking.ts       the marking's structure, parsed and spoken, and html(): a marking as an escaped HTML string
   src/types.ts         the contract as types: findings, artifacts, the state log, the vocabulary, the host
-  src/state.ts         the kit's half of the ladder: what the person did (answered, changed, kept as written,
-                       deferred, declined), keyed by finding id, append-only, plain JSON the host persists
+  src/state.ts         checked caller append and the kit's state projection, keyed by finding id
   src/attention.ts     rung(), sections(), markClass(): which of the five rungs a finding sits on, and the pane's
                        four sections; what Outlook's send gate decides with
   test/                the fixtures held to the types; the rung table and the state layer, against the memo; html()
@@ -61,18 +60,49 @@ pnpm build        # each package's dist/: the modules, their .d.ts, and the kit'
 pnpm demo         # vp dev; open /demo/
 ```
 
-A host mounts the pane and listens:
+A host connects the pane to its trusted workspace. `trustedWorkspace` below is the host's own storage adapter, not an API supplied by this kit:
 
 ```js
 import { mount } from '@knitli/marque-kit';
-const p = mount(el, { doc, state, vocab, moment: 'editing', onChange: (state, act) => save(state), onHelp, onJump });
+const state = await trustedWorkspace.loadState(documentId);
+const p = mount(el, {
+  doc,
+  state,
+  actBinding: await trustedWorkspace.currentActBinding(documentId),
+  vocab,
+  moment: 'editing',
+  onAppend: async (request) => {
+    // Persist the exact request before attempting its ordered append, so an uncertain outcome
+    // can be retried after a pane restart with the same requestId.
+    await trustedWorkspace.stageAppend(documentId, request);
+    // The workspace atomically consumes the staged row with the checked result.
+    // On commit it also persists a recoverable write-outbox item before returning;
+    // on refusal it retains the unsequenced request and returns the refusal without writing.
+    const result = await trustedWorkspace.append(documentId, request);
+    return result; // { status: 'committed', state, entry, replayed } or { status: 'refused', state, reason, pending? }
+  },
+  onChange: (state, notice) => {
+    if (notice) {
+      // Run/recover only this request's still-pending write. The host deduplicates
+      // by requestId, acknowledges the real write, then evaluates the document.
+      void trustedWorkspace.resumePendingWrite(documentId, notice.requestId, notice.entry);
+    } else {
+      // Bookkeeping such as `seen`; committed state was already persisted by append.
+      void trustedWorkspace.saveState(documentId, state);
+    }
+  },
+  onHelp,
+  onJump,
+});
 p.update({ doc });              // after a re-lint; async hosts add { linted: n, seq }
 p.update({ moment: 'finalize' }); // the host's moment; the kit never guesses it
 p.update({ open: id });         // an Office host's cursor in a marking: its card opens, focus stays put
 p.destroy();                    // when the pane goes away
 ```
 
-`act` is null when only the seen list changed. An answer shows on its card at once but stays in `document.pending`, and the document is not ready, until the host applies it, re-lints and calls `p.update({ doc })`. `@knitli/marque-kit/help` has what a host needs to answer `onHelp` and `onLookup`. The contract's types and the state log are `@knitli/marque-kit-core/types` and `@knitli/marque-kit-core/state`. At mount the kit measures the host's `--mq-*` tokens against the contrast and size floors (`@knitli/marque-kit/theme`); a failing token falls back to the shipped value, and the report is `p.theme` and `onTheme(report)`. Under forced colors the system palette stands and only sizes and the mark font are measured. When the room the host gives the pane is under 240px, the report says `narrow: true` and the kit shows rows only: opening one calls `onOpen(f)` for the host to show it its own way.
+The trusted workspace must keep committed history, pending refusals, and the write outbox private to that host. A refused request stays outside ordered history; the same request key can be retried after the host repairs unknown history, while sequence exhaustion is terminal for that chain. A replay reports the original entry with `replayed: true`; the host resumes only its still-pending write by `requestId`, and does not create a second log row. A physical write is not confirmed until the host acknowledges it and a fresh evaluation reflects it. Do not store this interaction log in document metadata, a seal or a portable sidecar.
+
+The demo uses the same checked append helper over an in-memory variable so a normal answer can be demonstrated. Its state resets on reload and is not a trusted durable workspace. `@knitli/marque-kit/help` has what a host needs to answer `onHelp` and `onLookup`. The contract's types and state log are `@knitli/marque-kit-core/types` and `@knitli/marque-kit-core/state`. At mount the kit measures the host's `--mq-*` tokens against the contrast and size floors (`@knitli/marque-kit/theme`); a failing token falls back to the shipped value, and the report is `p.theme` and `onTheme(report)`. Under forced colors the system palette stands and only sizes and the mark font are measured. When the room the host gives the pane is under 240px, the report says `narrow: true` and the kit shows rows only: opening one calls `onOpen(f)` for the host to show it its own way.
 
 The demo runs under `vp dev`, which serves the TypeScript source as modules.
 

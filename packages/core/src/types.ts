@@ -273,6 +273,84 @@ export interface ActValue {
   fields?: Record<string, string>;
 }
 
+/** A protocol handle carried by an act when the caller actually knows it. */
+export interface ActHandle {
+  chain: string;
+  serial: number;
+}
+
+/** Typed context retained with a caller-owned append. Missing fields stay unknown. */
+export interface ActAppendBinding {
+  documentId?: string;
+  chain?: string;
+  subject?: ActHandle;
+  question?: ActHandle;
+  questionRevision?: number;
+  resultRevision?: number;
+  payloadRef?: string;
+  sourceRevisions?: string[];
+  basis?: EvaluationBasis;
+  basisRef?: string;
+  supersedes?: string | null;
+  takesBack?: string | null;
+}
+
+/** An immutable request to append one act. `requestId` is its retry/idempotency key. */
+export interface ActAppendRequest {
+  requestId: string;
+  /** The kit's finding/artifact id; absent only when the caller has no such mapping. */
+  id?: string;
+  act: Act;
+  value: ActValue | null;
+  at?: string;
+  about?: Snapshot;
+  binding?: ActAppendBinding;
+}
+
+export type ActAppendRefusal =
+  | 'sequence-exhausted'
+  | 'missing-frontier'
+  | 'missing-coverage'
+  | 'history-incomplete'
+  | 'invalid-frontier'
+  | 'missing-target'
+  | 'request-id-conflict';
+
+/** A rejected append remains outside the ordered log, with the original request intact. */
+export interface PendingAct extends ActAppendRequest {
+  sequence: null;
+  state: 'pending_sequence';
+  reason: ActAppendRefusal;
+}
+
+/** A durably captured request whose host append has not yet returned a disposition. */
+export interface StagedAct extends ActAppendRequest {
+  sequence: null;
+  state: 'staged';
+}
+
+export type PendingAppend = PendingAct | StagedAct;
+
+export interface ActHistoryCoverage {
+  state: 'complete' | 'partial' | 'unavailable';
+  /** The declared sequence interval covered by this history lane; null means known empty. */
+  sequenceRange: [number, number] | null;
+}
+
+export type AppendActResult =
+  | { status: 'committed'; state: State; entry: LogEntry; replayed: boolean }
+  | { status: 'refused'; reason: ActAppendRefusal; state: State; pending?: PendingAct };
+
+/** A committed act notification; retries identify the same durable entry and host write intent. */
+export interface ActChangeNotice {
+  id: string;
+  act: Act;
+  value: ActValue | null;
+  requestId: string;
+  entry: LogEntry;
+  replayed: boolean;
+}
+
 /** What an act was about when it was taken: markings, rule and place, never body text. */
 export interface Snapshot {
   rule: string | null;
@@ -295,13 +373,16 @@ export interface Snapshot {
 }
 
 export interface LogEntry {
-  /** Stable append position used to confirm exactly which accepted write the host completed. */
+  /** One-based protocol sequence. Legacy JSON may omit the separate sequence frontier. */
   sequence: number;
+  /** Present on entries created by the checked append transition; absent on legacy rows. */
+  requestId?: string;
   id: string;
   act: Act;
   value: ActValue | null;
   at: string;
   about?: Snapshot;
+  binding?: ActAppendBinding;
 }
 
 export interface State {
@@ -309,6 +390,12 @@ export interface State {
   seen: { id: string; result: string | null }[];
   /** How many log lines the current lint already reflects. */
   linted?: number;
+  /** Last issued protocol sequence, independent of retained log length. Missing in legacy JSON. */
+  actSequence?: number;
+  /** Coverage is separate from the issuance frontier and must not be inferred from `log.length`. */
+  actHistoryCoverage?: ActHistoryCoverage;
+  /** Durably staged or refused requests; never included in `log` or engine history. */
+  pendingAppends?: PendingAppend[];
 }
 
 /** What view() adds: the person's acts overlaid. Every slot is optional, so Marque's own finding is a view too. */
@@ -448,6 +535,8 @@ export interface Host {
   confirmedWrites?: string[] | undefined;
   /** Each check value is its host acknowledgement token bound to this current basis. */
   acceptanceChecks?: Record<string, string> | undefined;
+  /** Known caller binding captured with an append request; unknown fields are omitted. */
+  actBinding?: ActAppendBinding | undefined;
   vocab?: Vocab | undefined;
   /** Under the width floor: rows only. */
   narrow?: boolean | undefined;
@@ -469,6 +558,12 @@ export interface Host {
   onRetry?: () => void;
   onReport?: () => void;
   onClose?: () => void;
-  onChange?: (state: State, act: { id: string; act: Act; value: ActValue | null } | null) => void;
+  /** The committed entry and retry key let the host resume its durable pending write, including after replay. */
+  onChange?: (state: State, act: ActChangeNotice | null) => void;
+  /**
+   * The host must durably stage this exact request before attempting append. Persist the checked result;
+   * commits also persist a recoverable host-write intent before acknowledgement.
+   */
+  onAppend?: (request: ActAppendRequest) => Promise<AppendActResult>;
   onTheme?: (report: ThemeReport | null) => void;
 }

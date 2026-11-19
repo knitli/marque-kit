@@ -9,6 +9,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { rung, sections } from '../src/attention.ts';
 import {
+  appendAcknowledgementIssue,
+  appendAct,
   empty,
   record,
   see,
@@ -18,9 +20,12 @@ import {
   docView,
   effectiveReady,
   writeConfirmationToken,
+  writeToken,
   ACTS,
 } from '../src/state.ts';
 import type {
+  ActAppendRequest,
+  AppendActResult,
   Act,
   ArtifactField,
   ArtifactView,
@@ -34,6 +39,7 @@ import type {
   Rung,
   EvaluationBasis,
   RequirementStatus,
+  State,
 } from '../src/types.ts';
 
 /* Table 2, row by row. */
@@ -52,6 +58,131 @@ const T: [NeedsPerson, Blocks, Moment, Rung][] = [
 for (const [needs_person, blocks, moment, want] of T) {
   assert.equal(rung({ needs_person, blocks }, moment), want, `${needs_person} × ${blocks} × ${moment}`);
 }
+{
+  const request: ActAppendRequest = {
+    requestId: 'validate-known-history',
+    id: 'known',
+    act: 'answered',
+    value: null,
+    at: 't1',
+  };
+  const malformedHistories: State[] = [
+    {
+      ...empty(),
+      log: [],
+      actSequence: 1,
+      actHistoryCoverage: { state: 'complete', sequenceRange: [1, 1] },
+    },
+    {
+      ...empty(),
+      log: [
+        { sequence: 1, requestId: 'old-1', id: 'one', act: 'answered', value: null, at: 't1' },
+        { sequence: 1, requestId: 'old-2', id: 'two', act: 'answered', value: null, at: 't2' },
+      ],
+      actSequence: 2,
+      actHistoryCoverage: { state: 'complete', sequenceRange: [1, 2] },
+    },
+    {
+      ...empty(),
+      log: [
+        { sequence: 2, requestId: 'old-2', id: 'two', act: 'answered', value: null, at: 't2' },
+        { sequence: 1, requestId: 'old-1', id: 'one', act: 'answered', value: null, at: 't1' },
+      ],
+      actSequence: 2,
+      actHistoryCoverage: { state: 'complete', sequenceRange: [1, 2] },
+    },
+  ];
+  for (const [index, malformed] of malformedHistories.entries()) {
+    const refused = appendAct(malformed, { ...request, requestId: `incoherent-${index}` });
+    assert.equal(refused.status, 'refused');
+    assert.equal(refused.reason, 'history-incomplete');
+    assert.deepEqual(refused.state.log, malformed.log, 'malformed declared history cannot be extended');
+    assert.equal(refused.state.actSequence, malformed.actSequence);
+  }
+
+  const duplicateKeys: State = {
+    ...empty(),
+    log: [
+      { sequence: 1, requestId: 'repeat', id: 'one', act: 'answered', value: null, at: 't1' },
+      { sequence: 2, requestId: 'repeat', id: 'two', act: 'answered', value: null, at: 't2' },
+    ],
+    actSequence: 2,
+    actHistoryCoverage: { state: 'complete', sequenceRange: [1, 2] },
+  };
+  const duplicateKeyRefusal = appendAct(duplicateKeys, { ...request, requestId: 'new-after-duplicate' });
+  assert.equal(duplicateKeyRefusal.status, 'refused');
+  assert.equal(duplicateKeyRefusal.reason, 'request-id-conflict');
+}
+{
+  const request: ActAppendRequest = {
+    requestId: 'acknowledgement-check',
+    id: 'finding',
+    act: 'answered',
+    value: null,
+    at: 't1',
+  };
+  const committed = appendAct(empty(), request);
+  assert.equal(committed.status, 'committed');
+  assert.equal(appendAcknowledgementIssue(request, committed), null);
+
+  const partialReplayState: State = {
+    ...committed.state,
+    actHistoryCoverage: { state: 'partial', sequenceRange: [1, 1] },
+  };
+  const partialReplay = appendAct(partialReplayState, request);
+  assert.equal(partialReplay.status, 'committed');
+  assert.equal(partialReplay.replayed, true);
+  assert.equal(appendAcknowledgementIssue(request, partialReplay), null);
+
+  const invalid = { ...committed.entry, sequence: 0 };
+  const invalidAck: AppendActResult = {
+    status: 'committed',
+    entry: invalid,
+    replayed: false,
+    state: {
+      ...committed.state,
+      log: [invalid],
+      actSequence: 0,
+      actHistoryCoverage: { state: 'complete', sequenceRange: null },
+    },
+  };
+  assert.equal(appendAcknowledgementIssue(request, invalidAck), 'invalid-frontier');
+
+  const missingRowAck: AppendActResult = {
+    status: 'committed',
+    entry: committed.entry,
+    replayed: false,
+    state: {
+      ...committed.state,
+      log: [],
+      actSequence: 1,
+      actHistoryCoverage: { state: 'complete', sequenceRange: [1, 1] },
+    },
+  };
+  assert.equal(appendAcknowledgementIssue(request, missingRowAck), 'request-id-conflict');
+}
+{
+  const request: ActAppendRequest = {
+    requestId: 'restart-staged-request',
+    id: 'finding',
+    act: 'answered',
+    value: { free: 'captured before restart' },
+    at: 't1',
+  };
+  const staged: State = {
+    ...empty(),
+    pendingAppends: [{ ...request, sequence: null, state: 'staged' }],
+  };
+  const committed = appendAct(staged, request);
+  assert.equal(committed.status, 'committed');
+  assert.equal(committed.entry.requestId, request.requestId);
+  assert.equal(committed.state.pendingAppends?.length, 0, 'commit consumes the durable staged copy');
+
+  const conflicting = appendAct(staged, { ...request, value: { free: 'different action' } });
+  assert.equal(conflicting.status, 'refused');
+  assert.equal(conflicting.reason, 'request-id-conflict');
+  assert.deepEqual(conflicting.state.pendingAppends, staged.pendingAppends);
+}
 // Noticeable while a visible change is unseen; seen only quiets; whitespace isn't visible.
 const comma = {
   needs_person: 'none' as const,
@@ -65,6 +196,295 @@ assert.equal(rung({ ...comma, outcome: { result: { text: '(S//REL TO  USA FVEY)'
 
 /* The memo. */
 const doc = JSON.parse(readFileSync(new URL('../../../fixtures/memo.findings.json', import.meta.url), 'utf8')) as Doc;
+
+// Raw14 caller control: its act-history lane is complete only through sequence 1,
+// while the separate caller-issued frontier is already MAX_SAFE_INTEGER.
+const rawHandleInputs = JSON.parse(
+  readFileSync(new URL('../../../../replacement/acceptance/joint-handle-inputs/inputs.json', import.meta.url), 'utf8'),
+) as {
+  successors: Array<{
+    control: string;
+    input: {
+      act_history: { coverage: { state: 'complete' | 'partial' | 'unavailable'; sequence_range: [number, number] } };
+      append_request: { unsequenced_act: Record<string, unknown> };
+      caller_control: { watermarks: { act_sequence: number } };
+    };
+  }>;
+};
+const rawHandleCases = JSON.parse(
+  readFileSync(new URL('../../../../replacement/acceptance/joint-protocol-v3/cases.json', import.meta.url), 'utf8'),
+) as {
+  handle_integrity_controls: Array<{
+    id: string;
+    expected: { act_sequence: string; wrap_rounding_or_duplicate: boolean };
+  }>;
+};
+const rawActControl = rawHandleInputs.successors.find((control) => control.control === 'act-sequence-exhausted')!;
+const rawAct = rawActControl.input.append_request.unsequenced_act;
+const rawExpected = rawHandleCases.handle_integrity_controls.find(
+  (control) => control.id === 'act-sequence-exhausted',
+)!.expected;
+// Map the accepted raw14 request without manufacturing an ordered row or losing its bindings.
+const raw14Request: ActAppendRequest = {
+  requestId: 'request-unsequenced-append',
+  id: 'chain-A/1',
+  act: 'answered',
+  value: null,
+  binding: {
+    chain: rawAct.chain as string,
+    subject: rawAct.subject as { chain: string; serial: number },
+    question: rawAct.question as { chain: string; serial: number },
+    questionRevision: rawAct.question_revision as number,
+    resultRevision: rawAct.result_revision as number,
+    payloadRef: rawAct.payload_ref as string,
+    sourceRevisions: rawAct.source_revisions as string[],
+    basisRef: rawAct.basis as string,
+    supersedes: rawAct.supersedes as null,
+    takesBack: rawAct.takes_back as null,
+  },
+};
+assert.equal(rawAct.row_id, 'unsequenced-append');
+assert.equal(rawAct.sequence, null);
+assert.equal(rawAct.payload_ref, 'payload-unsequenced-append');
+assert.equal(rawExpected.act_sequence, 'exhausted');
+assert.equal(rawExpected.wrap_rounding_or_duplicate, false);
+assert.deepEqual(raw14Request.binding, {
+  chain: 'chain-A',
+  subject: { chain: 'chain-A', serial: 1 },
+  question: { chain: 'chain-A', serial: 1 },
+  questionRevision: 1,
+  resultRevision: 1,
+  payloadRef: 'payload-unsequenced-append',
+  sourceRevisions: ['src-A@1'],
+  basisRef: 'b0',
+  supersedes: null,
+  takesBack: null,
+});
+{
+  const prior: State = {
+    ...empty(),
+    log: [{ sequence: 1, id: 'chain-A/1', act: 'answered', value: null, at: 'prior' }],
+    actSequence: Number.MAX_SAFE_INTEGER,
+    actHistoryCoverage: { state: 'complete', sequenceRange: [1, 1] },
+  };
+  const refused = appendAct(prior, raw14Request);
+  assert.equal(refused.status, 'refused');
+  assert.equal(refused.reason, 'sequence-exhausted');
+  assert.equal(refused.reason === 'sequence-exhausted' ? 'exhausted' : 'other', rawExpected.act_sequence);
+  assert.equal(refused.state.log.length > prior.log.length, rawExpected.wrap_rounding_or_duplicate);
+  assert.deepEqual(refused.state.log, prior.log);
+  assert.equal(refused.state.actSequence, Number.MAX_SAFE_INTEGER);
+  assert.deepEqual(refused.state.actHistoryCoverage, prior.actHistoryCoverage);
+  assert.equal(refused.state.pendingAppends?.length, 1);
+  assert.equal(refused.pending?.sequence, null);
+  assert.equal(refused.pending?.state, 'pending_sequence');
+  assert.deepEqual(refused.pending?.binding, raw14Request.binding);
+  assert.equal(
+    refused.state.log.some((entry) => entry.requestId === raw14Request.requestId),
+    false,
+  );
+
+  const reloaded = JSON.parse(JSON.stringify(refused.state)) as State;
+  const retry = appendAct(reloaded, raw14Request);
+  assert.equal(retry.status, 'refused');
+  assert.equal(retry.reason, 'sequence-exhausted');
+  assert.deepEqual(
+    retry.state.pendingAppends,
+    refused.state.pendingAppends,
+    'reload and retry preserve the exact pending request',
+  );
+  assert.equal(retry.state.pendingAppends?.length, 1);
+}
+{
+  const legacy: State = {
+    log: [{ sequence: 1, id: 'legacy', act: 'answered', value: null, at: 'prior' }],
+    seen: [],
+  };
+  const refused = appendAct(legacy, { ...raw14Request, requestId: 'legacy-missing-frontier' });
+  assert.equal(refused.status, 'refused');
+  assert.equal(refused.reason, 'missing-frontier');
+  assert.equal(refused.state.actSequence, undefined, 'a legacy watermark is not inferred from log length');
+  assert.equal(refused.state.log.length, 1);
+  assert.equal(refused.state.pendingAppends?.[0]?.sequence, null);
+}
+{
+  const noCoverage: State = {
+    log: [{ sequence: 1, id: 'known-watermark', act: 'answered', value: null, at: 'prior' }],
+    seen: [],
+    actSequence: 1,
+  };
+  const refused = appendAct(noCoverage, { ...raw14Request, requestId: 'legacy-missing-coverage' });
+  assert.equal(refused.status, 'refused');
+  assert.equal(refused.reason, 'missing-coverage');
+  assert.equal(refused.state.actSequence, 1);
+  assert.equal(refused.state.actHistoryCoverage, undefined, 'coverage is not fabricated from an explicit watermark');
+  assert.deepEqual(refused.state.log, noCoverage.log);
+  assert.equal(refused.state.pendingAppends?.[0]?.sequence, null);
+  const sameRefusal = appendAct(refused.state, { ...raw14Request, requestId: 'legacy-missing-coverage' });
+  assert.equal(sameRefusal.status, 'refused');
+  assert.equal(
+    sameRefusal.state.pendingAppends?.length,
+    1,
+    'retrying an unresolved request replaces rather than duplicates it',
+  );
+
+  const repaired: State = {
+    ...refused.state,
+    actHistoryCoverage: { state: 'complete', sequenceRange: [1, 1] },
+  };
+  const retried = appendAct(JSON.parse(JSON.stringify(repaired)) as State, {
+    ...raw14Request,
+    requestId: 'legacy-missing-coverage',
+  });
+  assert.equal(retried.status, 'committed');
+  assert.equal(retried.entry.sequence, 2);
+  assert.equal(
+    retried.state.pendingAppends?.some((item) => item.requestId === 'legacy-missing-coverage'),
+    false,
+  );
+  assert.equal(retried.state.log.filter((entry) => entry.requestId === 'legacy-missing-coverage').length, 1);
+  const recoveredReplay = appendAct(JSON.parse(JSON.stringify(retried.state)) as State, {
+    ...raw14Request,
+    requestId: 'legacy-missing-coverage',
+  });
+  assert.equal(recoveredReplay.status, 'committed');
+  assert.equal(recoveredReplay.replayed, true);
+  assert.equal(recoveredReplay.state.log.length, 2);
+}
+{
+  const committedRequest: ActAppendRequest = {
+    requestId: 'known-committed-request',
+    id: 'finding-known',
+    act: 'answered',
+    value: { free: 'same' },
+    at: 'committed-at',
+  };
+  const committed = appendAct(empty(), committedRequest);
+  assert.equal(committed.status, 'committed');
+  const partialHistory: State = {
+    ...committed.state,
+    actHistoryCoverage: { state: 'partial', sequenceRange: [1, 1] },
+  };
+  const exactReplay = appendAct(partialHistory, committedRequest);
+  assert.equal(
+    exactReplay.status,
+    'committed',
+    'a known retained request replays even when other history is incomplete',
+  );
+  assert.equal(exactReplay.replayed, true);
+
+  const unknown = appendAct(partialHistory, { ...committedRequest, requestId: 'unknown-new-request' });
+  assert.equal(unknown.status, 'refused');
+  assert.equal(unknown.reason, 'history-incomplete', 'a partial log cannot prove an absent request ID is novel');
+  assert.equal(unknown.state.log.length, 1);
+  assert.equal(unknown.state.actSequence, 1);
+  assert.equal(unknown.state.pendingAppends?.[0]?.requestId, 'unknown-new-request');
+
+  for (const coverage of [
+    { state: 'unavailable' as const, sequenceRange: null },
+    { state: 'complete' as const, sequenceRange: [1, 1] as [number, number] },
+  ]) {
+    const frontier = coverage.sequenceRange ? 2 : 0;
+    const incomplete: State = { ...empty(), actSequence: frontier, actHistoryCoverage: coverage };
+    const refused = appendAct(incomplete, { ...committedRequest, requestId: `unknown-${coverage.state}-${frontier}` });
+    assert.equal(refused.status, 'refused');
+    assert.equal(refused.reason, 'history-incomplete');
+  }
+}
+for (const frontier of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+  const malformed: State = { ...empty(), actSequence: frontier };
+  const refused = appendAct(malformed, { ...raw14Request, requestId: `malformed-${frontier}` });
+  assert.equal(refused.status, 'refused');
+  assert.equal(refused.reason, 'invalid-frontier', `reject malformed frontier ${frontier}`);
+  assert.equal(refused.state.actSequence, frontier);
+  assert.equal(refused.state.log.length, 0);
+  assert.equal(malformed.pendingAppends?.length, 0, 'refusal must not mutate the caller state');
+  assert.equal(refused.state.pendingAppends?.length, 1);
+}
+{
+  const occupied: State = {
+    ...empty(),
+    log: [{ sequence: 1, id: 'existing', act: 'answered', value: null, at: 'prior' }],
+    actSequence: 0,
+    actHistoryCoverage: { state: 'partial', sequenceRange: [1, 1] },
+  };
+  const refused = appendAct(occupied, { ...raw14Request, requestId: 'occupied-next-sequence' });
+  assert.equal(refused.status, 'refused');
+  assert.equal(refused.reason, 'invalid-frontier');
+  assert.deepEqual(refused.state.log, occupied.log, 'an occupied next sequence is never duplicated');
+  assert.equal(refused.state.actSequence, 0);
+  assert.equal(refused.state.pendingAppends?.length, 1);
+  assert.equal(occupied.pendingAppends?.length, 0);
+}
+{
+  const initial = empty();
+  assert.equal(initial.actSequence, 0);
+  const request: ActAppendRequest = {
+    requestId: 'append-retry-1',
+    id: 'finding-1',
+    act: 'answered',
+    value: { free: 'one answer' },
+  };
+  const committed = appendAct(initial, request);
+  assert.equal(committed.status, 'committed');
+  assert.equal(committed.entry.sequence, 1);
+  assert.equal(committed.state.actSequence, 1);
+  assert.deepEqual(committed.state.actHistoryCoverage, { state: 'complete', sequenceRange: [1, 1] });
+
+  const reloaded = JSON.parse(JSON.stringify(committed.state)) as State;
+  const replay = appendAct(reloaded, request);
+  assert.equal(replay.status, 'committed');
+  assert.equal(replay.replayed, true, 'a retry after a lost acknowledgement returns the original entry');
+  assert.equal(replay.entry.requestId, request.requestId);
+  assert.equal(replay.entry.sequence, 1);
+  assert.equal(replay.state.log.length, 1, 'idempotent replay must not append a duplicate');
+
+  const conflictingRetry = appendAct(committed.state, { ...request, value: { free: 'different answer' } });
+  assert.equal(conflictingRetry.status, 'refused');
+  assert.equal(conflictingRetry.reason, 'request-id-conflict');
+  assert.equal(conflictingRetry.state, committed.state);
+
+  const reorderedRequest: ActAppendRequest = {
+    requestId: 'ordered-fields-1',
+    id: 'finding-ordered',
+    act: 'answered',
+    value: { free: 'same value' },
+    binding: {
+      chain: 'chain-A',
+      question: { chain: 'chain-A', serial: 1 },
+      subject: { chain: 'chain-A', serial: 1 },
+      questionRevision: 1,
+      payloadRef: 'payload-1',
+      basisRef: 'basis-1',
+    },
+  };
+  const ordered = appendAct(empty(), reorderedRequest);
+  assert.equal(ordered.status, 'committed');
+  const fieldsReordered: ActAppendRequest = {
+    requestId: reorderedRequest.requestId,
+    id: reorderedRequest.id,
+    act: reorderedRequest.act,
+    value: { free: 'same value' },
+    binding: {
+      basisRef: 'basis-1',
+      payloadRef: 'payload-1',
+      questionRevision: 1,
+      subject: { serial: 1, chain: 'chain-A' },
+      question: { serial: 1, chain: 'chain-A' },
+      chain: 'chain-A',
+    },
+  };
+  const orderedReplay = appendAct(JSON.parse(JSON.stringify(ordered.state)) as State, fieldsReordered);
+  assert.equal(orderedReplay.status, 'committed');
+  assert.equal(orderedReplay.replayed, true, 'object-key order does not change request identity');
+  const changedTimestamp = appendAct(ordered.state, { ...reorderedRequest, at: 'different-time' });
+  assert.equal(changedTimestamp.status, 'refused');
+  assert.equal(changedTimestamp.reason, 'request-id-conflict');
+
+  const next = appendAct(replay.state, { ...request, requestId: 'append-retry-2', id: 'finding-2' });
+  assert.equal(next.status, 'committed');
+  assert.equal(next.entry.sequence, 2, 'the next sequence follows the explicit frontier');
+}
 const id = (x: { id: string }): string => x.id;
 const P3 = 'f-p3-ownership',
   P4 = 'f-p4-portion-mark-absent',
@@ -94,6 +514,49 @@ const readyEvaluation = (b = basis()) => ({
   requirements: [],
   snapshotReady: true,
 });
+
+// A lost append acknowledgement cannot lose or duplicate the independently
+// recoverable host write: the exact committed token stays outstanding on replay.
+{
+  const question = f(P3);
+  const request: ActAppendRequest = {
+    requestId: 'recoverable-write-p3',
+    id: P3,
+    act: 'answered',
+    value: { reading: question.outcome.readings![0]!, index: 0 },
+    about: snapshot(question),
+  };
+  const committed = appendAct(empty(), request);
+  assert.equal(committed.status, 'committed');
+  const firstView = docView(doc, committed.state);
+  assert.ok(firstView.document.pending?.includes(P3), 'a committed answer still awaits host application');
+  assert.deepEqual(firstView.document.awaitingWrites, [writeToken(committed.entry)]);
+
+  const reloaded = JSON.parse(JSON.stringify(committed.state)) as State;
+  const retry = appendAct(reloaded, request);
+  assert.equal(retry.status, 'committed');
+  assert.equal(retry.replayed, true);
+  assert.deepEqual(retry.entry, JSON.parse(JSON.stringify(committed.entry)));
+  const recoveredView = docView(doc, retry.state);
+  assert.deepEqual(recoveredView.document.pending, firstView.document.pending);
+  assert.deepEqual(recoveredView.document.awaitingWrites, firstView.document.awaitingWrites);
+
+  const hostDocument: Doc = {
+    ...doc,
+    document: {
+      ...doc.document,
+      pending: ['host-pending', P3],
+      awaitingWrites: ['host-write:external', writeToken(committed.entry)],
+    },
+  };
+  const mergedView = docView(hostDocument, committed.state);
+  assert.deepEqual(mergedView.document.pending, ['host-pending', P3], 'host pending work survives projection');
+  assert.deepEqual(
+    mergedView.document.awaitingWrites,
+    ['host-write:external', writeToken(committed.entry)],
+    'host write intents survive and duplicate tokens are collapsed',
+  );
+}
 
 // One real host consumer path: an incomplete/stale engine result or an unmet requirement
 // cannot become ready through attention overlays; optional preview availability is separate.
@@ -441,6 +904,7 @@ const relint = {
   document: {
     ...done.document,
     blocking: [],
+    pending: [],
     evaluation: readyEvaluation(basis()),
     artifacts: done.document.artifacts.map(strip),
   },
