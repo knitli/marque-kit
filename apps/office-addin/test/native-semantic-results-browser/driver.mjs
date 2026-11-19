@@ -204,5 +204,59 @@ outcomes.push({
   canaries: 'clear',
 });
 
+await navigate('overlapping-refresh');
+await waitFor('document.querySelector("#pane")?.innerText.includes("CLASSIFIED BY")');
+await evaluate('window.publicReversalSmoke.delayNextDocumentCheck(); document.querySelector("#pane button")?.click()');
+await waitFor('window.publicReversalSmoke.activeDocumentIdPending');
+await evaluate('document.querySelector("#pane button")?.click()');
+await waitFor(
+  'window.publicReversalSmoke.calls.semanticRefresh === 1 && document.querySelector("#pane")?.innerText.includes("CLASSIFIED BY")',
+);
+await evaluate('window.publicReversalSmoke.releaseDelayedDocumentCheck()');
+await waitFor('!window.publicReversalSmoke.activeDocumentIdPending');
+current = await snapshot();
+assertNoPrivilegedCalls(current, 'overlapping-refresh-before-invalidation');
+if (current.calls.semanticInvalidationUnwatch !== 0)
+  throw Error(`overlapping-refresh: stale refresh removed B's watcher: ${JSON.stringify(current.calls)}`);
+await evaluate('window.publicReversalSmoke.invalidateSemantic?.()');
+await waitFor('!document.querySelector("#pane")?.innerText.includes("CLASSIFIED BY")');
+current = await snapshot();
+assertNoPrivilegedCalls(current, 'overlapping-refresh-invalidated');
+if (current.calls.semanticRefresh !== 1 || current.calls.currentSemanticRequest !== 2)
+  throw Error(`overlapping-refresh: invalidation caused a provider read: ${JSON.stringify(current.calls)}`);
+outcomes.push({
+  scenario: 'overlapping-refresh',
+  result: 'pass',
+  calls: current.calls,
+  newerWatcherSurvivedStaleAttempt: true,
+  invalidationClearedRows: true,
+  canaries: 'clear',
+});
+
+await navigate('malformed-grant');
+await waitFor('document.querySelector("#pane")?.innerText.includes("CLASSIFIED BY")');
+for (const kind of ['rows', 'coverage']) {
+  await evaluate(
+    `window.publicReversalSmoke.setMalformedGrant(${JSON.stringify(kind)}); document.querySelector("#pane button")?.click()`,
+  );
+  await waitFor(
+    `window.publicReversalSmoke.calls.semanticRefresh === ${kind === 'rows' ? 1 : 2} && window.publicReversalSmoke.calls.currentSemanticRequest === ${kind === 'rows' ? 2 : 3}`,
+  );
+  await waitFor('!document.querySelector("#pane")?.innerText.includes("CLASSIFIED BY")');
+  current = await snapshot();
+  assertNoPrivilegedCalls(current, `malformed-grant-${kind}`);
+  if (current.calls.semanticInvalidationUnwatch !== 0)
+    throw Error(`malformed-grant-${kind}: malformed response changed watcher state`);
+}
+outcomes.push({
+  scenario: 'malformed-grant',
+  result: 'pass',
+  calls: current.calls,
+  malformedRowsRejected: true,
+  malformedCoverageRejected: true,
+  staleRowsCleared: true,
+  canaries: 'clear',
+});
+
 console.log(JSON.stringify({ result: 'pass', route: 'built Word taskpane', scenarios: outcomes }, null, 2));
 ws.close();

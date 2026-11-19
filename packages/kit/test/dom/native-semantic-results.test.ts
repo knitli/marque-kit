@@ -136,4 +136,28 @@ describe('native semantic results read-only pane', () => {
     pane.destroy();
     n.remove();
   });
+
+  test('malformed host grant shape fails closed before reading row count', () => {
+    const malformed = [
+      { ...request, grant: { ...request.grant, rows: null } },
+      { ...request, grant: { ...request.grant, rows: { length: 4 } } },
+      { ...request, grant: { ...request.grant, coverage: 'true' } },
+    ];
+    for (const bad of malformed) {
+      expect(() =>
+        readNativeSemanticResults(
+          doc(),
+          bad as unknown as NativeSemanticResultsRequest,
+          context.principalRevision,
+        ),
+      ).not.toThrow();
+      expect(
+        readNativeSemanticResults(
+          doc(),
+          bad as unknown as NativeSemanticResultsRequest,
+          context.principalRevision,
+        ),
+      ).toBeNull();
+    }
+  });
 });

@@ -50,6 +50,7 @@
     providerOpenWord: 0,
     currentSemanticRequest: 0,
     semanticInvalidationWatch: 0,
+    semanticInvalidationUnwatch: 0,
     semanticRefresh: 0,
     cabScopeRead: 0,
     cabInvalidationWatch: 0,
@@ -77,6 +78,19 @@
     bootComplete: false,
     error: null,
     invalidateSemantic: null,
+    malformedGrant: null,
+    delayNextActiveDocumentIdCheck: false,
+    activeDocumentIdPending: false,
+    releaseDelayedActiveDocumentIdCheck: null,
+    delayNextDocumentCheck() {
+      this.delayNextActiveDocumentIdCheck = true;
+    },
+    releaseDelayedDocumentCheck() {
+      this.releaseDelayedActiveDocumentIdCheck?.();
+    },
+    setMalformedGrant(kind) {
+      this.malformedGrant = kind;
+    },
     advanceContext() {
       currentContext = {
         ...currentContext,
@@ -131,7 +145,7 @@
           documentId: initialContext.documentId,
           viewerId: initialContext.viewerId,
           nativeSemanticResults: snapshotFor(initialContext),
-          ...(['stale-session-retry', 'same-context-grant-change'].includes(scenario)
+          ...(['stale-session-retry', 'same-context-grant-change', 'overlapping-refresh', 'malformed-grant'].includes(scenario)
             ? {
                 async readNativeSemanticResults() {
                   calls.semanticRefresh++;
@@ -139,6 +153,8 @@
                     if (calls.semanticRefresh === 1) return snapshotFor(initialContext);
                     return snapshotFor(currentContext, currentGrantId);
                   }
+                  if (scenario === 'overlapping-refresh' || scenario === 'malformed-grant')
+                    return snapshotFor(currentContext, currentGrantId);
                   if (calls.semanticRefresh === 1) return snapshotFor(currentContext, currentGrantId, true);
                   if (calls.semanticRefresh === 2) return snapshotFor(currentContext, 'b2'.repeat(16), true);
                   return snapshotFor(currentContext, currentGrantId);
@@ -151,18 +167,43 @@
     wordHost: {
       async activeDocumentId() {
         calls.activeDocumentId++;
+        if (scenario === 'overlapping-refresh' && state.delayNextActiveDocumentIdCheck) {
+          state.delayNextActiveDocumentIdCheck = false;
+          state.activeDocumentIdPending = true;
+          return new Promise((resolve) => {
+            state.releaseDelayedActiveDocumentIdCheck = () => {
+              state.activeDocumentIdPending = false;
+              state.releaseDelayedActiveDocumentIdCheck = null;
+              resolve(initialContext.documentId);
+            };
+          });
+        }
         if (scenario === 'cross-document-decline' && calls.activeDocumentId === 1) return 'other-document';
         if (scenario === 'navigation-before-results-read' && calls.activeDocumentId > 1) return 'other-document';
         return initialContext.documentId;
       },
       async readNativeSemanticResultsRequest() {
         calls.currentSemanticRequest++;
-        return requestFor(currentContext);
+        const current = requestFor(currentContext);
+        if (state.malformedGrant === 'rows')
+          return { ...current, grant: { ...current.grant, rows: null } };
+        if (state.malformedGrant === 'coverage')
+          return { ...current, grant: { ...current.grant, coverage: 'true' } };
+        return current;
       },
       watchNativeSemanticResultsInvalidation(_documentId, _viewerId, invalidate) {
         calls.semanticInvalidationWatch++;
-        state.invalidateSemantic = invalidate;
-        return () => {};
+        let active = true;
+        const notify = () => {
+          if (active) invalidate();
+        };
+        state.invalidateSemantic = notify;
+        return () => {
+          if (!active) return;
+          active = false;
+          calls.semanticInvalidationUnwatch++;
+          if (state.invalidateSemantic === notify) state.invalidateSemantic = null;
+        };
       },
       async readNativeCabScope() {
         calls.cabScopeRead++;

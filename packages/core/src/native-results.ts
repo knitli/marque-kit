@@ -28,6 +28,21 @@ export interface NativeSemanticResultsRequest {
   };
 }
 
+/** Runtime guard for a host callback boundary; TypeScript types are not runtime validation. */
+export function isNativeSemanticResultsRequest(value: unknown): value is NativeSemanticResultsRequest {
+  if (value === null || typeof value !== 'object') return false;
+  const request = value as { current?: unknown; grant?: unknown };
+  if (
+    request.current === null ||
+    typeof request.current !== 'object' ||
+    request.grant === null ||
+    typeof request.grant !== 'object'
+  )
+    return false;
+  const grant = request.grant as { rows?: unknown; coverage?: unknown };
+  return Array.isArray(grant.rows) && typeof grant.coverage === 'boolean';
+}
+
 const sameContext = (a: NativeSemanticResultsContext, b: NativeSemanticResultsContext): boolean =>
   !!a &&
   !!b &&
@@ -53,13 +68,13 @@ const sameContext = (a: NativeSemanticResultsContext, b: NativeSemanticResultsCo
  */
 export function readNativeSemanticResults(
   doc: Doc,
-  request: NativeSemanticResultsRequest | undefined,
+  request: unknown,
   currentPrincipalRevision: string | undefined,
 ): NativeSemanticResultsEnvelope | null {
   const envelope = doc.document.native_semantic_results;
   if (
     !isParsedNativeSemanticResults(envelope) ||
-    !request ||
+    !isNativeSemanticResultsRequest(request) ||
     !sameContext(request.current, request.grant) ||
     currentPrincipalRevision !== request.current.principalRevision ||
     typeof request.grant.grantId !== 'string' ||

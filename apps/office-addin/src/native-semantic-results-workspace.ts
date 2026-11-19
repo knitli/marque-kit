@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { mount } from '@knitli/marque-kit';
+import { isNativeSemanticResultsRequest } from '@knitli/marque-kit-core/native-results';
 import { parseNativeSemanticResultsJson } from '@knitli/marque-kit-core/native-wire';
 import type { Doc } from '@knitli/marque-kit-core/types';
 import { isSameWordDocument } from './workspace.ts';
@@ -65,7 +66,9 @@ export function mountNativeSemanticResultsWorkspace(
     pane.update({ nativeSemanticResultsRequest: null, doc: snapshotDoc(undefined, maxBytes) });
     if (!eligible || !wordHost.readNativeSemanticResultsRequest) return;
     try {
-      if (!(await isSameWordDocument(wordHost, session)) || disposed || attempt !== generation) {
+      const sameDocument = await isSameWordDocument(wordHost, session);
+      if (disposed || attempt !== generation) return;
+      if (!sameDocument) {
         stopWatching();
         return;
       }
@@ -93,15 +96,22 @@ export function mountNativeSemanticResultsWorkspace(
         return;
       const currentRequest = await wordHost.readNativeSemanticResultsRequest(session.documentId, session.viewerId);
       const stillBound = await isSameWordDocument(wordHost, session);
-      const current = currentRequest?.current;
       if (
-        !currentRequest ||
-        !current ||
-        current.documentId !== session.documentId ||
-        current.viewerId !== session.viewerId ||
-        !stillBound ||
         disposed ||
         attempt !== generation
+      )
+        return;
+      if (!stillBound) {
+        stopWatching();
+        return;
+      }
+      if (!isNativeSemanticResultsRequest(currentRequest)) return;
+      const current = currentRequest.current;
+      if (
+        current.documentId !== session.documentId ||
+        current.viewerId !== session.viewerId ||
+        !session.documentId ||
+        !session.viewerId
       )
         return;
       const doc = snapshotDoc(next, maxBytes);
