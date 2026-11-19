@@ -215,11 +215,16 @@ describe('ordinary lint transformation receipts', () => {
       candidates: [{ observation: 0, span: [5, 10] }],
     } as unknown as NonNullable<Doc['document']['intake']>;
     const d: Doc = { ...memo, document: { ...memo.document, intake } };
-    const receipt = pane(d).querySelector<HTMLDetailsElement>('details.mq-transform-receipt')!;
+    const root = document.createElement('div');
+    document.body.append(root);
+    const mounted = mount(root, { doc: d, readOnly: true });
+    const receipt = root.querySelector<HTMLDetailsElement>('details.mq-transform-receipt')!;
     receipt.open = true;
     expect(receipt.querySelector('summary')?.textContent).toBe('Source transformations · incomplete · 1 of 3 retained');
     expect(receipt.textContent).toContain('Owning observation 0');
     expect(receipt.textContent).not.toContain('Owning observation 99');
+    mounted.destroy();
+    root.remove();
   });
 
   test('over-bound receipt arrays are not traversed', () => {
@@ -237,8 +242,13 @@ describe('ordinary lint transformation receipts', () => {
       candidates: [{ observation: 0, span: [0, 1] }],
     } as unknown as NonNullable<Doc['document']['intake']>;
     const d: Doc = { ...memo, document: { ...memo.document, intake } };
-    const summary = pane(d).querySelector('details.mq-transform-receipt summary')?.textContent;
+    const root = document.createElement('div');
+    document.body.append(root);
+    const mounted = mount(root, { doc: d, readOnly: true });
+    const summary = root.querySelector('details.mq-transform-receipt summary')?.textContent;
     expect(summary).toBe('Source transformations · incomplete · 0 of 8192 retained');
+    mounted.destroy();
+    root.remove();
   });
 });
 
