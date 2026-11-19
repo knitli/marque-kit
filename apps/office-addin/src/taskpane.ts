@@ -29,6 +29,7 @@ import { locate, paragraphAt, written } from './locate.ts';
 import { banner, edits, made, relint, undoneSubject } from './write.ts';
 import { isSameWordDocument } from './workspace.ts';
 import { mountNativeWorkspace } from './native-workspace.ts';
+import { mountOfficeSourceMarking } from './source-marking.ts';
 import type { OfficeCurrentEvaluation, OfficeNativeWordSession, OfficeWordSession } from './workspace.ts';
 
 /** In dev, what the pane would say to a console it doesn't have goes to the dev server's .dev.log. */
@@ -135,6 +136,12 @@ const selected = (): Promise<{ index: number; texts: string[]; head: string }> =
 
 void Office.onReady(async (info) => {
   if (info.host !== Office.HostType.Word) return;
+  if (window.marqueOfficeSourceMarking) {
+    const sourceRoot = document.createElement('section');
+    document.querySelector<HTMLElement>('#pane')!.before(sourceRoot);
+    const sourceView = mountOfficeSourceMarking(sourceRoot, window.marqueOfficeSourceMarking);
+    addEventListener('pagehide', () => sourceView.destroy(), { once: true });
+  }
   const installation = window.marqueOfficeWorkspace;
   if (installation) {
     let session: OfficeWordSession | OfficeNativeWordSession | null;

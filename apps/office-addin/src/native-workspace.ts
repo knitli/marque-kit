@@ -24,7 +24,7 @@ export function mountNativeWorkspace(
   session: OfficeNativeWordSession,
   wordHost: OfficeWordHost,
   maxBytes: number | undefined,
-) {
+): { readonly ready: Promise<void>; refresh(): Promise<void>; destroy(): void } {
   const container = document.createElement('div');
   const controls = document.createElement('div');
   root.replaceChildren(container, controls);
