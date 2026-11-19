@@ -12,7 +12,9 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dist = resolve(here, '../../dist');
-const fixture = resolve(here, '../../../../packages/kit/test/fixtures/native-semantic-results.fixture');
+const fixture = process.env.MARQUE_SEMANTIC_RESULTS_FIXTURE
+  ? resolve(process.env.MARQUE_SEMANTIC_RESULTS_FIXTURE)
+  : resolve(here, '../../../../packages/kit/test/fixtures/native-semantic-results.fixture');
 const profile = await mkdtemp(join(tmpdir(), 'marque-restricted-browser-'));
 const server = createServer(async (request, response) => {
   const path = new URL(request.url, 'http://localhost').pathname;
