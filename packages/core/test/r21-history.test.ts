@@ -19,9 +19,9 @@ import { disclosedMarking } from '../src/marking.ts';
 
 const doc = JSON.parse(readFileSync(new URL('../../../fixtures/memo.findings.json', import.meta.url), 'utf8')) as Doc;
 const f = structuredClone(doc.findings.find((x) => x.outcome.readings?.length)!);
-const secret = 'HISTORY_CONCEALED_CANARY_138';
-const text = `(S//${secret})`;
-const mark: MarkingInput = { text, masks: [{ kind: 'concealed', span: [4, 4 + secret.length] }] };
+const concealedText = 'HISTORY_CONCEALED_CANARY_138';
+const text = `(S//${concealedText})`;
+const mark: MarkingInput = { text, masks: [{ kind: 'concealed', span: [4, 4 + concealedText.length] }] };
 f.marking = { as_written: mark };
 f.outcome = {
   ...f.outcome,
@@ -51,14 +51,14 @@ const basis = {
 };
 f.evaluationBasis = basis;
 const about = snapshot(f);
-assert.ok(!JSON.stringify(about).includes(secret));
+assert.ok(!JSON.stringify(about).includes(concealedText));
 assert.ok(about.marking && about.result_marking && about.outcome?.fallback && Array.isArray(about.asks?.options));
 assert.equal(about.outcome.readings?.[0]?.asserts?.ref, 'opaque-ref');
 assert.equal(about.outcome.fallback.basis, 'safe-fallback-basis');
-assert.ok(!JSON.stringify(see(empty(), f)).includes(secret));
+assert.ok(!JSON.stringify(see(empty(), f)).includes(concealedText));
 const selected = { reading: f.outcome.readings![0]!, index: 0 };
 const value = disclosedActValue(selected)!;
-assert.ok(!JSON.stringify(value).includes(secret));
+assert.ok(!JSON.stringify(value).includes(concealedText));
 assert.equal(value.reading?.asserts?.ref, 'opaque-ref');
 assert.equal(canWriteAct(value), false);
 const raw: ActAppendRequest = {
@@ -75,13 +75,13 @@ const request = disclosedAppendRequest(raw);
 const committed = appendAct(empty(), request);
 assert.equal(committed.status, 'committed');
 if (committed.status !== 'committed') throw Error('expected committed');
-assert.ok(!JSON.stringify(committed).includes(secret));
+assert.ok(!JSON.stringify(committed).includes(concealedText));
 assert.equal(committed.entry.binding?.payloadRef, 'opaque-binding');
 assert.equal(committed.entry.binding?.basis?.sourceRevisions.source, 'opaque-revision');
 assert.equal(appendAcknowledgementIssue(request, committed), null);
 assert.equal(appendAct(committed.state, request).status, 'committed');
 const changedRaw = structuredClone(raw);
-changedRaw.value!.reading!.result!.text = text.replace(secret, 'DIFFERENT_CONCEALED_BYTES_13');
+changedRaw.value!.reading!.result!.text = text.replace(concealedText, 'DIFFERENT_CONCEALED_BYTES_13');
 assert.equal(appendAct(committed.state, changedRaw).status, 'refused');
 const kept: ActAppendRequest = { requestId: 'keep', id: f.id, act: 'kept_as_written', value: null, about, at: 't' };
 const keptResult = appendAct(empty(), kept);
@@ -121,9 +121,9 @@ assert.equal(conflicting.status, 'refused');
 if (conflicting.status === 'refused') assert.equal(conflicting.reason, 'request-id-conflict');
 
 // Identical masked displays never establish a relationship between hidden source identities.
-const otherSecret = 'DIFFERENT_SECRET_CANARY_1234';
-assert.equal(otherSecret.length, secret.length);
-const otherMark: MarkingInput = { ...mark, text: text.replace(secret, otherSecret) };
+const otherConcealedText = 'DIFFERENT_SECRET_CANARY_1234';
+assert.equal(otherConcealedText.length, concealedText.length);
+const otherMark: MarkingInput = { ...mark, text: text.replace(concealedText, otherConcealedText) };
 const otherWithoutBasis = { ...withoutBasis, marking: { as_written: otherMark } };
 if (simple.status === 'committed') {
   assert.equal(view(otherWithoutBasis, simple.state).stale, true);

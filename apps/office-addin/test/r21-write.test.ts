@@ -9,9 +9,9 @@ const read = (n: string): string => readFileSync(new URL(`../../../fixtures/${n}
 const doc = JSON.parse(read('memo.findings.json')) as Doc;
 const memo = read('memo.txt');
 const finding = doc.findings.find((f) => f.outcome.readings?.length && f.anchor?.span)!;
-const secret = 'WORD_SECRET_4783';
-const text = `(S//${secret})`;
-const masked: MarkingInput = { text, masks: [{ kind: 'concealed', span: [4, 4 + secret.length] }] };
+const concealedText = 'WORD_SECRET_4783';
+const text = `(S//${concealedText})`;
+const masked: MarkingInput = { text, masks: [{ kind: 'concealed', span: [4, 4 + concealedText.length] }] };
 const direct = structuredClone(doc);
 direct.findings = [{ ...finding, outcome: { ...finding.outcome, result: masked } }];
 assert.deepEqual(edits(direct, memo), [], 'masked output must not become an edit');
