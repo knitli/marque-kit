@@ -174,18 +174,10 @@ export type NativeSourceMarkingBinding = {
   viewer_id: string;
 };
 type SourceMarkingBody = { marking: Marking };
-export type NativeSourceMarkingView = SourceMarkingBody &
-  (
-    | {
-        schema: 'knitli.native-source-marking.v2';
-        binding: NativeSourceMarkingBinding;
-      }
-    | {
-        schema: 'knitli.native-source-marking.v1';
-        authorization: 'synthetic_test_adapter';
-        binding: NativeSourceMarkingBinding;
-      }
-  );
+export type NativeSourceMarkingView = SourceMarkingBody & {
+  schema: 'knitli.native-source-marking.v2';
+  binding: NativeSourceMarkingBinding;
+};
 
 const fail = (where: string): never => {
   throw new TypeError(`invalid native evaluation wire: ${where}`);
@@ -724,16 +716,12 @@ export function isParsedNativeSourceMarkingView(value: unknown): value is Native
 
 /** Parse a bounded read-only source view; offsets and mask lengths are rejected. */
 export function parseNativeSourceMarkingJson(text: string, maxBytes: number): NativeSourceMarkingView {
-  const raw = object(parseJson(text, maxBytes), 'source marking envelope');
-  const trustedSchema = raw.schema === 'knitli.native-source-marking.v2';
-  const syntheticSchema =
-    raw.schema === 'knitli.native-source-marking.v1' && raw.authorization === 'synthetic_test_adapter';
   const o = keys(
-    raw,
-    trustedSchema ? ['schema', 'binding', 'marking'] : ['schema', 'authorization', 'binding', 'marking'],
+    parseJson(text, maxBytes),
+    ['schema', 'binding', 'marking'],
     'source marking envelope',
   );
-  if (!trustedSchema && !syntheticSchema) fail('source marking scope');
+  if (o.schema !== 'knitli.native-source-marking.v2') fail('source marking scope');
   const b = keys(
     o.binding,
     ['chain_id', 'source_id', 'revision_id', 'contribution_id', 'scope_id', 'viewer_id'],
@@ -782,9 +770,7 @@ export function parseNativeSourceMarkingJson(text: string, maxBytes: number): Na
     layers: [{ tokens } as Layer],
     masks: [],
   };
-  const result: NativeSourceMarkingView = syntheticSchema
-    ? { schema: 'knitli.native-source-marking.v1', authorization: 'synthetic_test_adapter', binding, marking }
-    : { schema: 'knitli.native-source-marking.v2', binding, marking };
+  const result: NativeSourceMarkingView = { schema: 'knitli.native-source-marking.v2', binding, marking };
   freezeTree(result);
   acceptedSourceViews.add(result);
   return result;

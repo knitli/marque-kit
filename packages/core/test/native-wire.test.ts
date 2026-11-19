@@ -26,8 +26,7 @@ const doc: Doc = { findings: [], document: { blocking: [], artifacts: [], native
 
 void test('source marking wire is read-only, offset-free and keeps mask kinds distinct', () => {
   const source = {
-    schema: 'knitli.native-source-marking.v1',
-    authorization: 'synthetic_test_adapter',
+    schema: 'knitli.native-source-marking.v2',
     binding: {
       chain_id: 'review-chain',
       source_id: 'doc-1',
@@ -54,7 +53,7 @@ void test('source marking wire is read-only, offset-free and keeps mask kinds di
     (value: typeof source) => ((value.marking.layers[0]!.tokens[0]!.mask as Record<string, unknown>)['len'] = 4),
     (value: typeof source) => (value.marking.text = 'S SECRET-CANARY'),
     (value: typeof source) => (value.binding.viewer_id = ''),
-    (value: typeof source) => (value.authorization = 'host_authorized'),
+    (value: typeof source) => Object.assign(value, { authorization: 'host_authorized' }),
   ]) {
     const invalid = structuredClone(source);
     mutate(invalid);
@@ -72,7 +71,7 @@ void test('trusted source marking envelope carries no synthetic authorization cl
     new URL('./fixtures/native-source-marking-synthetic-v1.fixture', import.meta.url),
     'utf8',
   );
-  assert.equal(parseNativeSourceMarkingJson(syntheticText, 4096).schema, 'knitli.native-source-marking.v1');
+  assert.throws(() => parseNativeSourceMarkingJson(syntheticText, 4096), TypeError);
   const forged = JSON.parse(trustedText) as Record<string, unknown>;
   forged['authorization'] = 'host_authorized';
   assert.throws(() => parseNativeSourceMarkingJson(JSON.stringify(forged), 4096), TypeError);
