@@ -709,20 +709,65 @@ describe('host-acknowledged append', () => {
     for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
     box.append(root);
     document.body.append(box);
-    const prior = record(empty(), P2, 'kept_as_written', null, 't0', snapshot(f(P2)));
+    const rawControl = JSON.parse(
+      readFileSync(join(import.meta.dirname, '../../../../fixtures/joint-handle-inputs.json'), 'utf8'),
+    ) as {
+      input: {
+        act_history: {
+          coverage: { state: 'complete'; sequence_range: [number, number] };
+          ordered_acts: Array<Record<string, unknown>>;
+        };
+        append_request: { unsequenced_act: Record<string, unknown> };
+        caller_control: { watermarks: { act_sequence: number } };
+      };
+    };
+    const rawExpected = JSON.parse(
+      readFileSync(join(import.meta.dirname, '../../../../fixtures/joint-protocol-cases.json'), 'utf8'),
+    ) as { expected: { act_sequence: string; wrap_rounding_or_duplicate: boolean } };
+    const rawAct = rawControl.input.append_request.unsequenced_act;
+    const rawId = (act: Record<string, unknown>): string => {
+      const subject = act.subject as { chain: string; serial: number };
+      return `${subject.chain}/${subject.serial}`;
+    };
+    const rawBinding = (act: Record<string, unknown>): NonNullable<ActAppendRequest['binding']> => ({
+      chain: act.chain as string,
+      subject: act.subject as { chain: string; serial: number },
+      question: act.question as { chain: string; serial: number },
+      questionRevision: act.question_revision as number,
+      resultRevision: act.result_revision as number,
+      payloadRef: act.payload_ref as string,
+      sourceRevisions: act.source_revisions as string[],
+      basisRef: act.basis as string,
+      supersedes: act.supersedes as null,
+      takesBack: act.takes_back as null,
+    });
+    const prior: State = {
+      ...empty(),
+      log: rawControl.input.act_history.ordered_acts.map((act) => ({
+        sequence: act.sequence as number,
+        id: rawId(act),
+        act: act.action as ActAppendRequest['act'],
+        value: null,
+        at: 'prior',
+        binding: rawBinding(act),
+      })),
+      actSequence: rawControl.input.caller_control.watermarks.act_sequence,
+      actHistoryCoverage: {
+        state: rawControl.input.act_history.coverage.state,
+        sequenceRange: rawControl.input.act_history.coverage.sequence_range,
+      },
+    };
+    const requestBinding = rawBinding(rawAct);
     const initial: State = {
       ...prior,
-      actSequence: Number.MAX_SAFE_INTEGER,
-      actHistoryCoverage: { state: 'complete', sequenceRange: [1, 1] },
     };
     const host = inMemoryAppender(initial);
-    const binding = { documentId: 'memo-fixture', chain: 'chain-A' };
     const requests: ActAppendRequest[] = [];
     const dispatched: unknown[] = [];
     const p = mount(root, {
       doc: memo,
       state: initial,
-      actBinding: binding,
+      actBinding: requestBinding,
       onAppend: async (request) => {
         requests.push(request);
         return host.append(request);
@@ -732,20 +777,31 @@ describe('host-acknowledged append', () => {
       },
     });
 
-    await clickAnswer(root, p);
+    // Drive the same mounted action route as the visible controls with the
+    // raw14 subject/action/binding. The fixture's raw sequence is null; the
+    // host, not the pane, owns checked allocation.
+    p.host.onAct?.({ ...f(P3), id: rawId(rawAct) }, 'answered', null);
     await flushAppend();
 
     expect(requests).toHaveLength(1);
-    expect(requests[0]?.binding).toEqual(binding);
+    expect(requests[0]?.id).toBe(rawId(rawAct));
+    expect(requests[0]?.act).toBe(rawAct.action);
+    expect(requests[0]?.value).toBeNull();
+    expect(requests[0]?.binding).toMatchObject(requestBinding);
     expect(host.state.log).toEqual(initial.log);
-    expect(host.state.actSequence).toBe(Number.MAX_SAFE_INTEGER);
+    expect(host.state.actSequence).toBe(rawControl.input.caller_control.watermarks.act_sequence);
+    expect(host.state.actHistoryCoverage).toEqual(initial.actHistoryCoverage);
     expect(host.state.pendingAppends).toHaveLength(1);
     expect(host.state.pendingAppends?.[0]).toMatchObject({
-      id: P3,
+      id: rawId(rawAct),
       sequence: null,
       state: 'pending_sequence',
       reason: 'sequence-exhausted',
     });
+    expect(host.state.pendingAppends?.[0]?.binding).toMatchObject(requestBinding);
+    expect(rawExpected.expected.act_sequence).toBe('exhausted');
+    expect(rawExpected.expected.wrap_rounding_or_duplicate).toBe(false);
+    expect(host.state.log.length > initial.log.length).toBe(rawExpected.expected.wrap_rounding_or_duplicate);
     expect(p.view()!.findings.find((x) => x.id === P3)?.asks).toBeTruthy();
     expect(root.querySelector('.mq-undo')).toBeNull();
     expect(root.textContent).toContain('This action remains pending outside history and has not been applied.');
