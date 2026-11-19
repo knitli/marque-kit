@@ -941,7 +941,9 @@ function nativeCab(doc: Doc, host: Host): HTMLElement {
         el(
           'span',
           'mq-p',
-          finding.outcome === 'needs_fact' ? 'Additional information is needed.' : 'Finding outcome is unavailable.',
+          finding.outcome === 'needs_fact'
+            ? 'Finding reports: Additional information is needed.'
+            : 'Finding outcome is unavailable.',
         ),
       );
       if (!finding.question) row.append(el('span', 'mq-p', 'Question identity is unavailable.'));

@@ -96,13 +96,34 @@ export function readCabSnapshot(doc: Doc, request: NativeCabRequest): NativeEval
   if (envelope.version === 2) {
     const v = envelope.evaluation;
     if (!request.expectedChain || v.chain !== request.expectedChain) return null;
+    const artifactIds = new Set<string>();
+    for (const artifact of v.artifacts) {
+      if (!artifact.id) continue;
+      if (
+        artifact.id.chain !== v.chain ||
+        Number(artifact.id.serial) === 0 ||
+        Number(artifact.id.serial) > Number(v.handles.last_artifact) ||
+        artifactIds.has(artifact.id.serial)
+      )
+        return null;
+      artifactIds.add(artifact.id.serial);
+    }
+    const questionIds = new Set<string>();
+    const subjectIds = new Set<string>();
     for (const f of v.findings.items) {
       if (
+        Number(f.subject.serial) === 0 ||
+        subjectIds.has(f.subject.serial) ||
         Number(f.subject.serial) > Number(v.handles.last_subject) ||
         (f.question &&
-          (Number(f.question.serial) > Number(v.handles.last_question) ||
+          (Number(f.question.serial) === 0 ||
+            Number(f.question.revision) === 0 ||
+            questionIds.has(f.question.serial) ||
+            Number(f.question.serial) > Number(v.handles.last_question) ||
             Number(f.question.revision) > Number(v.handles.last_question_revision))) ||
-        (f.result_revision !== null && Number(f.result_revision) > Number(v.handles.last_result_revision))
+        (f.result_revision !== null &&
+          (Number(f.result_revision) === 0 || Number(f.result_revision) > Number(v.handles.last_result_revision))) ||
+        (f.result && Number(f.result.serial) === 0)
       )
         return null;
       if (
@@ -110,6 +131,8 @@ export function readCabSnapshot(doc: Doc, request: NativeCabRequest): NativeEval
         (f.result && (f.result.subject_chain !== f.subject.chain || f.result.subject_serial !== f.subject.serial))
       )
         return null;
+      subjectIds.add(f.subject.serial);
+      if (f.question) questionIds.add(f.question.serial);
       if (f.question && f.requested_action) return null;
       const meaning = f.question?.meaning ?? f.requested_action;
       if (

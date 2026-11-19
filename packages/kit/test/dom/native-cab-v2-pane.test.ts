@@ -187,4 +187,77 @@ describe('native v2 read-only pane', () => {
     expect(root.textContent).not.toContain('Additional information is needed.');
     pane.destroy();
   });
+  test('rejects contradictory requirement states and unbound artifact identities', () => {
+    const original = JSON.parse(raw('funded'));
+    for (const mutate of [
+      (x: typeof original) => {
+        x.evaluation.artifacts[0].id.chain = 'foreign';
+      },
+      (x: typeof original) => {
+        x.evaluation.artifacts[0].id.serial = '9007199254740991';
+      },
+    ]) {
+      const x = structuredClone(original);
+      mutate(x);
+      const { doc, request } = setup(JSON.stringify(x));
+      expect(readCabSnapshot(doc, request)).toBeNull();
+      const root = document.createElement('div');
+      const pane = mount(root, { doc, nativeCabRequest: request });
+      expect(root.textContent).not.toContain('Additional information is needed.');
+      expect(root.textContent).toContain('evaluation is unavailable');
+      pane.destroy();
+    }
+    const partial = structuredClone(original);
+    partial.evaluation.requirements[0].state = 'unresolved';
+    partial.evaluation.findings.items[0].result_revision = null;
+    const { doc, request } = setup(JSON.stringify(partial));
+    expect(readCabSnapshot(doc, request)).not.toBeNull();
+  });
+  test('preserves the finding alongside a separately reported satisfied requirement', () => {
+    const x = JSON.parse(raw('funded'));
+    x.evaluation.requirements[0].state = 'satisfied';
+    const { doc, request } = setup(JSON.stringify(x));
+    const root = document.createElement('div');
+    const pane = mount(root, { doc, nativeCabRequest: request });
+    expect(root.textContent).toContain('satisfied');
+    expect(root.textContent?.match(/Finding reports: Additional information is needed/g)).toHaveLength(3);
+    pane.destroy();
+  });
+  test('rejects zero and reused represented identifiers', () => {
+    const original = JSON.parse(raw('funded'));
+    for (const mutate of [
+      (x: typeof original) => {
+        x.evaluation.findings.items[0].subject.serial = '0';
+      },
+      (x: typeof original) => {
+        x.evaluation.findings.items[0].question.serial = '0';
+      },
+      (x: typeof original) => {
+        x.evaluation.findings.items[0].question.revision = '0';
+      },
+      (x: typeof original) => {
+        x.evaluation.findings.items[0].result.serial = '0';
+      },
+      (x: typeof original) => {
+        x.evaluation.findings.items[0].result_revision = '0';
+      },
+      (x: typeof original) => {
+        x.evaluation.artifacts[0].id.serial = '0';
+      },
+      (x: typeof original) => {
+        x.evaluation.findings.items[1].question.serial = x.evaluation.findings.items[0].question.serial;
+      },
+      (x: typeof original) => {
+        const a = x.evaluation.findings.items;
+        a[1].subject.serial = a[0].subject.serial;
+        a[1].question.subject.serial = a[0].subject.serial;
+        a[1].result.subject_serial = a[0].subject.serial;
+      },
+    ]) {
+      const x = structuredClone(original);
+      mutate(x);
+      const { doc, request } = setup(JSON.stringify(x));
+      expect(readCabSnapshot(doc, request)).toBeNull();
+    }
+  });
 });
