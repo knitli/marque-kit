@@ -143,13 +143,35 @@ describe('native v2 read-only pane', () => {
       pane.destroy();
     },
   );
-  test.each(['subject-serial-max', 'result-serial-max'])('retains real allocated rows at %s', (name) => {
-    const { doc, request } = setup(raw(name));
+  test.each([
+    ['subject-serial-below-max', 2],
+    ['subject-serial-max', 1],
+  ] as const)('retains each finding when the subject watermark reaches %s', (name, issued) => {
+    const { e, doc, request } = setup(raw(name));
+    expect(readCabSnapshot(doc, request)).not.toBeNull();
+    const findings = e.evaluation.findings.items;
+    expect(findings).toHaveLength(3);
+    expect(findings.filter((row) => row.identity.status === 'issued')).toHaveLength(issued);
+    for (const row of findings.slice(issued)) {
+      expect(row.identity).toEqual({ status: 'unavailable', reason: 'subject_serial_exhausted' });
+      expect(row.requirement.status).toBe('resolved');
+      expect(row.requested_action?.requested_fact).toBeTruthy();
+      expect([row.question, row.result, row.result_revision]).toEqual([null, null, null]);
+    }
+    const root = document.createElement('div');
+    const pane = mount(root, { doc, nativeCabRequest: request });
+    expect(root.textContent?.match(/Additional information is needed/g)).toHaveLength(3);
+    expect(root.textContent?.match(/Finding identity is unavailable/g)).toHaveLength(3 - issued);
+    expect(root.querySelector('button')).toBeNull();
+    pane.destroy();
+  });
+  test('retains the issued result and reports exhausted result identities', () => {
+    const { doc, request } = setup(raw('result-serial-max'));
     expect(readCabSnapshot(doc, request)).not.toBeNull();
     const root = document.createElement('div');
     const pane = mount(root, { doc, nativeCabRequest: request });
     expect(root.textContent).toContain('Additional information is needed.');
-    if (name === 'result-serial-max') expect(root.textContent).toContain('Result identity is unavailable.');
+    expect(root.textContent).toContain('Result identity is unavailable.');
     pane.destroy();
   });
   test('independently missing result identities stay unresolved and invalid formats fail closed', () => {
@@ -458,14 +480,9 @@ describe('native v2 read-only pane', () => {
     expect(root.textContent).not.toContain('Additional information is needed.');
     pane.destroy();
   });
-  test('keeps a satisfied requirement separate from remaining native findings', () => {
-    const x = JSON.parse(raw('funded'));
-    x.evaluation.requirements[0].state = 'satisfied';
-    x.evaluation.findings.items = x.evaluation.findings.items.filter(
-      (finding: { requirement: { status: string; index?: string } }) =>
-        finding.requirement.status !== 'resolved' || finding.requirement.index !== '0',
-    );
-    const { e, doc, request } = setup(JSON.stringify(x));
+  test('shows the satisfied field and two remaining findings from the fresh producer revision', () => {
+    const { e, doc, request } = setup(raw('post-write'));
+    expect(request.target.revision_id).toBe('r2');
     expect(readCabSnapshot(doc, request)).not.toBeNull();
     expect(e.evaluation.requirements.find((r) => r.field === 'classified_by')?.state).toBe('satisfied');
     expect(e.evaluation.findings.items.some((f) => f.question?.field === 'classified_by')).toBe(false);

@@ -1,5 +1,3 @@
-Source: /private/tmp/r21-finding-identity-wire-b03/replacement/fixtures/subject-exhausted-identity.json
-Fixture SHA-256: d64e4d16da374539f7220e29b90fae68d32a76bcbfa06c4dd78dd863ef00ab88
-Producer snapshot: b03 source/lib.rs SHA-256 e001019d0a68170f0466d2ba6320ef0405183066f7c17db2c7de505308032f7c
-Producer snapshot: b03 src/joint_identity.rs SHA-256 1828f1d971f6945d041bf6e587c166cce9ce1f520d0e25dea74afb702549d18c
-Status: direct Rust output from b03; CAB reports staging-048 output byte-matches it while final frozen-source replay is pending.
+Producer fixture: replacement/fixtures/subject-exhausted-identity.json
+Producer test: replacement/native-wire/tests/findings_v2.rs, actual_subject_exhaustion_retains_requirement_and_action_without_addressable_work
+SHA-256: d64e4d16da374539f7220e29b90fae68d32a76bcbfa06c4dd78dd863ef00ab88
