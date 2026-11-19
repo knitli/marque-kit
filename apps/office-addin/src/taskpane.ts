@@ -21,7 +21,7 @@ import '@knitli/marque-kit/kit.css';
 import { mount } from '@knitli/marque-kit';
 import { button, el } from '@knitli/marque-kit/marking';
 import { sameBasis } from '@knitli/marque-kit-core/state';
-import type { Doc, State, Subject, Vocab } from '@knitli/marque-kit-core/types';
+import type { Doc, LogEntry, State, Subject, Vocab } from '@knitli/marque-kit-core/types';
 import findingsUrl from '../../../fixtures/memo.findings.json?url';
 import vocabUrl from '../../../fixtures/memo.vocab.json?url';
 import memo from '../../../fixtures/memo.txt?raw';
@@ -291,12 +291,19 @@ function mountWorkspace(
   let basis = session.basis;
   let queue = Promise.resolve();
   const pendingRecovery = new Set<string>();
+  const recoveryEntries = new Map<string, Pick<LogEntry, 'binding'>>();
   let pane!: ReturnType<typeof mount>;
   const stillBound = () => isSameWordDocument(wordHost, session);
   const applyPending = async (requestId: string): Promise<void> => {
     if (!(await stillBound())) throw new Error('Switch back to the document this action belongs to, then retry.');
-    const entry = (await session.pendingWrites()).find((item) => item.requestId === requestId);
-    if (!entry) return; // The provider has already durably completed its write and evaluation.
+    let entry = recoveryEntries.get(requestId);
+    if (!entry) {
+      const pending = (await session.pendingWrites()).find((item) => item.requestId === requestId);
+      if (!pending) return; // Some actions require no physical write.
+      // A lost evaluation reply can leave the provider's pending list empty on retry.
+      entry = { binding: structuredClone(pending.binding) };
+      recoveryEntries.set(requestId, entry);
+    }
     if (
       entry.binding?.documentId !== session.documentId ||
       entry.binding.chain !== session.chain ||
@@ -306,6 +313,8 @@ function mountWorkspace(
       throw new Error('This pending action no longer matches the document and evaluation it was taken on.');
     const ack = await session.applyCommitted(requestId, wordHost);
     if (
+      typeof ack.acknowledgement !== 'string' ||
+      !ack.acknowledgement.trim() ||
       ack.requestId !== requestId ||
       ack.documentId !== session.documentId ||
       !sameBasis(ack.basis, entry.binding.basis) ||
@@ -340,6 +349,7 @@ function mountWorkspace(
       .then(() => applyPending(requestId))
       .then(
         () => {
+          recoveryEntries.delete(requestId);
           failedRequestIds.delete(requestId);
           pendingRecovery.delete(requestId);
           if (!failedRequestIds.size && !recoveryScanFailed) {
