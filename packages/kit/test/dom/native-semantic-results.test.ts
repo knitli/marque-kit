@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test, vi } from 'vite-plus/test';
 import { parseNativeSemanticResultsJson } from '@knitli/marque-kit-core/native-wire';
-import { readNativeSemanticResults } from '@knitli/marque-kit-core/native-results';
+import { isNativeSemanticResultsRequest, readNativeSemanticResults } from '@knitli/marque-kit-core/native-results';
 import type { NativeSemanticResultsRequest } from '@knitli/marque-kit-core/native-results';
 import type { Doc } from '@knitli/marque-kit-core/types';
 import { mountNativeSemanticResultsWorkspace } from '../../../../apps/office-addin/src/native-semantic-results-workspace.ts';
@@ -55,6 +55,7 @@ describe('native semantic results read-only pane', () => {
       onAppend,
       onAct,
     });
+    expect(pane.view()?.document.native_semantic_results).toEqual(parsed());
     expect(n.textContent).toContain('4 selected result rows');
     expect(n.textContent).toContain('Classified by');
     expect(n.textContent).toContain('Classification reason');
@@ -144,19 +145,12 @@ describe('native semantic results read-only pane', () => {
       { ...request, grant: { ...request.grant, coverage: 'true' } },
     ];
     for (const bad of malformed) {
+      expect(isNativeSemanticResultsRequest(bad)).toBe(false);
       expect(() =>
-        readNativeSemanticResults(
-          doc(),
-          bad as unknown as NativeSemanticResultsRequest,
-          context.principalRevision,
-        ),
+        readNativeSemanticResults(doc(), bad as unknown as NativeSemanticResultsRequest, context.principalRevision),
       ).not.toThrow();
       expect(
-        readNativeSemanticResults(
-          doc(),
-          bad as unknown as NativeSemanticResultsRequest,
-          context.principalRevision,
-        ),
+        readNativeSemanticResults(doc(), bad as unknown as NativeSemanticResultsRequest, context.principalRevision),
       ).toBeNull();
     }
   });

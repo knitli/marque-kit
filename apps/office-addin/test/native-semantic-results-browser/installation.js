@@ -145,7 +145,9 @@
           documentId: initialContext.documentId,
           viewerId: initialContext.viewerId,
           nativeSemanticResults: snapshotFor(initialContext),
-          ...(['stale-session-retry', 'same-context-grant-change', 'overlapping-refresh', 'malformed-grant'].includes(scenario)
+          ...(['stale-session-retry', 'same-context-grant-change', 'overlapping-refresh', 'malformed-grant'].includes(
+            scenario,
+          )
             ? {
                 async readNativeSemanticResults() {
                   calls.semanticRefresh++;
@@ -185,10 +187,8 @@
       async readNativeSemanticResultsRequest() {
         calls.currentSemanticRequest++;
         const current = requestFor(currentContext);
-        if (state.malformedGrant === 'rows')
-          return { ...current, grant: { ...current.grant, rows: null } };
-        if (state.malformedGrant === 'coverage')
-          return { ...current, grant: { ...current.grant, coverage: 'true' } };
+        if (state.malformedGrant === 'rows') return { ...current, grant: { ...current.grant, rows: null } };
+        if (state.malformedGrant === 'coverage') return { ...current, grant: { ...current.grant, coverage: 'true' } };
         return current;
       },
       watchNativeSemanticResultsInvalidation(_documentId, _viewerId, invalidate) {

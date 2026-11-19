@@ -96,11 +96,7 @@ export function mountNativeSemanticResultsWorkspace(
         return;
       const currentRequest = await wordHost.readNativeSemanticResultsRequest(session.documentId, session.viewerId);
       const stillBound = await isSameWordDocument(wordHost, session);
-      if (
-        disposed ||
-        attempt !== generation
-      )
-        return;
+      if (disposed || attempt !== generation) return;
       if (!stillBound) {
         stopWatching();
         return;
