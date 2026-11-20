@@ -33,6 +33,18 @@ On every open, the provider includes the exact outstanding staged and refused re
 
 The provider and Word host must be installed by the trusted host integration before the task pane starts. Without them, only the sample route is available. The Word manifest still targets localhost until a hosting destination is selected.
 
+### Ordinary authority-block placement
+
+A trusted installation can open an `OfficeNativeCabPlacementSession` (`kind: 'native_cab_placement'`) for an ordinary Word document without supplying a CAB policy evaluation. Its read-only `inspectCabPlacement(text, requestJson)` calls the engine's `inspect_cab_placement` native or WASM entry point. The session and the host must be bound to the active document; a provider session alone does not grant placement access.
+
+The host's `readNativeCabPlacementScope` independently supplies the current document, revision, contribution, exclusively owned target byte scope, designated owner face, layout revision and source text. The source text is exactly Word body paragraphs joined by `\n`; offsets are half-open UTF-8 bytes into those exact bytes. The pane discovers retained candidate, label and value spans from the engine and binds a field only when its entire candidate lies inside that exclusive grant. Shared or uncertain ownership remains unavailable. Face pages are physical, 1-based Word page indexes, not printed page numbers. Sibling documents and attachments need their own explicit owner and scope; candidate proximity and matching text do not choose one.
+
+The pane maps the entire label-through-value range back to Word and gives the engine the pages Word observes. It reads the independent scope again around the Word read and engine comparison. The host's `watchNativeCabInvalidation` must revoke the view before any document, revision, authorization, provider, pagination or formatting change can be displayed, including reflow with unchanged text. An integration that cannot guarantee this must not expose the capability. Placement is a read-only observation, not a policy verdict, a write confirmation, or document readiness.
+
+Word's page API requires `WordApiDesktop 1.2`; unsupported hosts and unresolved, stale or incomplete evidence stay unavailable. The Word reader bounds source text to 1 MiB, bindings to 256, paragraphs to 16,384, matches to 256 per anchor and pages to 512 per field. The native inspector separately bounds its source and request to 256 KiB each. Empty-value fields and Word ranges it cannot map exactly are unknown. These bounds and the requirement to observe the complete page range avoid turning partial evidence into placement confirmation.
+
+On macOS, after building the Node-targeted engine WASM package, run the saved-file Word probe with `node --conditions=source apps/office-addin/test/cab-word-readback/run.mjs /absolute/path/to/marque_wasm.js`; see [the probe](test/cab-word-readback/run.mjs). It uses an isolated fictional document and Apple Events. It does not qualify Office.js event delivery or an installed trusted host provider.
+
 ## Run it in Word
 
 1. Trust a localhost certificate, once. This adds a certificate to your keychain, so it's yours to run:
