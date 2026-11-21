@@ -512,11 +512,16 @@ export type IntakeCandidateEvidence =
       polarity: 'supports';
       category: IntakeForeignOwnerCategory;
     }
-  | { kind: 'unresolved_owner'; span: [number, number]; polarity: 'opposes_well_formedness' }
+  | {
+      kind: 'unresolved_owner' | 'unexamined_control_token';
+      span: [number, number];
+      polarity: 'opposes_well_formedness';
+    }
   | { kind: 'known_classification_lexeme' | 'known_no_foreign_control'; span: [number, number]; polarity: 'supports' };
 
 export type IntakeSemanticValue =
   | { kind: 'classification'; classification: string }
+  | { kind: 'receive' | 'show' | 'unknown_audience_member' | 'known_empty_foreign_receive' }
   | { kind: 'no_foreign' }
   | { kind: 'originator_controlled' };
 
@@ -526,6 +531,7 @@ export interface IntakeSourceOccurrence {
   span: [number, number];
   outcome: string;
   value: IntakeSemanticValue | null;
+  reason?: string;
 }
 
 export interface IntakeSemanticClaim {
@@ -533,14 +539,17 @@ export interface IntakeSemanticClaim {
   value: IntakeSemanticValue;
 }
 
-export interface IntakeAudienceClaim {
+export type IntakeAudienceClaim = {
   claim: number;
   source_group: number;
-  kind: 'receive';
-  member: 'USA' | (string & {});
-  support: 'authored' | 'implied_usa' | (string & {});
-  occurrence: number | null;
-}
+} & (
+  | { kind: 'receive' | 'show'; member: string }
+  | { kind: 'unknown_member' | 'known_empty_foreign_receive'; member: null }
+) &
+  (
+    | { support: 'authored' | 'rel_receive_implies_show' | 'eyes_receive_implies_show'; occurrence: number }
+    | { support: 'implied_usa' | 'examined_absence'; occurrence: null }
+  );
 
 export interface IntakeAudienceEvidence {
   status: 'complete' | 'partial' | 'unavailable' | (string & {});
