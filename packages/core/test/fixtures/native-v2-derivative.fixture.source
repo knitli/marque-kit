@@ -1,0 +1,4 @@
+Engine commit: 5c05980c39ac8825433b52104657936a05703281
+Producer: replacement/native-wire/examples/cab_wire_caller.rs, derivative-v2 scenario
+Command from engine root: cargo run --locked --offline --manifest-path replacement/Cargo.toml -p capco-rust-native-wire --example cab_wire_caller -- derivative-v2
+SHA-256: 273de6636b658a96e673a50466a701bc85ca232eebfad83069110a9422aa0fb4

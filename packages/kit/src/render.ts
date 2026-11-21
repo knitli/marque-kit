@@ -1163,6 +1163,7 @@ const CAB_FIELD_LABEL: Record<NativeField, string> = {
   classified_by: 'Classified by',
   agency_and_office_of_origin: 'Agency and office of origin',
   classification_reason: 'Classification reason',
+  derived_from: 'Derived from',
   declassify_on: 'Declassify on',
 };
 const RESULT_SUPPORT_LABEL: Record<NativeSemanticResultSupportKind, string> = {
