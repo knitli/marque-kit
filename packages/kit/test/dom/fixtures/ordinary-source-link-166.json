@@ -16,34 +16,22 @@
         "contribution_id": "body",
         "role": "transmittal",
         "parent_document_id": null,
-        "intrinsic_classification_locator": [
-          1,
-          2
-        ]
+        "intrinsic_classification_locator": [1, 2]
       },
       "cab_inspection": {
         "basis": {
           "document_id": "synthetic-target",
           "revision_id": "r1",
           "contribution_id": "body",
-          "scope_locator": [
-            0,
-            125
-          ]
+          "scope_locator": [0, 125]
         },
         "target": {
           "document_id": "synthetic-target",
           "revision_id": "r1",
           "contribution_id": "body",
-          "scope_locator": [
-            0,
-            125
-          ]
+          "scope_locator": [0, 125]
         },
-        "candidate": [
-          57,
-          124
-        ],
+        "candidate": [57, 124],
         "face_page": 1,
         "layout_revision": "layout-1",
         "source_facts": [
@@ -74,16 +62,11 @@
                 "document_id": "synthetic-target",
                 "revision_id": "r1",
                 "contribution_id": "body",
-                "scope_locator": [
-                  0,
-                  125
-                ]
+                "scope_locator": [0, 125]
               },
               "face_page": 1,
               "layout_revision": "layout-1",
-              "pages": [
-                1
-              ]
+              "pages": [1]
             }
           },
           {
@@ -96,16 +79,11 @@
                 "document_id": "synthetic-target",
                 "revision_id": "r1",
                 "contribution_id": "body",
-                "scope_locator": [
-                  0,
-                  125
-                ]
+                "scope_locator": [0, 125]
               },
               "face_page": 1,
               "layout_revision": "layout-1",
-              "pages": [
-                1
-              ]
+              "pages": [1]
             }
           },
           {
@@ -113,34 +91,20 @@
             "coverage": "complete",
             "state": "present",
             "occurrence": {
-              "candidate": [
-                57,
-                124
-              ],
-              "label": [
-                57,
-                70
-              ],
-              "value": [
-                72,
-                80
-              ]
+              "candidate": [57, 124],
+              "label": [57, 70],
+              "value": [72, 80]
             },
             "readback": {
               "target": {
                 "document_id": "synthetic-target",
                 "revision_id": "r1",
                 "contribution_id": "body",
-                "scope_locator": [
-                  0,
-                  125
-                ]
+                "scope_locator": [0, 125]
               },
               "face_page": 1,
               "layout_revision": "layout-1",
-              "pages": [
-                1
-              ]
+              "pages": [1]
             }
           },
           {
@@ -148,34 +112,20 @@
             "coverage": "complete",
             "state": "present",
             "occurrence": {
-              "candidate": [
-                57,
-                124
-              ],
-              "label": [
-                81,
-                108
-              ],
-              "value": [
-                110,
-                124
-              ]
+              "candidate": [57, 124],
+              "label": [81, 108],
+              "value": [110, 124]
             },
             "readback": {
               "target": {
                 "document_id": "synthetic-target",
                 "revision_id": "r1",
                 "contribution_id": "body",
-                "scope_locator": [
-                  0,
-                  125
-                ]
+                "scope_locator": [0, 125]
               },
               "face_page": 1,
               "layout_revision": "layout-1",
-              "pages": [
-                1
-              ]
+              "pages": [1]
             }
           }
         ]
@@ -187,15 +137,9 @@
       "document_id": "synthetic-target",
       "revision_id": "r1",
       "contribution_id": "body",
-      "scope_locator": [
-        0,
-        125
-      ]
+      "scope_locator": [0, 125]
     },
-    "intrinsic_classification_locator": [
-      1,
-      2
-    ],
+    "intrinsic_classification_locator": [1, 2],
     "regime": {
       "coverage": "complete",
       "locator": "exam:regime",
@@ -237,34 +181,22 @@
         "contribution_id": "body",
         "role": "transmittal",
         "parent_document_id": null,
-        "intrinsic_classification_locator": [
-          1,
-          2
-        ]
+        "intrinsic_classification_locator": [1, 2]
       },
       "cab_inspection": {
         "basis": {
           "document_id": "source-document-a",
           "revision_id": "REV-1",
           "contribution_id": "body",
-          "scope_locator": [
-            0,
-            164
-          ]
+          "scope_locator": [0, 164]
         },
         "target": {
           "document_id": "source-document-a",
           "revision_id": "REV-1",
           "contribution_id": "body",
-          "scope_locator": [
-            0,
-            164
-          ]
+          "scope_locator": [0, 164]
         },
-        "candidate": [
-          96,
-          163
-        ],
+        "candidate": [96, 163],
         "face_page": 1,
         "layout_revision": "layout-1",
         "source_facts": [
@@ -295,16 +227,11 @@
                 "document_id": "source-document-a",
                 "revision_id": "REV-1",
                 "contribution_id": "body",
-                "scope_locator": [
-                  0,
-                  164
-                ]
+                "scope_locator": [0, 164]
               },
               "face_page": 1,
               "layout_revision": "layout-1",
-              "pages": [
-                1
-              ]
+              "pages": [1]
             }
           },
           {
@@ -317,16 +244,11 @@
                 "document_id": "source-document-a",
                 "revision_id": "REV-1",
                 "contribution_id": "body",
-                "scope_locator": [
-                  0,
-                  164
-                ]
+                "scope_locator": [0, 164]
               },
               "face_page": 1,
               "layout_revision": "layout-1",
-              "pages": [
-                1
-              ]
+              "pages": [1]
             }
           },
           {
@@ -334,34 +256,20 @@
             "coverage": "complete",
             "state": "present",
             "occurrence": {
-              "candidate": [
-                96,
-                163
-              ],
-              "label": [
-                96,
-                109
-              ],
-              "value": [
-                111,
-                119
-              ]
+              "candidate": [96, 163],
+              "label": [96, 109],
+              "value": [111, 119]
             },
             "readback": {
               "target": {
                 "document_id": "source-document-a",
                 "revision_id": "REV-1",
                 "contribution_id": "body",
-                "scope_locator": [
-                  0,
-                  164
-                ]
+                "scope_locator": [0, 164]
               },
               "face_page": 1,
               "layout_revision": "layout-1",
-              "pages": [
-                1
-              ]
+              "pages": [1]
             }
           },
           {
@@ -369,34 +277,20 @@
             "coverage": "complete",
             "state": "present",
             "occurrence": {
-              "candidate": [
-                96,
-                163
-              ],
-              "label": [
-                120,
-                147
-              ],
-              "value": [
-                149,
-                163
-              ]
+              "candidate": [96, 163],
+              "label": [120, 147],
+              "value": [149, 163]
             },
             "readback": {
               "target": {
                 "document_id": "source-document-a",
                 "revision_id": "REV-1",
                 "contribution_id": "body",
-                "scope_locator": [
-                  0,
-                  164
-                ]
+                "scope_locator": [0, 164]
               },
               "face_page": 1,
               "layout_revision": "layout-1",
-              "pages": [
-                1
-              ]
+              "pages": [1]
             }
           }
         ]
@@ -407,15 +301,9 @@
         "document_id": "source-document-a",
         "revision_id": "REV-1",
         "contribution_id": "body",
-        "scope_locator": [
-          0,
-          164
-        ]
+        "scope_locator": [0, 164]
       },
-      "intrinsic_classification_locator": [
-        1,
-        2
-      ],
+      "intrinsic_classification_locator": [1, 2],
       "regime": {
         "coverage": "complete",
         "locator": "exam:regime",
@@ -452,14 +340,8 @@
           "kind": "value",
           "field": "classifier_identity",
           "reference": "opaque-source-classifier-a",
-          "locator": [
-            78,
-            94
-          ],
-          "group_locator": [
-            0,
-            94
-          ]
+          "locator": [78, 94],
+          "group_locator": [0, 94]
         }
       ]
     },
@@ -468,26 +350,14 @@
         "document_id": "synthetic-target",
         "revision_id": "r1",
         "contribution_id": "body",
-        "scope_locator": [
-          0,
-          125
-        ]
+        "scope_locator": [0, 125]
       },
       "coverage": "complete",
       "reference": "ALPHA-PRIVATE",
       "revision": "REV-1",
-      "reference_span": [
-        36,
-        49
-      ],
-      "revision_span": [
-        50,
-        55
-      ],
-      "group_span": [
-        0,
-        55
-      ]
+      "reference_span": [36, 49],
+      "revision_span": [50, 55],
+      "group_span": [0, 55]
     },
     "material": {
       "reference": "ALPHA-PRIVATE",
@@ -496,10 +366,7 @@
         "document_id": "source-document-a",
         "revision_id": "REV-1",
         "contribution_id": "body",
-        "scope_locator": [
-          0,
-          164
-        ]
+        "scope_locator": [0, 164]
       }
     }
   }

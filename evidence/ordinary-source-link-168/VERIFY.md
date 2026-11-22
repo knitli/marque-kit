@@ -56,3 +56,18 @@ node packages/kit/test/dom/run-ordinary-cab-161.mjs \
 This tests a synthetic host, not a live Word provider, actual access control or
 Office invalidation delivery. It does not prove a document write, answer value,
 authority or readiness.
+
+## Formatting and guard review
+
+The fixture was formatted with `vp fmt`; a deep comparison of its parsed JSON
+before and after confirmed unchanged data. The source grant checks were split
+into permission, current source, face/readback and link checks. Independent
+comparison found their predicates and error handling preserved. Lizard reports
+the original guard's cyclomatic complexity as 64 and the revised guard as 5;
+the extracted checks range from 10 to 26.
+
+After both changes, the frozen-engine focused suites passed 91 tests and the
+full workspace run passed 50 Node and 299 DOM tests, with the historical
+selected-audience mismatch covered separately. The runner again confirmed its
+source and product hashes unchanged. TypeScript, changed-file lint and format
+checks passed; `vp check` still reports the same 32 inherited TOML issues.
