@@ -649,6 +649,7 @@ export const sameBasis = (a: unknown, b: unknown): boolean => a != null && b != 
 
 /** Effective readiness is affirmative engine evidence plus host-confirmed current work. */
 export function effectiveReady(doc: Doc, host: Host = {}): boolean {
+  if ('native_evaluation' in doc.document) return false;
   const evaluation = doc.document.evaluation;
   if (
     !evaluation ||

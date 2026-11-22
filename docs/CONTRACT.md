@@ -147,6 +147,8 @@ A write-confirmation token is unavailable (`null`) when its evaluation basis con
 
 **Effective readiness** requires an affirmative complete/current engine snapshot with no mandatory blocker, the host's confirmation that required and accepted writes/placements match the outgoing document, no accepted work awaiting application or re-evaluation, and any named host acceptance check passing. An unaccepted optional proposal does not count as pending work. The host may place a derived artifact at its finalize/send gate when the contract allows it, but it is not shown as written before success.
 
+For a native Classification Authority Block (CAB) snapshot, the host calls `parseNativeJson(text, maxBytes)` from the core package's `native-wire` export and places the returned envelope in `document.native_evaluation`. The `native-cab` export's `readCabSnapshot` requires the requested target, profile and an independently obtained current evaluation basis. It returns the engine's scoped requirements, artifacts and host-work status, or `null` when the binding cannot be established. The caller sets a UTF-8 byte limit for each JSON input. This route covers one CAB evaluation. Whole-document finalize and send require a wider evaluation.
+
 Who supplies each slot
 M — Marque emits it
 K — the kit derives or keeps it

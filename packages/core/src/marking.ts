@@ -125,13 +125,20 @@ export function parse(text: string): Marking {
 
 const utf8 = new TextEncoder();
 const decode = new TextDecoder('utf-8', { ignoreBOM: true });
-const loneSurrogate = /[\uD800-\uDFFF]/u;
+export function hasUnpairedSurrogate(text: string): boolean {
+  for (const character of text) {
+    const unit = character.charCodeAt(0);
+    if (character.length === 1 && unit >= 0xd800 && unit <= 0xdfff) return true;
+  }
+  return false;
+}
 
 function matchesText(layers: Layer[], text: string): boolean {
   let at = 0;
   for (const layer of layers) {
     for (const token of layer.tokens) {
-      if (loneSurrogate.test(token.t) || !text.startsWith(token.t, at) || (token.mask && token.t !== '')) return false;
+      if (hasUnpairedSurrogate(token.t) || !text.startsWith(token.t, at) || (token.mask && token.t !== ''))
+        return false;
       at += token.t.length;
     }
   }
@@ -148,7 +155,7 @@ export function disclosedMarking(m: MarkingInput): MarkingInput {
   const masks = m.masks ?? [];
   // A host may split one Unicode scalar between two adjacent ordinary tokens.
   const supplied = m.layers?.map((layer): Layer => {
-    if (!layer.tokens.some((token) => loneSurrogate.test(token.t))) return layer;
+    if (!layer.tokens.some((token) => hasUnpairedSurrogate(token.t))) return layer;
     const tokens: Token[] = [];
     let run = '';
     for (const token of layer.tokens) {
@@ -173,7 +180,7 @@ export function disclosedMarking(m: MarkingInput): MarkingInput {
     masks: [],
     layers: [{ tokens: [...inline, ...masks].map((k) => placeholder(k)) }],
   });
-  if ((inline.length && !matches) || loneSurrogate.test(m.text)) return withheld();
+  if ((inline.length && !matches) || hasUnpairedSurrogate(m.text)) return withheld();
 
   let layers = matches ? supplied! : parse(m.text).layers;
   if (!matches && !matchesText(layers, m.text)) layers = [{ tokens: [{ t: m.text }] }];
