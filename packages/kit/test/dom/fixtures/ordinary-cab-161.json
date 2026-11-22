@@ -15,34 +15,22 @@
       "contribution_id": "body",
       "role": "transmittal",
       "parent_document_id": null,
-      "intrinsic_classification_locator": [
-        1,
-        2
-      ]
+      "intrinsic_classification_locator": [1, 2]
     },
     "cab_inspection": {
       "basis": {
         "document_id": "synthetic-target",
         "revision_id": "r1",
         "contribution_id": "body",
-        "scope_locator": [
-          0,
-          91
-        ]
+        "scope_locator": [0, 91]
       },
       "target": {
         "document_id": "synthetic-target",
         "revision_id": "r1",
         "contribution_id": "body",
-        "scope_locator": [
-          0,
-          91
-        ]
+        "scope_locator": [0, 91]
       },
-      "candidate": [
-        23,
-        90
-      ],
+      "candidate": [23, 90],
       "face_page": 1,
       "layout_revision": "layout-1",
       "source_facts": [
@@ -73,16 +61,11 @@
               "document_id": "synthetic-target",
               "revision_id": "r1",
               "contribution_id": "body",
-              "scope_locator": [
-                0,
-                91
-              ]
+              "scope_locator": [0, 91]
             },
             "face_page": 1,
             "layout_revision": "layout-1",
-            "pages": [
-              1
-            ]
+            "pages": [1]
           }
         },
         {
@@ -95,16 +78,11 @@
               "document_id": "synthetic-target",
               "revision_id": "r1",
               "contribution_id": "body",
-              "scope_locator": [
-                0,
-                91
-              ]
+              "scope_locator": [0, 91]
             },
             "face_page": 1,
             "layout_revision": "layout-1",
-            "pages": [
-              1
-            ]
+            "pages": [1]
           }
         },
         {
@@ -112,34 +90,20 @@
           "coverage": "complete",
           "state": "present",
           "occurrence": {
-            "candidate": [
-              23,
-              90
-            ],
-            "label": [
-              23,
-              36
-            ],
-            "value": [
-              38,
-              46
-            ]
+            "candidate": [23, 90],
+            "label": [23, 36],
+            "value": [38, 46]
           },
           "readback": {
             "target": {
               "document_id": "synthetic-target",
               "revision_id": "r1",
               "contribution_id": "body",
-              "scope_locator": [
-                0,
-                91
-              ]
+              "scope_locator": [0, 91]
             },
             "face_page": 1,
             "layout_revision": "layout-1",
-            "pages": [
-              1
-            ]
+            "pages": [1]
           }
         },
         {
@@ -147,34 +111,20 @@
           "coverage": "complete",
           "state": "present",
           "occurrence": {
-            "candidate": [
-              23,
-              90
-            ],
-            "label": [
-              47,
-              74
-            ],
-            "value": [
-              76,
-              90
-            ]
+            "candidate": [23, 90],
+            "label": [47, 74],
+            "value": [76, 90]
           },
           "readback": {
             "target": {
               "document_id": "synthetic-target",
               "revision_id": "r1",
               "contribution_id": "body",
-              "scope_locator": [
-                0,
-                91
-              ]
+              "scope_locator": [0, 91]
             },
             "face_page": 1,
             "layout_revision": "layout-1",
-            "pages": [
-              1
-            ]
+            "pages": [1]
           }
         }
       ]

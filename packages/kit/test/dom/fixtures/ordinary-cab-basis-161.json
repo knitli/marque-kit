@@ -861,9 +861,7 @@
             "chain": "neutral-chain-159",
             "field": "classified_by",
             "meaning": {
-              "answer_effects": [
-                "satisfy CAB required field ClassifiedBy"
-              ],
+              "answer_effects": ["satisfy CAB required field ClassifiedBy"],
               "answer_kinds": [
                 {
                   "field": "classified_by",
@@ -1018,9 +1016,7 @@
             "chain": "neutral-chain-159",
             "field": "classification_reason",
             "meaning": {
-              "answer_effects": [
-                "satisfy CAB required field ClassificationReason"
-              ],
+              "answer_effects": ["satisfy CAB required field ClassificationReason"],
               "answer_kinds": [
                 {
                   "field": "classification_reason",
@@ -1056,11 +1052,7 @@
         }
       ],
       "status": "partial",
-      "unrepresented": [
-        "other_outcomes",
-        "readings",
-        "complete_finding_inventory"
-      ]
+      "unrepresented": ["other_outcomes", "readings", "complete_finding_inventory"]
     },
     "handles": {
       "last_act_sequence": "0",
