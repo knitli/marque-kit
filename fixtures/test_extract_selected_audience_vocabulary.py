@@ -8,7 +8,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 extractor = runpy.run_path(str(Path(__file__).with_name('extract-selected-audience-vocabulary.py')))
 extract = extractor['extract']
 render = extractor['render']
