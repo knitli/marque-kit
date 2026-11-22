@@ -28,7 +28,8 @@ import memo from '../../../fixtures/memo.txt?raw';
 import { locate, paragraphAt, written } from './locate.ts';
 import { banner, edits, made, relint, undoneSubject } from './write.ts';
 import { isSameWordDocument } from './workspace.ts';
-import type { OfficeCurrentEvaluation, OfficeWordSession } from './workspace.ts';
+import { mountNativeWorkspace } from './native-workspace.ts';
+import type { OfficeCurrentEvaluation, OfficeNativeWordSession, OfficeWordSession } from './workspace.ts';
 
 /** In dev, what the pane would say to a console it doesn't have goes to the dev server's .dev.log. */
 const log = (event: 'error' | 'unhandled' | 'not the memo' | 'undone in Word', ...counts: number[]): void => {
@@ -136,7 +137,7 @@ void Office.onReady(async (info) => {
   if (info.host !== Office.HostType.Word) return;
   const installation = window.marqueOfficeWorkspace;
   if (installation) {
-    let session: OfficeWordSession | null;
+    let session: OfficeWordSession | OfficeNativeWordSession | null;
     let bound = false;
     try {
       session = await installation.provider.openWord(installation.wordHost);
@@ -144,11 +145,21 @@ void Office.onReady(async (info) => {
     } catch {
       session = null;
     }
+    if (session && bound && 'kind' in session && session.kind === 'native_cab') {
+      mountNativeWorkspace(
+        document.querySelector<HTMLElement>('#pane')!,
+        session,
+        installation.wordHost,
+        installation.nativeMaxBytes,
+      );
+      return;
+    }
     if (
       session &&
+      bound &&
+      !('kind' in session) &&
       isDisclosedState(session.state) &&
-      sameBasis(session.doc.document.evaluation?.basis, session.basis) &&
-      bound
+      sameBasis(session.doc.document.evaluation?.basis, session.basis)
     ) {
       mountWorkspace(session, installation.wordHost);
       return;
@@ -299,7 +310,12 @@ function mountWorkspace(
   const recoveryEntries = new Map<string, Pick<LogEntry, 'binding'>>();
   let pane!: ReturnType<typeof mount>;
   const stillBound = () => isSameWordDocument(wordHost, session);
+  const canDispatch = (): boolean => {
+    const current = pane?.view();
+    return !!current && !pane.host.readOnly && !('native_evaluation' in current.document);
+  };
   const applyPending = async (requestId: string): Promise<void> => {
+    if (!canDispatch()) throw new Error('The current view cannot issue document writes.');
     if (!(await stillBound())) throw new Error('Switch back to the document this action belongs to, then retry.');
     let entry = recoveryEntries.get(requestId);
     if (!entry) {
@@ -322,6 +338,7 @@ function mountWorkspace(
       !(await stillBound())
     )
       throw new Error('This pending action no longer matches the document and evaluation it was taken on.');
+    if (!canDispatch()) throw new Error('The current view cannot issue document writes.');
     const ack = await session.applyCommitted(requestId, wordHost);
     if (
       typeof ack.acknowledgement !== 'string' ||
@@ -332,6 +349,9 @@ function mountWorkspace(
       !(await stillBound())
     )
       throw new Error('The host acknowledgement does not match the saved action.');
+    // The provider persists the acknowledgement before returning; do not start
+    // a new evaluation after the pane has lost write authority.
+    if (!canDispatch()) throw new Error('The write receipt is saved for reconciliation.');
     const current: OfficeCurrentEvaluation = await session.evaluateCurrent(wordHost);
     if (
       current.documentId !== session.documentId ||
@@ -354,9 +374,13 @@ function mountWorkspace(
       historyDisclosure: current.historyDisclosure ?? null,
       actBinding: { documentId: session.documentId, chain: session.chain, basis: current.basis },
     });
+    if (!canDispatch()) {
+      retry.disabled = true;
+      recovery.hidden = true;
+    }
   };
   function scheduleRecovery(requestId: string): void {
-    if (pendingRecovery.has(requestId)) return;
+    if (!canDispatch() || pendingRecovery.has(requestId)) return;
     pendingRecovery.add(requestId);
     queue = queue
       .then(() => applyPending(requestId))
@@ -373,6 +397,11 @@ function mountWorkspace(
         () => {
           failedRequestIds.add(requestId);
           pendingRecovery.delete(requestId);
+          if (!canDispatch()) {
+            retry.disabled = true;
+            recovery.hidden = true;
+            return;
+          }
           recoveryText.textContent =
             'A saved action still needs a document update or fresh evaluation. It has not been marked complete.';
           retry.disabled = false;
@@ -399,12 +428,14 @@ function mountWorkspace(
         });
     },
     onAppend: async (request) => {
-      if (!(await stillBound())) throw new Error('The active Word document changed.');
+      if (!canDispatch()) throw new Error('The current view cannot record actions.');
+      if (!(await stillBound()) || !canDispatch()) throw new Error('The active view changed.');
       if (request.binding?.documentId !== session.documentId || request.binding.chain !== session.chain) {
         return { status: 'refused', reason: 'request-id-conflict', state: pane.state };
       }
       await session.stageAppend(structuredClone(request));
-      if (!(await stillBound())) throw new Error('The active Word document changed after the intent was saved.');
+      if (!(await stillBound()) || !canDispatch())
+        throw new Error('The active view changed after the intent was saved.');
       const result = await session.append(request);
       if (!(await stillBound())) throw new Error('The active Word document changed.');
       return result;

@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import type { NativeCabRequest } from '@knitli/marque-kit-core/native-cab';
 import type {
   ActAppendRequest,
   AppendActResult,
@@ -42,6 +43,22 @@ export interface OfficeCurrentEvaluation {
   confirmedWriteAcks: Record<string, string>;
 }
 
+/** Native wire text and independently issued scope, without a legacy document. */
+export interface OfficeNativeCabSnapshot {
+  documentId: string;
+  chain: string;
+  wire: string;
+  request?: Omit<NativeCabRequest, 'maxBasisBytes'>;
+}
+export interface OfficeNativeWordSession {
+  readonly kind: 'native_cab';
+  readonly documentId: string;
+  readonly chain: string;
+  readonly nativeCab: OfficeNativeCabSnapshot;
+  /** Read-only refresh; must not apply or acknowledge a write. */
+  readNativeCab?(): Promise<OfficeNativeCabSnapshot>;
+}
+
 /** One provider-issued document scope. Never use a session with another document or provider. */
 export interface OfficeWordSession {
   readonly documentId: string;
@@ -70,7 +87,7 @@ export interface OfficeWordSession {
 
 /** Installed by a trusted host integration; no default network or browser-storage implementation exists. */
 export interface OfficeWorkspaceProvider {
-  openWord(host: OfficeWordHost): Promise<OfficeWordSession | null>;
+  openWord(host: OfficeWordHost): Promise<OfficeWordSession | OfficeNativeWordSession | null>;
 }
 
 declare global {
@@ -78,9 +95,13 @@ declare global {
     marqueOfficeWorkspace?: {
       provider: OfficeWorkspaceProvider;
       wordHost: OfficeWordHost;
+      /** Installation-owned UTF-8 byte cap for native wire and current basis. */
+      nativeMaxBytes?: number;
     };
   }
 }
 
-export const isSameWordDocument = async (host: OfficeWordHost, session: OfficeWordSession): Promise<boolean> =>
-  (await host.activeDocumentId()) === session.documentId;
+export const isSameWordDocument = async (
+  host: OfficeWordHost,
+  session: { readonly documentId: string },
+): Promise<boolean> => (await host.activeDocumentId()) === session.documentId;
