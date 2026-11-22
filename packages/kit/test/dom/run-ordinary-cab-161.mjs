@@ -78,6 +78,8 @@ const stagedEntry = resolve(stage, 'marque_wasm.js');
 const stagedBinary = resolve(stage, 'marque_wasm_bg.wasm');
 const stagedManifest = resolve(stage, 'package.json');
 const files = [
+  'apps/office-addin/README.md',
+  'apps/office-addin/src/ordinary-cab-preview.ts',
   'apps/office-addin/src/ordinary-cab-workspace.ts',
   'apps/office-addin/src/selected-audience-workspace.ts',
   'apps/office-addin/src/selected-audience-wire.ts',
@@ -90,11 +92,15 @@ const files = [
   'packages/kit/vite.config.ts',
   'packages/kit/package.json',
   'packages/kit/test/dom/ordinary-cab-161.test.ts',
+  'packages/kit/test/dom/ordinary-cab-preview-adversarial.test.ts',
   'packages/kit/test/dom/ordinary-cab-questions-adversarial.test.ts',
+  'packages/kit/test/dom/ordinary-source-evidence-165.test.ts',
   'packages/kit/test/dom/native-office-entry.test.ts',
   'packages/kit/test/dom/selected-audience.test.ts',
   'packages/kit/test/dom/fixtures/ordinary-cab-161.json',
   'packages/kit/test/dom/fixtures/ordinary-cab-basis-161.json',
+  'packages/kit/test/dom/fixtures/ordinary-source-link-166.json',
+  'packages/kit/test/dom/fixtures/ordinary-source-link-166.json.license',
   'packages/kit/test/dom/run-ordinary-cab-161.mjs',
 ];
 async function sourceHashes() {

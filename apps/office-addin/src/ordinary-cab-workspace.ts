@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { readCabSnapshot } from '@knitli/marque-kit-core/native-cab';
+import { canon } from '@knitli/marque-kit-core/state';
 import { parseNativeBasisJson, parseNativeJson } from '@knitli/marque-kit-core/native-wire';
 import type { NativeEvaluationV2, NativeField } from '@knitli/marque-kit-core/native-wire';
 import type { Doc } from '@knitli/marque-kit-core/types';
@@ -19,6 +20,7 @@ import type {
   OfficeNativeWordSession,
   OfficeOrdinaryCabGrant,
   OfficeOrdinaryCabPreviewGrant,
+  OfficeOrdinaryCabSourceLinkGrant,
   OfficeWordHost,
 } from './workspace.ts';
 
@@ -165,6 +167,141 @@ function checkedGrant(
   }
 }
 
+/** Bind the separately granted source bytes, identity, face and layout to the link. */
+function checkedSourceLinkGrant(
+  grant: OfficeOrdinaryCabSourceLinkGrant | null,
+  session: OfficeNativeWordSession,
+  grantId: string,
+  target: unknown,
+  maxBytes: number,
+): string | null {
+  if (
+    !grant ||
+    grant.documentId !== session.documentId ||
+    grant.chain !== session.chain ||
+    grant.viewerId !== session.ordinaryCab?.viewerId ||
+    grant.grantId !== grantId ||
+    !id(grant.grantId) ||
+    !id(grant.permissionRevision) ||
+    grant.authorizeRawInput !== true ||
+    grant.authorizeRawOutput !== true ||
+    typeof grant.sourceLinkJson !== 'string' ||
+    grant.sourceLinkJson.length > Math.min(maxBytes, 1_048_576) ||
+    encoder.encode(grant.sourceLinkJson).length > Math.min(maxBytes, 1_048_576) ||
+    !grant.current
+  )
+    return null;
+  try {
+    const current = grant.current;
+    if (
+      !id(current.documentId) ||
+      current.documentId === session.documentId ||
+      !id(current.revisionId) ||
+      !id(current.contributionId) ||
+      !id(current.layoutRevision) ||
+      !Number.isSafeInteger(current.facePage) ||
+      current.facePage < 1 ||
+      typeof current.text !== 'string' ||
+      current.text.length > 262_144 ||
+      !current.owner ||
+      !['transmittal', 'attachment'].includes(current.owner.role) ||
+      (current.owner.parentDocumentId !== null && !id(current.owner.parentDocumentId)) ||
+      !Array.isArray(current.owner.intrinsicClassificationLocator) ||
+      current.owner.intrinsicClassificationLocator.length !== 2 ||
+      !current.owner.intrinsicClassificationLocator.every(Number.isSafeInteger) ||
+      current.owner.intrinsicClassificationLocator[0] < 0 ||
+      current.owner.intrinsicClassificationLocator[1] <= current.owner.intrinsicClassificationLocator[0] ||
+      !Array.isArray(current.scopeLocator) ||
+      current.scopeLocator.length !== 2 ||
+      !current.scopeLocator.every(Number.isSafeInteger) ||
+      current.scopeLocator[0] < 0 ||
+      current.scopeLocator[1] < current.scopeLocator[0]
+    )
+      return null;
+    const sourceBytes = encoder.encode(current.text).length;
+    if (
+      sourceBytes > 262_144 ||
+      current.scopeLocator[1] > sourceBytes ||
+      current.owner.intrinsicClassificationLocator[1] > sourceBytes
+    )
+      return null;
+    const link = JSON.parse(grant.sourceLinkJson) as {
+      member?: {
+        identity?: unknown;
+        format?: unknown;
+        source?: unknown;
+        owner?: {
+          document_id?: unknown;
+          revision_id?: unknown;
+          contribution_id?: unknown;
+          role?: unknown;
+          parent_document_id?: unknown;
+          intrinsic_classification_locator?: unknown;
+        };
+        cab_inspection?: {
+          basis?: unknown;
+          target?: unknown;
+          layout_revision?: unknown;
+          face_page?: unknown;
+          fields?: { readback?: { target?: unknown; layout_revision?: unknown; face_page?: unknown } | null }[];
+        };
+      };
+      source_examination?: unknown;
+      target_use?: { target?: unknown };
+      material?: { kind?: unknown; source?: unknown };
+    };
+    const member = link?.member;
+    const face = member?.cab_inspection;
+    const identity = {
+      document_id: current.documentId,
+      revision_id: current.revisionId,
+      contribution_id: current.contributionId,
+    };
+    const sourceTarget = { ...identity, scope_locator: current.scopeLocator };
+    const sameIdentity = (value: unknown) => {
+      const owner = value as Partial<typeof identity> | null;
+      return (
+        owner?.document_id === identity.document_id &&
+        owner.revision_id === identity.revision_id &&
+        owner.contribution_id === identity.contribution_id
+      );
+    };
+    const sameTarget = (value: unknown) => canon(value) === canon(sourceTarget);
+    if (
+      !member ||
+      !sameIdentity(member.identity) ||
+      !sameIdentity(member.owner) ||
+      member.owner?.role !== current.owner.role ||
+      member.owner.parent_document_id !== current.owner.parentDocumentId ||
+      canon(member.owner.intrinsic_classification_locator) !== canon(current.owner.intrinsicClassificationLocator) ||
+      member.format !== 'document_content' ||
+      member.source !== current.text ||
+      !face ||
+      !sameTarget(face.basis) ||
+      !sameTarget(face.target) ||
+      face.layout_revision !== current.layoutRevision ||
+      face.face_page !== current.facePage ||
+      !Array.isArray(face.fields) ||
+      face.fields.some(
+        (row) =>
+          row?.readback &&
+          (!sameTarget(row.readback.target) ||
+            row.readback.layout_revision !== current.layoutRevision ||
+            row.readback.face_page !== current.facePage),
+      ) ||
+      !matchesSourceExamination({ member }, link.source_examination) ||
+      !target ||
+      canon(link.target_use?.target) !== canon(target) ||
+      link.material?.kind !== 'source_document' ||
+      !sameTarget(link.material.source)
+    )
+      return null;
+    return JSON.stringify(grant);
+  } catch {
+    return null;
+  }
+}
+
 /** Check preview permission separately from the questions grant. */
 function checkedPreviewGrant(
   grant: OfficeOrdinaryCabPreviewGrant | null,
@@ -183,9 +320,12 @@ function checkedPreviewGrant(
     !validDigest(grant.expectedPreviewFingerprint) ||
     grant.authorizeRawInput !== true ||
     grant.authorizeRawOutput !== true ||
+    (grant.sourceLinkGrantId !== undefined && !id(grant.sourceLinkGrantId)) ||
     typeof grant.sourceExaminationJson !== 'string' ||
+    grant.sourceExaminationJson.length > Math.min(maxBytes, 1_048_576) ||
     encoder.encode(grant.sourceExaminationJson).length > Math.min(maxBytes, 1_048_576) ||
     typeof grant.answersJson !== 'string' ||
+    grant.answersJson.length > Math.min(maxBytes, 1_048_576) ||
     encoder.encode(grant.answersJson).length > Math.min(maxBytes, 1_048_576) ||
     !Array.isArray(grant.disclosedFields) ||
     grant.disclosedFields.length > fields.length ||
@@ -339,6 +479,25 @@ export function mountOrdinaryCabWorkspace(
       const baseKey = checkedGrant(base, session, maxBytes);
       const permission = await host.readOrdinaryCabPreviewGrant(session.documentId, session.chain, viewerId!);
       const permissionKey = checkedPreviewGrant(permission, session, maxBytes);
+      if (!baseKey || baseKey !== originalGrant || !original || !permissionKey || !base || !permission) return;
+      const authorized = JSON.parse(baseKey) as OfficeOrdinaryCabGrant;
+      const previewGrant = JSON.parse(permissionKey) as OfficeOrdinaryCabPreviewGrant;
+      const questionRequest: unknown = JSON.parse(authorized.requestJson);
+      const sourceExamination: unknown = JSON.parse(previewGrant.sourceExaminationJson);
+      if (!matchesSourceExamination(questionRequest, sourceExamination)) return;
+      const target = (questionRequest as { member: { cab_inspection: { target: unknown } } }).member.cab_inspection
+        .target;
+      const sourceId = previewGrant.sourceLinkGrantId;
+      let sourceKey: string | null = null;
+      if (sourceId) {
+        if (!host.readOrdinaryCabSourceLinkGrant) return;
+        const source = await host.readOrdinaryCabSourceLinkGrant(session.documentId, session.chain, viewerId!);
+        sourceKey = checkedSourceLinkGrant(source, session, sourceId, target, maxBytes);
+        if (!sourceKey) return;
+      }
+      const sourceLink: unknown = sourceKey
+        ? JSON.parse((JSON.parse(sourceKey) as OfficeOrdinaryCabSourceLinkGrant).sourceLinkJson)
+        : undefined;
       const current = async () =>
         !disposed &&
         attempt === generation &&
@@ -355,24 +514,22 @@ export function mountOrdinaryCabWorkspace(
           session,
           maxBytes,
         ) === permissionKey &&
+        (!sourceId ||
+          (!!host.readOrdinaryCabSourceLinkGrant &&
+            checkedSourceLinkGrant(
+              await host.readOrdinaryCabSourceLinkGrant(session.documentId, session.chain, viewerId!),
+              session,
+              sourceId,
+              target,
+              maxBytes,
+            ) === sourceKey)) &&
         (await isSameWordDocument(host, session)) &&
         !disposed &&
-        attempt === generation;
-      if (
-        !baseKey ||
-        baseKey !== originalGrant ||
-        !original ||
-        !permissionKey ||
-        !base ||
-        !permission ||
-        !(await current())
-      )
-        return;
-      const authorized = JSON.parse(baseKey) as OfficeOrdinaryCabGrant;
-      const previewGrant = JSON.parse(permissionKey) as OfficeOrdinaryCabPreviewGrant;
-      const questionRequest: unknown = JSON.parse(authorized.requestJson);
-      const sourceExamination: unknown = JSON.parse(previewGrant.sourceExaminationJson);
-      if (!matchesSourceExamination(questionRequest, sourceExamination)) return;
+        attempt === generation &&
+        session.ordinaryCab === provider &&
+        provider.viewerId === viewerId &&
+        provider.preview === previewOperation;
+      if (!(await current())) return;
       const validSnapshot = (snapshot: unknown) => {
         try {
           const native = parseNativeJson(JSON.stringify(snapshot), maxBytes);
@@ -392,6 +549,7 @@ export function mountOrdinaryCabWorkspace(
           mode: 'prepare',
           question_request: questionRequest,
           source_examination: sourceExamination,
+          ...(sourceLink ? { source_link: sourceLink } : {}),
         },
         maxBytes,
       );
@@ -411,6 +569,7 @@ export function mountOrdinaryCabWorkspace(
           mode: 'apply',
           question_request: questionRequest,
           source_examination: sourceExamination,
+          ...(sourceLink ? { source_link: sourceLink } : {}),
           preview_receipt: prepared.preview_receipt,
           answers,
         },

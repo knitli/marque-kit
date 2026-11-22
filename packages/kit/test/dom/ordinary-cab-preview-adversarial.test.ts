@@ -8,10 +8,12 @@ import type {
   OfficeNativeWordSession,
   OfficeOrdinaryCabGrant,
   OfficeOrdinaryCabPreviewGrant,
+  OfficeOrdinaryCabSourceLinkGrant,
   OfficeWordHost,
 } from '../../../../apps/office-addin/src/workspace.ts';
 import requestFixture from './fixtures/ordinary-cab-161.json' with { type: 'json' };
 import snapshotFixture from './fixtures/ordinary-cab-basis-161.json' with { type: 'json' };
+import linkedFixture from './fixtures/ordinary-source-link-166.json' with { type: 'json' };
 
 const snapshot = structuredClone(snapshotFixture);
 const target = snapshot.evaluation.artifacts[0]!.target as OfficeOrdinaryCabGrant['current']['target'];
@@ -80,12 +82,64 @@ function previewGrant(): OfficeOrdinaryCabPreviewGrant {
   };
 }
 
+function sourceLinkGrant(): OfficeOrdinaryCabSourceLinkGrant {
+  const member = structuredClone(requestFixture.member);
+  member.identity.document_id = 'private-source-document';
+  member.owner.document_id = member.identity.document_id;
+  member.cab_inspection.basis.document_id = member.identity.document_id;
+  member.cab_inspection.target.document_id = member.identity.document_id;
+  for (const row of member.cab_inspection.fields) row.readback.target.document_id = member.identity.document_id;
+  const sourceLink = {
+    member,
+    source_examination: { ...structuredClone(sourceExamination), target: member.cab_inspection.target },
+    target_use: {
+      target: requestFixture.member.cab_inspection.target,
+      reference: 'private-source-reference',
+      revision: 'r1',
+      reference_span: [0, 1],
+      revision_span: [1, 2],
+      group_span: [0, 2],
+      coverage: 'complete',
+    },
+    material: {
+      reference: 'private-source-reference',
+      kind: 'source_document',
+      source: member.cab_inspection.target,
+    },
+  };
+  return {
+    documentId: 'synthetic-target',
+    chain: 'neutral-chain-159',
+    viewerId: 'private-viewer',
+    grantId: 'private-source-grant',
+    permissionRevision: 'source-permission-1',
+    authorizeRawInput: true,
+    authorizeRawOutput: true,
+    current: {
+      documentId: member.identity.document_id,
+      revisionId: member.identity.revision_id,
+      contributionId: member.identity.contribution_id,
+      scopeLocator: member.cab_inspection.target.scope_locator as [number, number],
+      text: member.source,
+      layoutRevision: member.cab_inspection.layout_revision,
+      facePage: member.cab_inspection.face_page,
+      owner: {
+        role: member.owner.role as 'transmittal' | 'attachment',
+        parentDocumentId: member.owner.parent_document_id,
+        intrinsicClassificationLocator: member.owner.intrinsic_classification_locator as [number, number],
+      },
+    },
+    sourceLinkJson: JSON.stringify(sourceLink),
+  };
+}
+
 type PreviewRequest = {
   mode: 'prepare' | 'apply';
   question_request: unknown;
   source_examination: unknown;
   preview_receipt?: string;
   answers?: typeof answers;
+  source_link?: unknown;
 };
 
 function responseFor(input: string): string {
@@ -135,11 +189,16 @@ afterEach(() => {
 function setup(
   execute: (input: string) => Promise<string> = async (input) => responseFor(input),
   initial: OfficeOrdinaryCabPreviewGrant | null = previewGrant(),
+  initialSource: OfficeOrdinaryCabSourceLinkGrant | null = null,
+  currentBase: OfficeOrdinaryCabGrant = baseGrant(),
+  evaluateRequest?: (input: string) => string,
 ) {
   const root = document.createElement('div');
   document.body.append(root);
-  const evaluate = vi.fn(async () =>
-    JSON.stringify({ schema: 'marque.ordinary-cab-questions.v1', status: 'available', reason: null, snapshot }),
+  const evaluate = vi.fn(async (input: string) =>
+    evaluateRequest
+      ? evaluateRequest(input)
+      : JSON.stringify({ schema: 'marque.ordinary-cab-questions.v1', status: 'available', reason: null, snapshot }),
   );
   const preview = vi.fn(execute);
   const session: OfficeNativeWordSession = {
@@ -149,17 +208,21 @@ function setup(
     nativeCab: { documentId: 'synthetic-target', chain: 'neutral-chain-159', wire: '' },
     ordinaryCab: { viewerId: 'private-viewer', evaluate, preview },
   };
-  let base = baseGrant();
+  let base = currentBase;
   let permission = initial;
+  let sourceGrant = initialSource;
   let documentId = session.documentId;
+  let readDocument = async () => documentId;
   let invalidate = () => {};
   const apply = vi.fn();
   const readPreviewGrant = vi.fn(async () => (permission ? structuredClone(permission) : null));
+  const readSourceGrant = vi.fn(async () => (sourceGrant ? structuredClone(sourceGrant) : null));
   const host: OfficeWordHost = {
-    activeDocumentId: async () => documentId,
+    activeDocumentId: () => readDocument(),
     applyCommitted: apply,
     readOrdinaryCabGrant: async () => structuredClone(base),
     readOrdinaryCabPreviewGrant: readPreviewGrant,
+    readOrdinaryCabSourceLinkGrant: readSourceGrant,
     watchOrdinaryCabInvalidation: (_document, _chain, _viewer, notify) => {
       invalidate = notify;
       return () => {};
@@ -170,18 +233,29 @@ function setup(
   return {
     root,
     pane,
+    session,
     evaluate,
     preview,
     apply,
     readPreviewGrant,
+    readSourceGrant,
     setBase(value: OfficeOrdinaryCabGrant) {
       base = value;
     },
     setPermission(value: OfficeOrdinaryCabPreviewGrant | null) {
       permission = value;
     },
+    setSourceGrant(value: OfficeOrdinaryCabSourceLinkGrant | null) {
+      sourceGrant = value;
+    },
+    removeSourceReader() {
+      delete host.readOrdinaryCabSourceLinkGrant;
+    },
     setDocument(value: string) {
       documentId = value;
+    },
+    setDocumentReader(read: () => Promise<string>) {
+      readDocument = read;
     },
     invalidate() {
       invalidate();
@@ -207,6 +281,20 @@ function noPrivateValues(root: HTMLElement): void {
     'private-preview-grant',
     'private-base-permission',
     'private-preview-permission',
+    'private-source-document',
+    'private-source-reference',
+    'private-source-grant',
+    'source-permission-1',
+    'ALPHA-PRIVATE',
+    'source-document-a',
+    'Synthetic source.',
+    'REV-1',
+    '20400101',
+    '20440229',
+    'EVENT-CHARLIE',
+    'CLASSIFIER-ALPHA',
+    'opaque-external-cab-date',
+    'opaque-source-classifier-a',
     'private-answer-id',
     'private-reason-id',
     'private-classifier-value',
@@ -251,6 +339,421 @@ test('previews the independently disclosed field without exposing opaque inputs 
   expect(hypothetical?.textContent).not.toContain('Classified by');
   expect(f.apply).not.toHaveBeenCalled();
   expect(f.root.querySelector('input, textarea, a')).toBeNull();
+  expect(f.readSourceGrant).not.toHaveBeenCalled();
+  noPrivateValues(f.root);
+});
+
+test('forwards a separately granted current source to both preview stages', async () => {
+  const source = sourceLinkGrant();
+  const permission = { ...previewGrant(), sourceLinkGrantId: source.grantId };
+  const f = setup(undefined, permission, source);
+  await f.pane.ready;
+  clickPreview(f.root);
+  await vi.waitFor(() => expect(f.root.textContent).toContain('Hypothetical authority block'));
+  expect(f.preview).toHaveBeenCalledTimes(2);
+  for (const [input] of f.preview.mock.calls) {
+    expect((JSON.parse(input) as PreviewRequest).source_link).toEqual(JSON.parse(source.sourceLinkJson));
+  }
+  expect(f.readSourceGrant.mock.calls.length).toBeGreaterThanOrEqual(4);
+  expect(f.apply).not.toHaveBeenCalled();
+  noPrivateValues(f.root);
+});
+
+test.each([
+  'missing reader',
+  'missing source',
+  'raw input',
+  'raw output',
+  'viewer',
+  'target document',
+  'chain',
+  'grant',
+  'permission',
+  'same document',
+  'source identity',
+  'source revision',
+  'source contribution',
+  'source bytes',
+  'source scope',
+  'source owner missing',
+  'source owner role',
+  'source owner parent',
+  'source owner selector',
+  'changed owner and examination',
+  'source layout',
+  'source face',
+  'source readback',
+  'source examination',
+  'material',
+  'target use',
+  'invalid link',
+  'oversized source',
+  'oversized link',
+] as const)('refuses to forward an unqualified linked source: %s', async (denial) => {
+  const source = sourceLinkGrant();
+  const permission = { ...previewGrant(), sourceLinkGrantId: source.grantId };
+  const link = JSON.parse(source.sourceLinkJson);
+  if (denial === 'raw input') (source as unknown as { authorizeRawInput: boolean }).authorizeRawInput = false;
+  if (denial === 'raw output') (source as unknown as { authorizeRawOutput: boolean }).authorizeRawOutput = false;
+  if (denial === 'viewer') source.viewerId = 'another-viewer';
+  if (denial === 'target document') source.documentId = 'another-target';
+  if (denial === 'chain') source.chain = 'another-chain';
+  if (denial === 'grant') source.grantId = 'another-source-grant';
+  if (denial === 'permission') source.permissionRevision = '';
+  if (denial === 'same document') source.current.documentId = 'synthetic-target';
+  if (denial === 'source identity') source.current.documentId = 'another-source';
+  if (denial === 'source revision') source.current.revisionId = 'another-revision';
+  if (denial === 'source contribution') source.current.contributionId = 'another-contribution';
+  if (denial === 'source bytes') source.current.text += ' altered';
+  if (denial === 'source scope') source.current.scopeLocator[1]--;
+  if (denial === 'source owner missing') delete (source.current as Partial<typeof source.current>).owner;
+  if (denial === 'source owner role') source.current.owner.role = 'attachment';
+  if (denial === 'source owner parent') source.current.owner.parentDocumentId = 'another-parent';
+  if (denial === 'source owner selector') source.current.owner.intrinsicClassificationLocator = [2, 3];
+  if (denial === 'changed owner and examination') {
+    link.member.owner.intrinsic_classification_locator = [2, 3];
+    link.source_examination.intrinsic_classification_locator = [2, 3];
+  }
+  if (denial === 'source layout') source.current.layoutRevision = 'another-layout';
+  if (denial === 'source face') source.current.facePage++;
+  if (denial === 'source readback') link.member.cab_inspection.fields[0].readback.face_page++;
+  if (denial === 'source examination') link.source_examination.target.revision_id = 'another-revision';
+  if (denial === 'material') link.material.source.document_id = 'another-source';
+  if (denial === 'target use') link.target_use.target.revision_id = 'another-revision';
+  if (denial === 'oversized source') source.current.text = 'x'.repeat(262_145);
+  source.sourceLinkJson =
+    denial === 'invalid link' ? '{' : denial === 'oversized link' ? 'x'.repeat(1_048_577) : JSON.stringify(link);
+  const f = setup(undefined, permission, denial === 'missing source' ? null : source);
+  if (denial === 'missing reader') f.removeSourceReader();
+  await f.pane.ready;
+  clickPreview(f.root);
+  await vi.waitFor(() => expect(f.readPreviewGrant).toHaveBeenCalled());
+  await settled();
+  expect(f.preview).not.toHaveBeenCalled();
+  expect(f.root.textContent).not.toContain('Hypothetical authority block');
+  expect(f.apply).not.toHaveBeenCalled();
+  noPrivateValues(f.root);
+});
+
+function reissueSource(source: OfficeOrdinaryCabSourceLinkGrant, change: 'document' | 'revision', id?: string) {
+  const link = JSON.parse(source.sourceLinkJson);
+  const key = change === 'document' ? 'document_id' : 'revision_id';
+  const value = id ?? (change === 'document' ? 'new-source-document' : 'new-source-revision');
+  if (change === 'document') source.current.documentId = value;
+  else source.current.revisionId = value;
+  link.member.identity[key] = value;
+  link.member.owner[key] = value;
+  link.member.cab_inspection.basis[key] = value;
+  link.member.cab_inspection.target[key] = value;
+  for (const field of link.member.cab_inspection.fields) field.readback.target[key] = value;
+  link.source_examination.target[key] = value;
+  link.material.source[key] = value;
+  source.sourceLinkJson = JSON.stringify(link);
+}
+
+test.each(['__proto__', 'constructor', 'toString'])(
+  'accepts the opaque source identifier %s as ordinary data',
+  async (identifier) => {
+    const source = sourceLinkGrant();
+    reissueSource(source, 'document', identifier);
+    const f = setup(undefined, { ...previewGrant(), sourceLinkGrantId: source.grantId }, source);
+    await f.pane.ready;
+    clickPreview(f.root);
+    await vi.waitFor(() => expect(f.root.textContent).toContain('Hypothetical authority block'));
+    expect(f.preview).toHaveBeenCalledTimes(2);
+    noPrivateValues(f.root);
+  },
+);
+
+test.each([
+  ['prepare', 'document'],
+  ['prepare', 'revision'],
+  ['apply', 'document'],
+  ['apply', 'revision'],
+] as const)('withholds delayed %s when the source %s changes without changing its text', async (phase, change) => {
+  let release: (() => void) | undefined;
+  const source = sourceLinkGrant();
+  const permission = { ...previewGrant(), sourceLinkGrantId: source.grantId };
+  const f = setup(
+    (input) => {
+      const output = responseFor(input);
+      if ((JSON.parse(input) as PreviewRequest).mode !== phase) return Promise.resolve(output);
+      return new Promise((resolve) => {
+        release = () => resolve(output);
+      });
+    },
+    permission,
+    source,
+  );
+  await f.pane.ready;
+  clickPreview(f.root);
+  await vi.waitFor(() => expect(release).toBeDefined());
+  const changed = structuredClone(source);
+  reissueSource(changed, change);
+  expect(changed.current.text).toBe(source.current.text);
+  f.setSourceGrant(changed);
+  release!();
+  await settled();
+  expect(f.root.textContent).not.toContain('Hypothetical authority block');
+  if (phase === 'prepare') expect(f.preview).toHaveBeenCalledTimes(1);
+  expect(f.apply).not.toHaveBeenCalled();
+  noPrivateValues(f.root);
+});
+
+test.each(['prepare', 'apply'] as const)(
+  'a source invalidation cancels a delayed %s provider result',
+  async (phase) => {
+    let release: (() => void) | undefined;
+    const source = sourceLinkGrant();
+    const f = setup(
+      (input) => {
+        const output = responseFor(input);
+        if ((JSON.parse(input) as PreviewRequest).mode !== phase) return Promise.resolve(output);
+        return new Promise((resolve) => {
+          release = () => resolve(output);
+        });
+      },
+      { ...previewGrant(), sourceLinkGrantId: source.grantId },
+      source,
+    );
+    await f.pane.ready;
+    clickPreview(f.root);
+    await vi.waitFor(() => expect(release).toBeDefined());
+    f.setSourceGrant(null);
+    f.invalidate();
+    release!();
+    await settled();
+    expect(f.root.textContent).not.toContain('Hypothetical authority block');
+    if (phase === 'prepare') expect(f.preview).toHaveBeenCalledTimes(1);
+    noPrivateValues(f.root);
+  },
+);
+
+test('a linked-source invalidation immediately removes a displayed preview', async () => {
+  const source = sourceLinkGrant();
+  const f = setup(undefined, { ...previewGrant(), sourceLinkGrantId: source.grantId }, source);
+  await f.pane.ready;
+  clickPreview(f.root);
+  await vi.waitFor(() => expect(f.root.textContent).toContain('Hypothetical authority block'));
+  f.setSourceGrant(null);
+  f.invalidate();
+  expect(f.root.textContent).not.toContain('Hypothetical authority block');
+  noPrivateValues(f.root);
+});
+
+test.each([
+  ['prepare', 1],
+  ['display', 3],
+] as const)('does not %s after a provider change during the final document read', async (stage, holdAt) => {
+  let release: (() => void) | undefined;
+  let reads = 0;
+  const source = sourceLinkGrant();
+  const f = setup(undefined, { ...previewGrant(), sourceLinkGrantId: source.grantId }, source);
+  await f.pane.ready;
+  f.setDocumentReader(() => {
+    if (++reads !== holdAt) return Promise.resolve('synthetic-target');
+    return new Promise((resolve) => {
+      release = () => resolve('synthetic-target');
+    });
+  });
+  clickPreview(f.root);
+  await vi.waitFor(() => expect(release).toBeDefined());
+  f.session.ordinaryCab!.viewerId = 'changed-viewer';
+  release!();
+  await settled();
+  expect(f.preview).toHaveBeenCalledTimes(stage === 'prepare' ? 0 : 2);
+  expect(f.root.textContent).not.toContain('Hypothetical authority block');
+  noPrivateValues(f.root);
+});
+
+type LinkedEngine = {
+  evaluate_ordinary_cab_questions(input: string): string;
+  evaluate_ordinary_cab_preview(input: string): string;
+};
+
+function realLinkedGrants(wasm: LinkedEngine, inputFixture = linkedFixture) {
+  const fixture = structuredClone(inputFixture);
+  const question = JSON.parse(wasm.evaluate_ordinary_cab_questions(JSON.stringify(fixture.question_request)));
+  expect(question.status).toBe('available');
+  const request = { ...fixture, mode: 'prepare' };
+  const prepared = JSON.parse(wasm.evaluate_ordinary_cab_preview(JSON.stringify(request)));
+  expect(prepared.status).toBe('available');
+  const issued = prepared.snapshot.evaluation.findings.items.filter((item: { question: unknown }) => item.question);
+  expect(issued).toHaveLength(2);
+  const answerGroup = issued.map(({ question: q }: { question: (typeof answers)[number]['question'] }) => ({
+    question: { chain: q.chain, serial: q.serial, revision: q.revision, field: q.field },
+    answer_id: `accepted-${q.field}`,
+    value_reference: q.field === 'classified_by' ? 'opaque-answer-classifier' : 'opaque-answer-reason',
+    occurrence_locator: q.field === 'classified_by' ? [100, 115] : [120, 126],
+  }));
+  const applied = JSON.parse(
+    wasm.evaluate_ordinary_cab_preview(
+      JSON.stringify({ ...fixture, mode: 'apply', preview_receipt: prepared.preview_receipt, answers: answerGroup }),
+    ),
+  );
+  expect(applied.status).toBe('available');
+  expect(applied.preview?.status).toBe('complete');
+  const base = baseGrant();
+  base.requestJson = JSON.stringify(fixture.question_request);
+  base.current.target = question.snapshot.evaluation.artifacts[0].target;
+  base.current.profile = question.snapshot.evaluation.basis.basis.profile;
+  base.current.currentBasisJson = JSON.stringify(question.snapshot.evaluation.basis);
+  const source = sourceLinkGrant();
+  const member = fixture.source_link.member;
+  source.current = {
+    documentId: member.identity.document_id,
+    revisionId: member.identity.revision_id,
+    contributionId: member.identity.contribution_id,
+    scopeLocator: member.cab_inspection.target.scope_locator as [number, number],
+    text: member.source,
+    layoutRevision: member.cab_inspection.layout_revision,
+    facePage: member.cab_inspection.face_page,
+    owner: {
+      role: member.owner.role as 'transmittal' | 'attachment',
+      parentDocumentId: member.owner.parent_document_id,
+      intrinsicClassificationLocator: member.owner.intrinsic_classification_locator as [number, number],
+    },
+  };
+  source.sourceLinkJson = JSON.stringify(fixture.source_link);
+  const permission: OfficeOrdinaryCabPreviewGrant = {
+    ...previewGrant(),
+    sourceLinkGrantId: source.grantId,
+    sourceExaminationJson: JSON.stringify(fixture.source_examination),
+    answersJson: JSON.stringify(answerGroup),
+    expectedReceipt: prepared.preview_receipt,
+    expectedPreviewFingerprint: applied.preview_fingerprint,
+  };
+  return { fixture, base, source, permission };
+}
+
+test.skipIf(!process.env.MARQUE_166_WASM)(
+  'a linked source is previewed by the real engine without display leaks',
+  async () => {
+    const wasm = createRequire(import.meta.url)(process.env.MARQUE_166_WASM!) as LinkedEngine;
+    const { fixture, base, source, permission } = realLinkedGrants(wasm);
+    const f = setup(
+      async (input) => wasm.evaluate_ordinary_cab_preview(input),
+      permission,
+      source,
+      base,
+      (input) => wasm.evaluate_ordinary_cab_questions(input),
+    );
+    await f.pane.ready;
+    clickPreview(f.root);
+    await vi.waitFor(() => expect(f.root.textContent).toContain('Hypothetical authority block'));
+    expect(f.preview).toHaveBeenCalledTimes(2);
+    for (const [input] of f.preview.mock.calls)
+      expect((JSON.parse(input) as PreviewRequest).source_link).toEqual(fixture.source_link);
+    expect(f.apply).not.toHaveBeenCalled();
+    noPrivateValues(f.root);
+  },
+);
+
+test.skipIf(!process.env.MARQUE_166_WASM).each(['__proto__', 'constructor', 'toString'])(
+  'the real engine accepts opaque source identifier %s',
+  async (identifier) => {
+    const wasm = createRequire(import.meta.url)(process.env.MARQUE_166_WASM!) as LinkedEngine;
+    const fixture = structuredClone(linkedFixture);
+    const changed = sourceLinkGrant();
+    changed.sourceLinkJson = JSON.stringify(fixture.source_link);
+    reissueSource(changed, 'document', identifier);
+    fixture.source_link = JSON.parse(changed.sourceLinkJson);
+    const { base, source, permission } = realLinkedGrants(wasm, fixture);
+    const f = setup(
+      async (input) => wasm.evaluate_ordinary_cab_preview(input),
+      permission,
+      source,
+      base,
+      (input) => wasm.evaluate_ordinary_cab_questions(input),
+    );
+    await f.pane.ready;
+    clickPreview(f.root);
+    await vi.waitFor(() => expect(f.root.textContent).toContain('Hypothetical authority block'));
+    expect(f.preview).toHaveBeenCalledTimes(2);
+    noPrivateValues(f.root);
+  },
+);
+
+test.skipIf(!process.env.MARQUE_166_WASM)('the real engine receives no linked source without its grant', async () => {
+  const wasm = createRequire(import.meta.url)(process.env.MARQUE_166_WASM!) as LinkedEngine;
+  const { base, permission } = realLinkedGrants(wasm);
+  const f = setup(
+    async (input) => wasm.evaluate_ordinary_cab_preview(input),
+    permission,
+    null,
+    base,
+    (input) => wasm.evaluate_ordinary_cab_questions(input),
+  );
+  await f.pane.ready;
+  clickPreview(f.root);
+  await vi.waitFor(() => expect(f.readSourceGrant).toHaveBeenCalled());
+  await settled();
+  expect(f.preview).not.toHaveBeenCalled();
+  expect(f.root.textContent).not.toContain('Hypothetical authority block');
+  noPrivateValues(f.root);
+});
+
+test.skipIf(!process.env.MARQUE_166_WASM).each([
+  ['prepare', 'document'],
+  ['prepare', 'revision'],
+  ['apply', 'document'],
+  ['apply', 'revision'],
+] as const)('a real delayed %s cannot outlive a changed source %s with the same text', async (phase, change) => {
+  const wasm = createRequire(import.meta.url)(process.env.MARQUE_166_WASM!) as LinkedEngine;
+  const { base, source, permission } = realLinkedGrants(wasm);
+  let release: (() => void) | undefined;
+  const f = setup(
+    (input) => {
+      const output = wasm.evaluate_ordinary_cab_preview(input);
+      if ((JSON.parse(input) as PreviewRequest).mode !== phase) return Promise.resolve(output);
+      return new Promise((resolve) => {
+        release = () => resolve(output);
+      });
+    },
+    permission,
+    source,
+    base,
+    (input) => wasm.evaluate_ordinary_cab_questions(input),
+  );
+  await f.pane.ready;
+  clickPreview(f.root);
+  await vi.waitFor(() => expect(release).toBeDefined());
+  const changed = structuredClone(source);
+  reissueSource(changed, change);
+  expect(changed.current.text).toBe(source.current.text);
+  f.setSourceGrant(changed);
+  release!();
+  await settled();
+  expect(f.root.textContent).not.toContain('Hypothetical authority block');
+  if (phase === 'prepare') expect(f.preview).toHaveBeenCalledTimes(1);
+  expect(f.apply).not.toHaveBeenCalled();
+  noPrivateValues(f.root);
+});
+
+test.skipIf(!process.env.MARQUE_166_WASM)('the pane withholds a real refused source link', async () => {
+  const wasm = createRequire(import.meta.url)(process.env.MARQUE_166_WASM!) as LinkedEngine;
+  const { base, source, permission } = realLinkedGrants(wasm);
+  const link = JSON.parse(source.sourceLinkJson);
+  link.target_use.reference_span = link.target_use.revision_span;
+  source.sourceLinkJson = JSON.stringify(link);
+  const results: { status: string; reason: string }[] = [];
+  const f = setup(
+    async (input) => {
+      const output = wasm.evaluate_ordinary_cab_preview(input);
+      results.push(JSON.parse(output));
+      return output;
+    },
+    permission,
+    source,
+    base,
+    (input) => wasm.evaluate_ordinary_cab_questions(input),
+  );
+  await f.pane.ready;
+  clickPreview(f.root);
+  await vi.waitFor(() => expect(f.preview).toHaveBeenCalledTimes(1));
+  await settled();
+  expect(results[0]).toMatchObject({ status: 'unavailable', reason: 'source_link_unresolved' });
+  expect(f.root.textContent).not.toContain('Hypothetical authority block');
   noPrivateValues(f.root);
 });
 
@@ -397,9 +900,12 @@ test.each([
   'viewer',
   'document',
   'chain',
+  'invalid source selector',
   'invalid answers',
+  'oversized answers',
   'empty answers',
   'invalid examination',
+  'oversized examination',
   'wrong examination target',
   'wrong examination classification locator',
 ] as const)('requires a separate current preview grant: %s', async (denial) => {
@@ -409,9 +915,12 @@ test.each([
   if (denial === 'viewer') grant.viewerId = 'another-viewer';
   if (denial === 'document') grant.documentId = 'another-document';
   if (denial === 'chain') grant.chain = 'another-chain';
+  if (denial === 'invalid source selector') grant.sourceLinkGrantId = '';
   if (denial === 'invalid answers') grant.answersJson = '{';
+  if (denial === 'oversized answers') grant.answersJson = 'x'.repeat(1_048_577);
   if (denial === 'empty answers') grant.answersJson = '[]';
   if (denial === 'invalid examination') grant.sourceExaminationJson = '{';
+  if (denial === 'oversized examination') grant.sourceExaminationJson = 'x'.repeat(1_048_577);
   if (denial === 'wrong examination target') {
     const examination = structuredClone(sourceExamination);
     examination.target.revision_id = 'another-revision';
