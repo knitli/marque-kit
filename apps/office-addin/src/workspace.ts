@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type { OfficeSourceMarkingInstallation } from './source-marking.ts';
+import type { WordCabOwnerGrant } from './cab-placement.ts';
 import type { NativeCabRequest } from '@knitli/marque-kit-core/native-cab';
 import type { NativeSemanticResultsRequest } from '@knitli/marque-kit-core/native-results';
 import type {
@@ -22,7 +23,7 @@ export interface OfficeWordHost {
   /** Must bind the write to entry.binding and revalidate target/destination before touching Word. */
   applyCommitted(entry: LogEntry, documentId: string): Promise<OfficeWriteAck>;
   jump?(subjectId: string, documentId: string): Promise<void>;
-  /** The installation guarantees notification for any change to document revision, disclosure, session, or provider before further results may be shown. */
+  /** Notify before further results on any document, revision, disclosure, session, provider, pagination or formatting change. */
   watchNativeCabInvalidation?(documentId: string, chain: string, invalidate: () => void): () => void;
   /** Fires before semantic result disclosure, viewer, document, or provider changes can be shown. */
   watchNativeSemanticResultsInvalidation?(documentId: string, viewerId: string, invalidate: () => void): () => void;
@@ -33,6 +34,14 @@ export interface OfficeWordHost {
     documentId: string,
     chain: string,
   ): Promise<Omit<NativeCabRequest, 'maxBasisBytes' | 'expectedChain'> | null>;
+  /** Independent current owner, source text and layout revision. */
+  readNativeCabPlacementScope?(documentId: string, chain: string): Promise<OfficeCabPlacementScope | null>;
+}
+
+export interface OfficeCabPlacementScope extends WordCabOwnerGrant {
+  /** Independently designated owner and face; never inferred from a candidate or an attachment. */
+  text: string;
+  layout_revision: string;
 }
 
 export interface OfficeWriteAck {
@@ -71,6 +80,14 @@ export interface OfficeNativeWordSession {
   readonly nativeCab: OfficeNativeCabSnapshot;
   /** Read-only refresh; must not apply or acknowledge a write. */
   readNativeCab?(): Promise<OfficeNativeCabSnapshot>;
+}
+/** An authorized ordinary-document placement inspection; it carries no policy or readiness receipt. */
+export interface OfficeNativeCabPlacementSession {
+  readonly kind: 'native_cab_placement';
+  readonly documentId: string;
+  readonly chain: string;
+  /** Read-only native/WASM comparison over Word's observed pages and the independent owner binding. */
+  inspectCabPlacement(text: string, requestJson: string): Promise<string>;
 }
 /** A restricted viewer receives only a sanitized semantic-results projection. */
 export interface OfficeNativeSemanticResultsSnapshot {
@@ -116,7 +133,13 @@ export interface OfficeWordSession {
 export interface OfficeWorkspaceProvider {
   openWord(
     host: OfficeWordHost,
-  ): Promise<OfficeWordSession | OfficeNativeWordSession | OfficeNativeSemanticResultsSession | null>;
+  ): Promise<
+    | OfficeWordSession
+    | OfficeNativeWordSession
+    | OfficeNativeCabPlacementSession
+    | OfficeNativeSemanticResultsSession
+    | null
+  >;
 }
 
 declare global {

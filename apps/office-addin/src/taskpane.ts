@@ -29,10 +29,12 @@ import { locate, paragraphAt, written } from './locate.ts';
 import { banner, edits, made, relint, undoneSubject } from './write.ts';
 import { isSameWordDocument } from './workspace.ts';
 import { mountNativeWorkspace } from './native-workspace.ts';
+import { mountCabPlacementWorkspace } from './cab-placement-workspace.ts';
 import { mountNativeSemanticResultsWorkspace } from './native-semantic-results-workspace.ts';
 import { mountOfficeSourceMarking } from './source-marking.ts';
 import type {
   OfficeCurrentEvaluation,
+  OfficeNativeCabPlacementSession,
   OfficeNativeSemanticResultsSession,
   OfficeNativeWordSession,
   OfficeWordSession,
@@ -153,7 +155,12 @@ void Office.onReady(async (info) => {
     addEventListener('pagehide', () => sourceView.destroy(), { once: true });
   };
   if (installation) {
-    let session: OfficeWordSession | OfficeNativeWordSession | OfficeNativeSemanticResultsSession | null;
+    let session:
+      | OfficeWordSession
+      | OfficeNativeWordSession
+      | OfficeNativeCabPlacementSession
+      | OfficeNativeSemanticResultsSession
+      | null;
     let bound = false;
     try {
       session = await installation.provider.openWord(installation.wordHost);
@@ -163,6 +170,15 @@ void Office.onReady(async (info) => {
     }
     if (session && bound && 'kind' in session && session.kind === 'native_semantic_results') {
       mountNativeSemanticResultsWorkspace(
+        document.querySelector<HTMLElement>('#pane')!,
+        session,
+        installation.wordHost,
+        installation.nativeMaxBytes,
+      );
+      return;
+    }
+    if (session && bound && 'kind' in session && session.kind === 'native_cab_placement') {
+      mountCabPlacementWorkspace(
         document.querySelector<HTMLElement>('#pane')!,
         session,
         installation.wordHost,
