@@ -46,6 +46,7 @@ const SUPPORT_KINDS = [
   'implied_usa',
   'examined_absence',
   'rel_receive_implies_show',
+  'eyes_receive_implies_show',
   'preview_answer',
   'cab_proof',
   'sci_proof',

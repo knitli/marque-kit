@@ -447,6 +447,46 @@ export interface DocumentState {
   /** Accepted physical changes remain host-confirmation obligations after a re-lint. */
   awaitingWrites?: string[];
   withdrawn?: Withdrawn[];
+  /** Read-only, content-free evidence retained by the ordinary lint projection. */
+  intake?: DocumentIntake;
+}
+
+/** A transformation the engine recorded while inspecting source bytes. */
+export type TransformationKind = 'normalized_ascii_case' | 'missing_opening_delimiter_at_boundary';
+
+export interface PerformedTransformation {
+  kind: TransformationKind;
+  /** Original UTF-8 byte range, including zero-width insertion points. */
+  span: [number, number];
+  /** Index of the source candidate that owns the operation. */
+  observation: number;
+}
+
+/** The ordinary lint projection's bounded transformation receipt fields. */
+export type IntakeStatus = 'complete' | 'partial' | 'refused' | 'unavailable';
+export type IntakeResource =
+  | 'input_bytes'
+  | 'input_records'
+  | 'input_members'
+  | 'items'
+  | 'support_edges'
+  | 'work'
+  | 'retained_bytes'
+  | 'output_bytes';
+
+/** Minimal candidate ownership reference used to validate read-only receipts. */
+export interface IntakeCandidateReference {
+  observation: number;
+  span: [number, number];
+}
+
+export interface DocumentIntake {
+  status: IntakeStatus | (string & {});
+  transformation_count?: number;
+  transformations?: PerformedTransformation[];
+  candidate_count_emitted?: number;
+  candidates?: IntakeCandidateReference[];
+  projection_cutoff?: { phase?: string | null; resource?: IntakeResource | (string & {}) | null } | null;
 }
 
 /** The engine's document, or a view of it (docView). */

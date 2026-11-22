@@ -69,6 +69,189 @@ describe('question first', () => {
   });
 });
 
+describe('ordinary lint transformation receipts', () => {
+  const sample: NonNullable<Doc['document']['intake']> & {
+    candidates: Array<{ observation: number; span: [number, number]; private: string }>;
+    source_occurrences: unknown[];
+    claims: unknown[];
+  } = {
+    status: 'complete' as const,
+    transformation_count: 1,
+    transformations: [{ kind: 'normalized_ascii_case', span: [7, 9] as [number, number], observation: 0 }],
+    candidate_count_emitted: 1,
+    candidates: [{ observation: 0, span: [6, 17], private: 'candidate evidence must not be rendered' }],
+    source_occurrences: [{ value: 'GRANTED SECRET evidence must stay masked' }],
+    claims: [{ value: 'grant evidence must not be rendered' }],
+  };
+
+  test('shows only the read-only kind, original byte span, and owning observation', () => {
+    const d: Doc = { ...memo, document: { ...memo.document, intake: sample } };
+    const p = pane(d, { readOnly: true });
+    const receipt = p.querySelector<HTMLDetailsElement>('details.mq-transform-receipt')!;
+    receipt.open = true;
+    expect(receipt.querySelector('summary')?.textContent).toBe('Source transformations · 1 recorded');
+    expect(receipt.textContent).toContain('Normalized ASCII case');
+    expect(receipt.textContent).toContain('Original byte span 7–9');
+    expect(receipt.textContent).toContain('Owning observation 0');
+    expect(receipt.textContent).not.toContain('candidate evidence');
+    expect(receipt.textContent).not.toContain('GRANTED SECRET');
+    expect(receipt.textContent).not.toContain('grant evidence');
+    expect(receipt.querySelector('button, input, textarea, select')).toBeNull();
+    expect(buttons(p)).toEqual(buttons(pane(memo, { readOnly: true })));
+    expect(p.querySelector('.mq-stamp')?.textContent).toBe(
+      pane(memo, { readOnly: true }).querySelector('.mq-stamp')?.textContent,
+    );
+  });
+
+  test('reports a bounded projection as partial and preserves the cutoff', () => {
+    const d: Doc = {
+      ...memo,
+      document: {
+        ...memo.document,
+        intake: {
+          status: 'partial',
+          transformation_count: 500,
+          transformations: sample.transformations,
+          candidate_count_emitted: 1,
+          candidates: sample.candidates,
+          projection_cutoff: { phase: 'projection', resource: 'output_bytes' },
+        },
+      },
+    };
+    const receipt = pane(d).querySelector<HTMLDetailsElement>('details.mq-transform-receipt')!;
+    receipt.open = true;
+    expect(receipt.querySelector('summary')?.textContent).toBe('Source transformations · partial · 1 of 500 retained');
+    expect(receipt.textContent).toContain('projection stopped at output bytes');
+    const documentState = d.document;
+    pane(d);
+    expect(d.document).toBe(documentState);
+  });
+
+  test.each(['refused', 'unavailable'])('%s receipts do not render stale rows or claim completeness', (status) => {
+    const intake = {
+      status,
+      get transformation_count() {
+        throw new Error('refused receipts must be handled before reading stale counts');
+      },
+      get transformations() {
+        throw new Error('refused receipts must be handled before reading stale rows');
+      },
+      get candidates() {
+        throw new Error('refused receipts must be handled before reading candidate references');
+      },
+    } as unknown as NonNullable<Doc['document']['intake']>;
+    const d: Doc = { ...memo, document: { ...memo.document, intake } };
+    const receipt = pane(d).querySelector('details.mq-transform-receipt')!;
+    expect(receipt.querySelector('summary')?.textContent).toBe(`Source transformations · ${status}`);
+    expect(receipt.textContent).toContain('A complete transformation receipt was not available.');
+    expect(receipt.querySelector('ul.mq-transforms')).toBeNull();
+    expect(receipt.textContent).not.toContain('Original byte span');
+  });
+
+  test.each([
+    { status: 'complete' },
+    { status: 'complete', transformation_count: 0 },
+    { status: 'complete', transformation_count: 2, transformations: sample.transformations },
+  ])('missing count or rows cannot claim complete-empty or complete receipt (%j)', (input) => {
+    const intake = input as unknown as NonNullable<Doc['document']['intake']>;
+    const d: Doc = { ...memo, document: { ...memo.document, intake } };
+    const summary = pane(d).querySelector('details.mq-transform-receipt summary')?.textContent;
+    expect(summary).not.toBe('Source transformations · none recorded');
+    expect(summary).not.toBe('Source transformations · 2 recorded');
+    expect(summary).toContain('incomplete');
+  });
+
+  test('mounted protected view filters malformed rows and never renders unknown wire strings', () => {
+    const privateValue = 'GRANTED SECRET must never be rendered';
+    const intake = {
+      status: 'complete',
+      transformation_count: 4,
+      transformations: [
+        { kind: 'normalized_ascii_case', span: [5, 5], observation: 1 },
+        { kind: privateValue, span: [0, 2], observation: 0 },
+        { kind: 'missing_opening_delimiter_at_boundary', span: [8, 4], observation: 0 },
+        { kind: 'normalized_ascii_case', span: [0, 1], observation: privateValue },
+        { kind: 'toString', span: [6, 7], observation: 1 },
+        { kind: 'constructor', span: [6, 7], observation: 1 },
+        { kind: '__proto__', span: [6, 7], observation: 1 },
+      ],
+      candidate_count_emitted: 1,
+      projection_cutoff: { resource: 'toString' },
+      candidates: [{ observation: 1, span: [5, 10], private: privateValue }],
+      source_occurrences: [{ value: privateValue }],
+      claims: [{ value: privateValue }],
+    } as unknown as Doc['document']['intake'];
+    const d: Doc = { ...memo, document: { ...memo.document, intake } };
+    const root = document.createElement('div');
+    document.body.append(root);
+    const mounted = mount(root, { doc: d, readOnly: true });
+    const receipt = root.querySelector<HTMLDetailsElement>('details.mq-transform-receipt')!;
+    receipt.open = true;
+    expect(receipt.querySelector('summary')?.textContent).toContain('incomplete');
+    expect(receipt.querySelectorAll('li.mq-transform')).toHaveLength(1);
+    expect(receipt.textContent).toContain('Normalized ASCII case');
+    expect(receipt.textContent).toContain('Original byte span 5–5');
+    expect(receipt.textContent).toContain('Owning observation 1');
+    expect(receipt.textContent).not.toContain(privateValue);
+    expect(receipt.textContent).not.toContain('missing_opening_delimiter_at_boundary');
+    expect(receipt.textContent).not.toContain('toString');
+    expect(receipt.textContent).not.toContain('constructor');
+    expect(receipt.textContent).not.toContain('__proto__');
+    expect(receipt.querySelector('button, input, textarea, select')).toBeNull();
+    mounted.destroy();
+    root.remove();
+  });
+
+  test('missing and invented owners cannot be shown as transformation receipts', () => {
+    const intake = {
+      status: 'complete',
+      transformation_count: 3,
+      candidate_count_emitted: 1,
+      transformations: [
+        { kind: 'normalized_ascii_case', span: [6, 7], observation: 0 },
+        { kind: 'normalized_ascii_case', span: [6, 7] },
+        { kind: 'normalized_ascii_case', span: [6, 7], observation: 99 },
+      ],
+      candidates: [{ observation: 0, span: [5, 10] }],
+    } as unknown as NonNullable<Doc['document']['intake']>;
+    const d: Doc = { ...memo, document: { ...memo.document, intake } };
+    const root = document.createElement('div');
+    document.body.append(root);
+    const mounted = mount(root, { doc: d, readOnly: true });
+    const receipt = root.querySelector<HTMLDetailsElement>('details.mq-transform-receipt')!;
+    receipt.open = true;
+    expect(receipt.querySelector('summary')?.textContent).toBe('Source transformations · incomplete · 1 of 3 retained');
+    expect(receipt.textContent).toContain('Owning observation 0');
+    expect(receipt.textContent).not.toContain('Owning observation 99');
+    mounted.destroy();
+    root.remove();
+  });
+
+  test('over-bound receipt arrays are not traversed', () => {
+    const rows = Array.from({ length: 8_192 });
+    Object.defineProperty(rows, '0', {
+      get() {
+        throw new Error('over-bound rows must not be read');
+      },
+    });
+    const intake = {
+      status: 'complete',
+      transformation_count: 8_192,
+      candidate_count_emitted: 1,
+      transformations: rows,
+      candidates: [{ observation: 0, span: [0, 1] }],
+    } as unknown as NonNullable<Doc['document']['intake']>;
+    const d: Doc = { ...memo, document: { ...memo.document, intake } };
+    const root = document.createElement('div');
+    document.body.append(root);
+    const mounted = mount(root, { doc: d, readOnly: true });
+    const summary = root.querySelector('details.mq-transform-receipt summary')?.textContent;
+    expect(summary).toBe('Source transformations · incomplete · 0 of 8192 retained');
+    mounted.destroy();
+    root.remove();
+  });
+});
+
 describe('the pane follows the cursor (DECISIONS #8)', () => {
   test('update({ open }) opens that card and leaves focus in the document; null closes it', async () => {
     // happy-dom lays nothing out: give the pane and its parent room for a card (the kit's floor is 240px).
@@ -709,20 +892,65 @@ describe('host-acknowledged append', () => {
     for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
     box.append(root);
     document.body.append(box);
-    const prior = record(empty(), P2, 'kept_as_written', null, 't0', snapshot(f(P2)));
+    const rawControl = JSON.parse(
+      readFileSync(join(import.meta.dirname, '../../../../fixtures/joint-handle-inputs.json'), 'utf8'),
+    ) as {
+      input: {
+        act_history: {
+          coverage: { state: 'complete'; sequence_range: [number, number] };
+          ordered_acts: Array<Record<string, unknown>>;
+        };
+        append_request: { unsequenced_act: Record<string, unknown> };
+        caller_control: { watermarks: { act_sequence: number } };
+      };
+    };
+    const rawExpected = JSON.parse(
+      readFileSync(join(import.meta.dirname, '../../../../fixtures/joint-protocol-cases.json'), 'utf8'),
+    ) as { expected: { act_sequence: string; wrap_rounding_or_duplicate: boolean } };
+    const rawAct = rawControl.input.append_request.unsequenced_act;
+    const rawId = (act: Record<string, unknown>): string => {
+      const subject = act.subject as { chain: string; serial: number };
+      return `${subject.chain}/${subject.serial}`;
+    };
+    const rawBinding = (act: Record<string, unknown>): NonNullable<ActAppendRequest['binding']> => ({
+      chain: act.chain as string,
+      subject: act.subject as { chain: string; serial: number },
+      question: act.question as { chain: string; serial: number },
+      questionRevision: act.question_revision as number,
+      resultRevision: act.result_revision as number,
+      payloadRef: act.payload_ref as string,
+      sourceRevisions: act.source_revisions as string[],
+      basisRef: act.basis as string,
+      supersedes: act.supersedes as null,
+      takesBack: act.takes_back as null,
+    });
+    const prior: State = {
+      ...empty(),
+      log: rawControl.input.act_history.ordered_acts.map((act) => ({
+        sequence: act.sequence as number,
+        id: rawId(act),
+        act: act.action as ActAppendRequest['act'],
+        value: null,
+        at: 'prior',
+        binding: rawBinding(act),
+      })),
+      actSequence: rawControl.input.caller_control.watermarks.act_sequence,
+      actHistoryCoverage: {
+        state: rawControl.input.act_history.coverage.state,
+        sequenceRange: rawControl.input.act_history.coverage.sequence_range,
+      },
+    };
+    const requestBinding = rawBinding(rawAct);
     const initial: State = {
       ...prior,
-      actSequence: Number.MAX_SAFE_INTEGER,
-      actHistoryCoverage: { state: 'complete', sequenceRange: [1, 1] },
     };
     const host = inMemoryAppender(initial);
-    const binding = { documentId: 'memo-fixture', chain: 'chain-A' };
     const requests: ActAppendRequest[] = [];
     const dispatched: unknown[] = [];
     const p = mount(root, {
       doc: memo,
       state: initial,
-      actBinding: binding,
+      actBinding: requestBinding,
       onAppend: async (request) => {
         requests.push(request);
         return host.append(request);
@@ -732,20 +960,31 @@ describe('host-acknowledged append', () => {
       },
     });
 
-    await clickAnswer(root, p);
+    // Drive the same mounted action route as the visible controls with the
+    // raw14 subject/action/binding. The fixture's raw sequence is null; the
+    // host, not the pane, owns checked allocation.
+    p.host.onAct?.({ ...f(P3), id: rawId(rawAct) }, 'answered', null);
     await flushAppend();
 
     expect(requests).toHaveLength(1);
-    expect(requests[0]?.binding).toEqual(binding);
+    expect(requests[0]?.id).toBe(rawId(rawAct));
+    expect(requests[0]?.act).toBe(rawAct.action);
+    expect(requests[0]?.value).toBeNull();
+    expect(requests[0]?.binding).toMatchObject(requestBinding);
     expect(host.state.log).toEqual(initial.log);
-    expect(host.state.actSequence).toBe(Number.MAX_SAFE_INTEGER);
+    expect(host.state.actSequence).toBe(rawControl.input.caller_control.watermarks.act_sequence);
+    expect(host.state.actHistoryCoverage).toEqual(initial.actHistoryCoverage);
     expect(host.state.pendingAppends).toHaveLength(1);
     expect(host.state.pendingAppends?.[0]).toMatchObject({
-      id: P3,
+      id: rawId(rawAct),
       sequence: null,
       state: 'pending_sequence',
       reason: 'sequence-exhausted',
     });
+    expect(host.state.pendingAppends?.[0]?.binding).toMatchObject(requestBinding);
+    expect(rawExpected.expected.act_sequence).toBe('exhausted');
+    expect(rawExpected.expected.wrap_rounding_or_duplicate).toBe(false);
+    expect(host.state.log.length > initial.log.length).toBe(rawExpected.expected.wrap_rounding_or_duplicate);
     expect(p.view()!.findings.find((x) => x.id === P3)?.asks).toBeTruthy();
     expect(root.querySelector('.mq-undo')).toBeNull();
     expect(root.textContent).toContain('This action remains pending outside history and has not been applied.');

@@ -113,6 +113,12 @@ void test('parser rejects hidden gaps, raw reference fields, unsafe edges, and u
   for (const text of cases) assert.throws(() => parseNativeSemanticResultsJson(text, 4096));
 });
 
+void test('strict semantic-result decoder accepts the EYES receive-to-show support kind', () => {
+  const withEyesSupport = fixture.replace('"cab_proof"', '"eyes_receive_implies_show"');
+  const parsed = parseNativeSemanticResultsJson(withEyesSupport, 4096);
+  assert.deepEqual(parsed.disclosure.items[0]?.support_kinds, ['eyes_receive_implies_show']);
+});
+
 void test('byte limits are enforced before parse and output never grants finalize', () => {
   assert.throws(() => parseNativeSemanticResultsJson(fixture, fixture.length - 1));
   assert.equal(docFrom(fixture).document.native_semantic_results?.whole_document_finalize, 'unsupported');
