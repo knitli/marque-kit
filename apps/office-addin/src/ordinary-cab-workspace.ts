@@ -3,10 +3,24 @@
 
 import { readCabSnapshot } from '@knitli/marque-kit-core/native-cab';
 import { parseNativeBasisJson, parseNativeJson } from '@knitli/marque-kit-core/native-wire';
-import type { NativeField } from '@knitli/marque-kit-core/native-wire';
+import type { NativeEvaluationV2, NativeField } from '@knitli/marque-kit-core/native-wire';
 import type { Doc } from '@knitli/marque-kit-core/types';
+import {
+  appliedPreview,
+  executePreview,
+  issuedAnswers,
+  matchesSourceExamination,
+  preparedPreview,
+  projectedRows,
+  validDigest,
+} from './ordinary-cab-preview.ts';
 import { isSameWordDocument } from './workspace.ts';
-import type { OfficeNativeWordSession, OfficeOrdinaryCabGrant, OfficeWordHost } from './workspace.ts';
+import type {
+  OfficeNativeWordSession,
+  OfficeOrdinaryCabGrant,
+  OfficeOrdinaryCabPreviewGrant,
+  OfficeWordHost,
+} from './workspace.ts';
 
 const fields: readonly NativeField[] = [
   'classified_by',
@@ -151,6 +165,43 @@ function checkedGrant(
   }
 }
 
+/** Check preview permission separately from the questions grant. */
+function checkedPreviewGrant(
+  grant: OfficeOrdinaryCabPreviewGrant | null,
+  session: OfficeNativeWordSession,
+  maxBytes: number,
+): string | null {
+  if (
+    !grant ||
+    grant.documentId !== session.documentId ||
+    grant.chain !== session.chain ||
+    grant.viewerId !== session.ordinaryCab?.viewerId ||
+    !id(grant.viewerId) ||
+    !id(grant.grantId) ||
+    !id(grant.permissionRevision) ||
+    !validDigest(grant.expectedReceipt) ||
+    !validDigest(grant.expectedPreviewFingerprint) ||
+    grant.authorizeRawInput !== true ||
+    grant.authorizeRawOutput !== true ||
+    typeof grant.sourceExaminationJson !== 'string' ||
+    encoder.encode(grant.sourceExaminationJson).length > Math.min(maxBytes, 1_048_576) ||
+    typeof grant.answersJson !== 'string' ||
+    encoder.encode(grant.answersJson).length > Math.min(maxBytes, 1_048_576) ||
+    !Array.isArray(grant.disclosedFields) ||
+    grant.disclosedFields.length > fields.length ||
+    new Set(grant.disclosedFields).size !== grant.disclosedFields.length ||
+    grant.disclosedFields.some((field) => !fields.includes(field))
+  )
+    return null;
+  try {
+    const answers: unknown = JSON.parse(grant.answersJson);
+    if (!Array.isArray(answers) || answers.length < 1 || answers.length > 16) return null;
+    return JSON.stringify(grant);
+  } catch {
+    return null;
+  }
+}
+
 /** Read a trusted provider with an independently current basis and host grants. */
 export function mountOrdinaryCabWorkspace(
   root: HTMLElement,
@@ -160,9 +211,11 @@ export function mountOrdinaryCabWorkspace(
 ): { readonly ready: Promise<void>; refresh(): Promise<void>; destroy(): void } {
   let generation = 0;
   let disposed = false;
+  let displayedGrant: string | null = null;
   let unsubscribe: (() => void) | undefined;
   const revoke = () => {
     generation++;
+    displayedGrant = null;
     root.textContent = 'The current authority block questions are unavailable.';
   };
   const provider = session.ordinaryCab;
@@ -252,7 +305,141 @@ export function mountOrdinaryCabWorkspace(
         row.textContent = `Provide ${labels[field]}.`;
         section.append(row);
       }
+      if (provider.preview && host.readOrdinaryCabPreviewGrant) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = 'Preview answers';
+        button.addEventListener('click', () => void preview());
+        section.append(button);
+      }
+      displayedGrant = fingerprint;
       root.replaceChildren(section);
+    } catch {
+      /* keep revoked */
+    }
+  }
+  async function preview() {
+    const originalGrant = displayedGrant;
+    const original = root.firstElementChild?.cloneNode(true) as HTMLElement | undefined;
+    original?.querySelector('button')?.remove();
+    displayedGrant = null;
+    const attempt = ++generation;
+    root.textContent = 'The authority block preview is unavailable.';
+    if (
+      !provider?.preview ||
+      !host.readOrdinaryCabGrant ||
+      !host.readOrdinaryCabPreviewGrant ||
+      typeof unsubscribe !== 'function' ||
+      !maxBytes
+    )
+      return;
+    const previewOperation = provider.preview;
+    try {
+      const base = await host.readOrdinaryCabGrant(session.documentId, session.chain, viewerId!);
+      const baseKey = checkedGrant(base, session, maxBytes);
+      const permission = await host.readOrdinaryCabPreviewGrant(session.documentId, session.chain, viewerId!);
+      const permissionKey = checkedPreviewGrant(permission, session, maxBytes);
+      const current = async () =>
+        !disposed &&
+        attempt === generation &&
+        session.ordinaryCab === provider &&
+        provider.viewerId === viewerId &&
+        provider.preview === previewOperation &&
+        checkedGrant(
+          await host.readOrdinaryCabGrant!(session.documentId, session.chain, viewerId!),
+          session,
+          maxBytes,
+        ) === baseKey &&
+        checkedPreviewGrant(
+          await host.readOrdinaryCabPreviewGrant!(session.documentId, session.chain, viewerId!),
+          session,
+          maxBytes,
+        ) === permissionKey &&
+        (await isSameWordDocument(host, session)) &&
+        !disposed &&
+        attempt === generation;
+      if (
+        !baseKey ||
+        baseKey !== originalGrant ||
+        !original ||
+        !permissionKey ||
+        !base ||
+        !permission ||
+        !(await current())
+      )
+        return;
+      const authorized = JSON.parse(baseKey) as OfficeOrdinaryCabGrant;
+      const previewGrant = JSON.parse(permissionKey) as OfficeOrdinaryCabPreviewGrant;
+      const questionRequest: unknown = JSON.parse(authorized.requestJson);
+      const sourceExamination: unknown = JSON.parse(previewGrant.sourceExaminationJson);
+      if (!matchesSourceExamination(questionRequest, sourceExamination)) return;
+      const validSnapshot = (snapshot: unknown) => {
+        try {
+          const native = parseNativeJson(JSON.stringify(snapshot), maxBytes);
+          const doc: Doc = { findings: [], document: { blocking: [], artifacts: [], native_evaluation: native } };
+          return readCabSnapshot(doc, {
+            ...authorized.current,
+            expectedChain: session.chain,
+            maxBasisBytes: maxBytes,
+          });
+        } catch {
+          return null;
+        }
+      };
+      const prepared = await executePreview(
+        previewOperation,
+        {
+          mode: 'prepare',
+          question_request: questionRequest,
+          source_examination: sourceExamination,
+        },
+        maxBytes,
+      );
+      if (
+        !(await current()) ||
+        !preparedPreview(prepared, previewGrant.expectedReceipt) ||
+        !validSnapshot(prepared.snapshot)
+      )
+        return;
+      const currentBase = validSnapshot(prepared.snapshot);
+      if (!currentBase || !('findings' in currentBase)) return;
+      const answers: unknown = JSON.parse(previewGrant.answersJson);
+      if (!issuedAnswers(currentBase as NativeEvaluationV2, answers)) return;
+      const applied = await executePreview(
+        previewOperation,
+        {
+          mode: 'apply',
+          question_request: questionRequest,
+          source_examination: sourceExamination,
+          preview_receipt: prepared.preview_receipt,
+          answers,
+        },
+        maxBytes,
+      );
+      if (
+        !(await current()) ||
+        !appliedPreview(applied, prepared, previewGrant.expectedPreviewFingerprint) ||
+        !validSnapshot(applied.snapshot)
+      )
+        return;
+      const rows = projectedRows(applied.preview, answers, authorized.current.target, session.chain);
+      if (!rows) return;
+      const section = document.createElement('section');
+      const heading = document.createElement('h2');
+      heading.textContent = 'Hypothetical authority block';
+      section.append(heading);
+      const note = document.createElement('p');
+      note.textContent =
+        'This preview shows field presence only. Values and authority have not been verified; no changes were written.';
+      section.append(note);
+      for (const row of rows) {
+        if (!previewGrant.disclosedFields.includes(row.field)) continue;
+        const line = document.createElement('p');
+        const outcome = row.satisfaction === 'satisfied' ? 'projected present' : row.satisfaction.replaceAll('_', ' ');
+        line.textContent = `${labels[row.field]}: ${outcome}.`;
+        section.append(line);
+      }
+      root.replaceChildren(original, section);
     } catch {
       /* keep revoked */
     }
