@@ -59,3 +59,64 @@ const outside = check({ 'bad.mts': source('Doc', memo.replace('"kind": "span"', 
 assert.match(outside, /"spam"/);
 const unnamed = check({ 'bad.mts': source('Doc', memo.replace('"needs_person"', '"unlisted": 1, "needs_person"')) });
 assert.match(unnamed, /unlisted/);
+
+const audienceFixture = JSON.parse(
+  readFileSync(join(root, 'packages/kit/test/fixtures/rust-ordinary-audience-variants.fixture'), 'utf8'),
+);
+const audience = audienceFixture.document.intake.audience_evidence;
+const intake = audienceFixture.document.intake;
+assert.equal(
+  check({ 'audience.mts': source('IntakeAudienceEvidence', JSON.stringify(audience)) }),
+  '',
+  'every audience claim emitted by the engine fits the kit contract',
+);
+assert.equal(
+  check({
+    ...Object.fromEntries(
+      intake.candidates.map((row: unknown, index: number) => [
+        `candidate-${index}.mts`,
+        source('IntakeCandidateReference', JSON.stringify(row)),
+      ]),
+    ),
+    ...Object.fromEntries(
+      intake.source_occurrences.map((row: unknown, index: number) => [
+        `occurrence-${index}.mts`,
+        source('IntakeSourceOccurrence', JSON.stringify(row)),
+      ]),
+    ),
+    ...Object.fromEntries(
+      intake.claims.map((row: unknown, index: number) => [
+        `claim-${index}.mts`,
+        source('IntakeSemanticClaim', JSON.stringify(row)),
+      ]),
+    ),
+    'empty-value.mts': source('IntakeSemanticValue', '{"kind":"known_empty_foreign_receive"}'),
+  }),
+  '',
+  'producer candidates, occurrences and claims fit without adding audience members',
+);
+assert.notEqual(
+  check({ 'bad-occurrence.mts': source('IntakeSemanticValue', '{"kind":"receive","member":"GBR"}') }),
+  '',
+);
+const show = audience.claims.find((claim: { kind: string }) => claim.kind === 'show');
+const empty = audience.claims.find((claim: { kind: string }) => claim.kind === 'known_empty_foreign_receive');
+const authored = audience.claims.find((claim: { support: string }) => claim.support === 'authored');
+const implied = audience.claims.find((claim: { support: string }) => claim.support === 'implied_usa');
+assert.ok(show && empty && authored && implied, 'fixture contains each needed audience example');
+assert.equal(
+  check({
+    'eyes.mts': source('IntakeAudienceClaim', JSON.stringify({ ...show, support: 'eyes_receive_implies_show' })),
+  }),
+  '',
+);
+for (const invalid of [
+  { ...show, member: null },
+  { ...empty, member: 'USA' },
+  { ...authored, occurrence: null },
+  { ...implied, occurrence: 0 },
+  { ...show, support: 'future_support' },
+  { ...show, kind: 'future_kind' },
+]) {
+  assert.notEqual(check({ 'bad-audience.mts': source('IntakeAudienceClaim', JSON.stringify(invalid)) }), '');
+}

@@ -21,6 +21,70 @@ const root = (): HTMLDivElement => {
 };
 
 describe('ordinary Rust source projection', () => {
+  test('retains the engine audience claims without conflating empty, unknown, countries, or groups', () => {
+    const n = root();
+    const doc = fixture('rust-ordinary-audience-variants.fixture');
+    const mounted = mount(n, { doc, readOnly: true });
+    const original = doc.document.intake?.audience_evidence;
+    const projected = mounted.view()?.document.intake?.audience_evidence;
+    expect(projected).toEqual(original);
+    expect(projected?.status).toBe('complete');
+    expect(projected?.claim_count).toBe(14);
+    expect(projected?.claims).toContainEqual({
+      claim: 1,
+      source_group: 0,
+      kind: 'known_empty_foreign_receive',
+      member: null,
+      support: 'examined_absence',
+      occurrence: null,
+    });
+    expect(projected?.claims).toContainEqual({
+      claim: 5,
+      source_group: 1,
+      kind: 'receive',
+      member: 'GBR',
+      support: 'authored',
+      occurrence: 3,
+    });
+    expect(projected?.claims).toContainEqual({
+      claim: 7,
+      source_group: 1,
+      kind: 'receive',
+      member: 'FVEY',
+      support: 'authored',
+      occurrence: 4,
+    });
+    expect(projected?.claims).toContainEqual({
+      claim: 8,
+      source_group: 1,
+      kind: 'show',
+      member: 'FVEY',
+      support: 'rel_receive_implies_show',
+      occurrence: 4,
+    });
+    expect(projected?.claims).toContainEqual({
+      claim: 13,
+      source_group: 2,
+      kind: 'unknown_member',
+      member: null,
+      support: 'authored',
+      occurrence: 8,
+    });
+    const intake = mounted.view()?.document.intake;
+    expect(intake?.source_occurrences?.[3]?.value).toEqual({ kind: 'receive' });
+    expect(intake?.source_occurrences?.[5]?.value).toEqual({ kind: 'show' });
+    expect(intake?.source_occurrences?.[8]).toMatchObject({ value: null, reason: 'unrecognized_member' });
+    expect(intake?.claims?.[8]).toEqual({ occurrence: 8, value: { kind: 'unknown_audience_member' } });
+    expect(intake?.candidates?.[2]?.evidence).toContainEqual({
+      kind: 'unexamined_control_token',
+      span: [65, 68],
+      polarity: 'opposes_well_formedness',
+    });
+    expect(n.textContent).not.toContain('XYZ');
+    mounted.destroy();
+    n.remove();
+  });
+
   test('retains Restricted and unresolved foreign ownership without disclosing source tokens', () => {
     const n = root();
     const doc = fixture('rust-ordinary-restricted-owner-unresolved.fixture');
