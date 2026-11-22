@@ -9,8 +9,8 @@
  * back takes its edit out, so the text goes back with the question.
  */
 
-import { docView, last } from '@knitli/marque-kit-core/state';
-import type { ArtifactView, Doc, FindingView, State, Subject } from '@knitli/marque-kit-core/types';
+import { canWriteAct, canWriteMarking, docView, last } from '@knitli/marque-kit-core/state';
+import type { ArtifactView, Doc, MarkingLike, FindingView, State, Subject } from '@knitli/marque-kit-core/types';
 
 export interface Edit {
   span: [number, number];
@@ -36,6 +36,7 @@ const shown = (f: FindingView): string => textOf(f.outcome?.result) ?? textOf(f.
 export function edits(view: Doc, memo: string): Edit[] {
   const bytes = enc.encode(memo);
   return view.findings.flatMap((f): Edit[] => {
+    if (!canWriteMarking(f.outcome?.result) || !canWriteMarking(f.marking?.as_written)) return [];
     const span = f.anchor?.span;
     if (!span) return [];
     if (f.anchor?.kind === 'portion') {
@@ -53,7 +54,9 @@ export function edits(view: Doc, memo: string): Edit[] {
 /** The banner a re-linted document carries: Marque's derived value once it's applied, or none. */
 export function banner(linted: Doc): string | null {
   const a = linted.document.artifacts.find((x: ArtifactView) => x.kind === 'front_marking');
-  return a?.state === 'present' ? textOf(a.derived_value) : null;
+  return a?.state === 'present' && (textOf(a.derived_value) == null || canWriteMarking(a.derived_value as MarkingLike))
+    ? textOf(a.derived_value)
+    : null;
 }
 
 /** A marking's classification, lowest 0; -1 when this can't read one. The first layer, after any owner
@@ -82,6 +85,10 @@ export function held(doc: Doc, state: State): Set<string> {
   const out = new Set<string>();
   for (const f of v.findings) {
     const e = last(state, f.id);
+    if ((e?.act === 'answered' || e?.act === 'changed') && e.value != null && !canWriteAct(e.value)) {
+      out.add(f.id);
+      continue;
+    }
     if (f.stale || (e?.act !== 'answered' && e?.act !== 'changed') || e.value == null) continue;
     const t = textOf(f.outcome?.result);
     // One it can't read the level of is held too: it might be above the banner. A typed one is written
@@ -89,7 +96,16 @@ export function held(doc: Doc, state: State): Set<string> {
     // only Marque's own readings carry a derivation for.
     const bare = !e.value.free || /^\(\s*(TOP SECRET|TS|SECRET|S|CONFIDENTIAL|C|UNCLASSIFIED|U)\s*\)$/.test(t ?? '');
     // The sample has no joint engine result for a finding and its dependent artifacts.
-    if (f.moves?.length || !t || !bare || level(t) < 0 || level(t) > top) out.add(f.id);
+    if (
+      !canWriteMarking(f.outcome?.result) ||
+      !canWriteMarking(f.marking?.as_written) ||
+      f.moves?.length ||
+      !t ||
+      !bare ||
+      level(t) < 0 ||
+      level(t) > top
+    )
+      out.add(f.id);
   }
   for (const a of v.document.artifacts)
     if (a.kind !== 'front_marking' && last(state, a.id)?.act === 'answered') out.add(a.id);

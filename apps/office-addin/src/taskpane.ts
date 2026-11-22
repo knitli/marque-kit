@@ -20,7 +20,7 @@ import '@knitli/marque-kit/theme.css';
 import '@knitli/marque-kit/kit.css';
 import { mount } from '@knitli/marque-kit';
 import { button, el } from '@knitli/marque-kit/marking';
-import { sameBasis } from '@knitli/marque-kit-core/state';
+import { canWriteAct, canWriteMarking, isDisclosedState, sameBasis } from '@knitli/marque-kit-core/state';
 import type { Doc, LogEntry, State, Subject, Vocab } from '@knitli/marque-kit-core/types';
 import findingsUrl from '../../../fixtures/memo.findings.json?url';
 import vocabUrl from '../../../fixtures/memo.vocab.json?url';
@@ -144,7 +144,12 @@ void Office.onReady(async (info) => {
     } catch {
       session = null;
     }
-    if (session && sameBasis(session.doc.document.evaluation?.basis, session.basis) && bound) {
+    if (
+      session &&
+      isDisclosedState(session.state) &&
+      sameBasis(session.doc.document.evaluation?.basis, session.basis) &&
+      bound
+    ) {
       mountWorkspace(session, installation.wordHost);
       return;
     }
@@ -300,6 +305,12 @@ function mountWorkspace(
     if (!entry) {
       const pending = (await session.pendingWrites()).find((item) => item.requestId === requestId);
       if (!pending) return; // Some actions require no physical write.
+      if (
+        !canWriteAct(pending.value) ||
+        !canWriteMarking(pending.about?.marking) ||
+        !canWriteMarking(pending.about?.result_marking)
+      )
+        throw new Error('The workspace must supply an authorized write for this masked marking.');
       // A lost evaluation reply can leave the provider's pending list empty on retry.
       entry = { binding: structuredClone(pending.binding) };
       recoveryEntries.set(requestId, entry);
@@ -339,6 +350,8 @@ function mountWorkspace(
     pane.host.acceptanceChecks = { ...current.acceptanceChecks };
     pane.update({
       doc: current.doc,
+      currentDisclosureRevision: current.currentDisclosureRevision ?? null,
+      historyDisclosure: current.historyDisclosure ?? null,
       actBinding: { documentId: session.documentId, chain: session.chain, basis: current.basis },
     });
   };
@@ -368,6 +381,8 @@ function mountWorkspace(
   }
   pane = mount(document.querySelector<HTMLElement>('#pane')!, {
     doc: session.doc,
+    currentDisclosureRevision: session.currentDisclosureRevision,
+    historyDisclosure: session.historyDisclosure,
     state: session.state,
     vocab: session.vocab,
     engine: 'ok',

@@ -69,4 +69,45 @@ assert.equal(spoken(part), 'S, REL TO, U, 1 character not identified, A');
 // As plain text (a receipt label), the mask is drawn and the bytes it covers never are.
 assert.equal(masked(hidden), '(S//FGI ███//NF)');
 assert.equal(masked(part), '(S//REL TO U_A)');
+// Inconsistent producer tokens never override the source text or its span masks.
+const mismatch: Marking = {
+  text: 'PUBLIC HIDE END',
+  layers: [{ tokens: [{ t: 'PUBLIC HIDE END-CANARY', help: 'CANARY-HELP' }] }],
+  masks: [{ kind: 'concealed', span: [7, 11] }],
+};
+assert.equal(masked(mismatch), 'PUBLIC ████ END');
+assert.ok(!spoken(mismatch).includes('CANARY'));
+const inline: Marking = {
+  text: 'PUBLIC END',
+  layers: [{ tokens: [{ t: 'PUBLIC ' }, { t: '', mask: { kind: 'concealed', len: 2 } }, { t: 'END' }] }],
+  masks: [],
+};
+assert.equal(masked(inline), 'PUBLIC ██END');
+assert.ok(spoken(inline).includes('source concealed'));
+const both: Marking = {
+  ...inline,
+  text: 'PUBLIC HIDE END',
+  layers: [{ tokens: [{ t: 'PUBLIC HIDE ' }, { t: '', mask: { kind: 'unidentified', len: 2 } }, { t: 'END' }] }],
+  masks: [{ kind: 'concealed', span: [7, 11] }],
+};
+assert.equal(masked(both), 'PUBLIC ████ __END');
+assert.ok(spoken(both).includes('source concealed'));
+assert.ok(spoken(both).includes('2 characters not identified'));
+const ambiguous: Marking = { ...inline, text: 'PUBLIC SECRET END' };
+assert.ok(!masked(ambiguous).includes('SECRET'));
+assert.ok(!spoken(ambiguous).includes('SECRET'));
+const invalid: Marking = {
+  text: 'éSECRET',
+  layers: [{ tokens: [{ t: 'éSECRET' }] }],
+  masks: [{ kind: 'concealed', span: [1, 3] }],
+};
+assert.ok(!masked(invalid).includes('SECRET'));
+assert.ok(!spoken(invalid).includes('SECRET'));
+const malformedSpan = {
+  text: 'SECRET',
+  layers: [{ tokens: [{ t: 'SECRET' }] }],
+  masks: [{ kind: 'concealed', span: 'bad' }],
+} as unknown as Marking;
+assert.ok(!masked(malformedSpan).includes('SECRET'));
+assert.ok(!spoken(malformedSpan).includes('SECRET'));
 console.log(`ok · ${cases.length + 1} markings`);

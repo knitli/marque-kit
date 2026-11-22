@@ -19,7 +19,7 @@
  * list comma, then between tokens; never inside a token (REL TO, TOP SECRET, SI-G).
  */
 
-import type { Layer, Marking, MarkingLike, Mask, Token, Vocab } from './types.ts';
+import type { Layer, Marking, MarkingInput, MarkingLike, Mask, Token, Vocab } from './types.ts';
 
 /** Options for render() and html(). */
 export interface MarkOptions {
@@ -123,55 +123,120 @@ export function parse(text: string): Marking {
   return { text, layers: layers(text).map((l) => ({ tokens: tokens(l).map((t) => ({ t })) })), masks: [] };
 }
 
-/** Normalize whatever the caller passed — a string, or an engine marking —
- *  into { text, layers:[{tokens:[{t, help?}]}], masks:[] }. */
-export function normalize(marking: MarkingLike): Marking {
-  if (typeof marking === 'string') return parse(marking);
-  if (marking && marking.layers) return conceal({ ...marking, layers: marking.layers, masks: marking.masks || [] });
-  if (marking && marking.text) return conceal({ ...parse(marking.text), masks: marking.masks || [] });
-  throw new TypeError('marking must be a string or {text, layers}');
+const utf8 = new TextEncoder();
+const decode = new TextDecoder('utf-8', { ignoreBOM: true });
+const loneSurrogate = /[\uD800-\uDFFF]/u;
+
+function matchesText(layers: Layer[], text: string): boolean {
+  let at = 0;
+  for (const layer of layers) {
+    for (const token of layer.tokens) {
+      if (loneSurrogate.test(token.t) || !text.startsWith(token.t, at) || (token.mask && token.t !== '')) return false;
+      at += token.t.length;
+    }
+  }
+  return at === text.length;
 }
 
-/** A mask given as a span ([start, end) in UTF-8 bytes of `text`, as every span is) covers bytes the tokens
- *  may still carry: those bytes go, in what is drawn, said and copied, and the mask stands where they were
- *  (a `{ t: '', mask }` token); the rest of a token it cuts through stays. */
-const utf8 = new TextEncoder(),
-  utf8d = new TextDecoder();
-type Spanned = Mask & { span: [number, number] };
-const spanned = (k: Mask): k is Spanned => Array.isArray(k.span);
-function conceal(m: Marking): Marking {
-  const spans = m.masks.filter(spanned).sort((x, y) => x.span[0] - y.span[0]);
-  if (!spans.length) return m;
-  const placed = new Set<Spanned>();
-  let at = 0;
-  const layers = m.layers.map((l): Layer => ({
-    ...l,
-    tokens: l.tokens.flatMap((tok): Token[] => {
-      const b = utf8.encode(tok.t),
-        s = at,
-        e = (at += b.length);
-      const over = spans.filter((k) => k.span[0] < e && s < k.span[1]);
-      if (!over.length) return [tok];
-      const out: Token[] = [];
-      let c = s;
-      for (const k of over) {
-        if (k.span[0] > c) out.push({ ...tok, t: utf8d.decode(b.slice(c - s, k.span[0] - s)) });
-        if (!placed.has(k)) {
-          placed.add(k);
-          out.push({ t: '', mask: { ...k, len: k.len ?? k.span[1] - k.span[0] } });
-        }
-        c = Math.max(c, k.span[1]);
+function placeholder(mask: Mask, length = mask.len): Token {
+  const len = length !== undefined && Number.isSafeInteger(length) && length >= 0 ? length : undefined;
+  return { t: '', mask: { kind: mask.kind, ...(len !== undefined && { len }) } };
+}
+
+/** Project source byte spans and layer masks once. Resulting masks contain no source text or offsets. */
+export function disclosedMarking(m: MarkingInput): MarkingInput {
+  const masks = m.masks ?? [];
+  // A host may split one Unicode scalar between two adjacent ordinary tokens.
+  const supplied = m.layers?.map((layer): Layer => {
+    if (!layer.tokens.some((token) => loneSurrogate.test(token.t))) return layer;
+    const tokens: Token[] = [];
+    let run = '';
+    for (const token of layer.tokens) {
+      if (token.mask) {
+        if (run) tokens.push({ t: run });
+        run = '';
+        tokens.push(token);
+      } else run += token.t;
+    }
+    if (run) tokens.push({ t: run });
+    return { tokens };
+  });
+  const inline = supplied?.flatMap((layer) => layer.tokens.flatMap((token) => (token.mask ? [token.mask] : []))) ?? [];
+  const matches = supplied && matchesText(supplied, m.text);
+  if (!masks.length && !inline.length) {
+    if (!supplied) return m;
+    if (!matches) return { text: m.text };
+    return supplied.some((l, i) => l !== m.layers![i]) ? { ...m, layers: supplied } : m;
+  }
+  const withheld = (): Marking => ({
+    text: '',
+    masks: [],
+    layers: [{ tokens: [...inline, ...masks].map((k) => placeholder(k)) }],
+  });
+  if ((inline.length && !matches) || loneSurrogate.test(m.text)) return withheld();
+
+  let layers = matches ? supplied! : parse(m.text).layers;
+  if (!matches && !matchesText(layers, m.text)) layers = [{ tokens: [{ t: m.text }] }];
+  if (!layers.length) layers = [{ tokens: [] }];
+  const bytes = utf8.encode(m.text);
+  const boundary = (at: number): boolean =>
+    Number.isSafeInteger(at) && at >= 0 && at <= bytes.length && (at === bytes.length || (bytes[at]! & 0xc0) !== 0x80);
+  const spans: Array<{ start: number; end: number; mask: Mask }> = [];
+  const endMasks = new Map<number, Token[]>();
+  for (const mask of masks) {
+    if (mask.span !== undefined) {
+      if (!Array.isArray(mask.span) || mask.span.length !== 2) return withheld();
+      const [start, end] = mask.span;
+      if (!boundary(start) || !boundary(end) || start >= end) return withheld();
+      spans.push({ start, end, mask });
+    } else {
+      const layer = mask.layer ?? layers.length - 1;
+      if (!Number.isSafeInteger(layer) || layer < 0 || layer >= layers.length) return withheld();
+      const tokens = endMasks.get(layer) ?? [];
+      tokens.push(placeholder(mask));
+      endMasks.set(layer, tokens);
+    }
+  }
+  spans.sort((a, b) => a.start - b.start);
+  if (spans.some((span, i) => i > 0 && spans[i - 1]!.end > span.start)) return withheld();
+
+  let offset = 0;
+  let next = 0;
+  const visible = layers.map((layer, index): Layer => {
+    const tokens: Token[] = [];
+    for (const token of layer.tokens) {
+      if (token.mask) {
+        tokens.push(placeholder(token.mask));
+        continue;
       }
-      if (c < e) out.push({ ...tok, t: utf8d.decode(b.slice(c - s)) });
-      return out;
-    }),
-  }));
-  const masks = m.masks.filter((k) => !spanned(k)); // the rest are drawn at their layer's end
-  const b = [...spans]
-    .sort((x, y) => y.span[0] - x.span[0])
-    .reduce<number[]>((t, k) => [...t.slice(0, k.span[0]), ...t.slice(k.span[1])], [...utf8.encode(m.text)]);
-  const text = utf8d.decode(new Uint8Array(b));
-  return { ...m, text, layers, masks };
+      const end = offset + utf8.encode(token.t).length;
+      while (next < spans.length && spans[next]!.start < end) {
+        const span = spans[next]!;
+        if (offset <= span.start) {
+          if (offset < span.start) tokens.push({ t: decode.decode(bytes.subarray(offset, span.start)) });
+          // An existing spanned mask without an explicit length represents the covered characters.
+          const length = span.mask.len ?? Array.from(decode.decode(bytes.subarray(span.start, span.end))).length;
+          tokens.push(placeholder(span.mask, length));
+        }
+        offset = Math.min(end, span.end);
+        if (offset < span.end) break;
+        next++;
+      }
+      if (offset < end) tokens.push({ t: decode.decode(bytes.subarray(offset, end)) });
+      offset = end;
+    }
+    for (const mask of endMasks.get(index) ?? []) tokens.push(mask);
+    return { tokens };
+  });
+  return { text: visible.map((l) => l.tokens.map((t) => t.t).join('')).join(''), layers: visible, masks: [] };
+}
+
+/** Normalize whatever the caller passed — a string, or an engine marking — into
+ *  { text, layers:[{tokens:[{t, help?}]}], masks:[] }. The renderer and action history use the same disclosure projection. */
+export function normalize(marking: MarkingLike): Marking {
+  if (typeof marking === 'string') return parse(marking);
+  const safe = disclosedMarking(marking);
+  return { text: safe.text, layers: safe.layers ?? parse(safe.text).layers, masks: safe.masks ?? [] };
 }
 
 const chars = (n: number): string => `${n} character${n === 1 ? '' : 's'}`;
@@ -191,7 +256,11 @@ export function masked(marking: MarkingLike): string {
 }
 /** The layer a mask without a span is drawn at the end of: its own, else the last. */
 const layerOf = (m: Marking, mask: Mask): number => mask.layer ?? m.layers.length - 1;
-const glyphs = (mask: Mask): string => (mask.kind === 'concealed' ? '█' : '_').repeat(mask.len ?? 0);
+const glyphs = (mask: Mask): string => {
+  const glyph = mask.kind === 'concealed' ? '█' : '_';
+  // A long withheld region is represented by a single mark, with its count in the accessible label.
+  return mask.len === undefined || mask.len > 4096 ? glyph : glyph.repeat(Math.max(1, mask.len));
+};
 
 /* ── the structure ─────────────────────────────────────────────────────── */
 

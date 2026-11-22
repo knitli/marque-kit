@@ -7,6 +7,7 @@ import type {
   AppendActResult,
   Doc,
   EvaluationBasis,
+  HistoryDisclosure,
   LogEntry,
   State,
   Vocab,
@@ -32,6 +33,8 @@ export interface OfficeCurrentEvaluation {
   chain: string;
   doc: Doc;
   basis: EvaluationBasis;
+  currentDisclosureRevision?: string;
+  historyDisclosure?: HistoryDisclosure;
   requiredWrites: string[];
   requiredAcceptanceChecks: string[];
   confirmedWrites: string[];
@@ -48,6 +51,8 @@ export interface OfficeWordSession {
   /** On open, pendingAppends must include every durably staged or refused intent for this document and chain. */
   readonly state: State;
   readonly basis: EvaluationBasis;
+  readonly currentDisclosureRevision?: string;
+  readonly historyDisclosure?: HistoryDisclosure;
   readonly requiredWrites: string[];
   readonly requiredAcceptanceChecks: string[];
   readonly confirmedWrites: string[];

@@ -146,6 +146,36 @@ describe('masks', () => {
     expect(m.textContent).not.toContain('GBR');
     expect(m.querySelector('.mq-conceal')?.textContent).toBe('███');
   });
+  test('mismatched tokens and covered fragment metadata do not escape visible, copy or accessible output', () => {
+    const m = mark({
+      text: 'PUBLIC HIDE END',
+      layers: [{ tokens: [{ t: 'PUBLIC HIDE END-CANARY', help: 'CANARY-HELP' }] }],
+      masks: [{ kind: 'concealed', span: [7, 11] }],
+    });
+    expect(m.textContent).toBe('PUBLIC ████ END');
+    expect(m.outerHTML).not.toContain('CANARY');
+    expect(m.outerHTML).not.toContain('HIDE');
+    expect(m.getAttribute('aria-label')).not.toContain('HIDE');
+    expect(m.dataset.text).toBe('PUBLIC  END');
+  });
+  test('partial token metadata cannot identify masked content', () => {
+    const m = mark({
+      text: 'PUBLIC HIDE END',
+      layers: [{ tokens: [{ t: 'PUBLIC HIDE END', help: 'HIDE' }] }],
+      masks: [{ kind: 'concealed', span: [7, 11] }],
+    });
+    expect(m.outerHTML).not.toContain('HIDE');
+    expect(m.textContent).toBe('PUBLIC ████ END');
+  });
+  test('unbound inline mask suppresses ambiguous text', () => {
+    const m = mark({
+      text: 'PUBLIC SECRET END',
+      layers: [{ tokens: [{ t: 'PUBLIC ' }, { t: '', mask: { kind: 'concealed', len: 2 } }, { t: 'END' }] }],
+      masks: [],
+    });
+    expect(m.outerHTML).not.toContain('SECRET');
+    expect(m.dataset.text).toBe('');
+  });
   test('a mask with neither span nor layer is drawn at the end, and kept in the plain text', () => {
     const m = mark({ text, masks: [{ kind: 'concealed', len: 3 }] });
     expect(m.querySelector('.mq-conceal')?.textContent).toBe('███');
@@ -212,7 +242,7 @@ describe('no internal id reaches a person', () => {
       ...host,
       requiredAcceptanceChecks: ['outgoing-saved'],
       acceptanceChecks: {
-        'outgoing-saved': writeConfirmationToken('outgoing-saved', { ...b, contextRevision: 'old' }),
+        'outgoing-saved': writeConfirmationToken('outgoing-saved', { ...b, contextRevision: 'old' })!,
       },
     };
     for (const [candidate, candidateHost] of [
@@ -490,14 +520,61 @@ describe('the undo window (DECISIONS #23)', () => {
     done();
   });
 
+  test('redrawing a form cannot select an indistinguishable or unbound reading on the person’s behalf', async () => {
+    const { root, p, done } = setup();
+    const changed = structuredClone(memo);
+    const target = changed.findings.find((item) => item.id === P3)!;
+    const reading = target.outcome.readings![0]!;
+    target.outcome.readings = [reading, structuredClone(reading)];
+    const redraw = async () => {
+      p.update({ doc: changed, open: P3 });
+      await new Promise((resolve) => setTimeout(resolve));
+    };
+    const radios = () => [...root.querySelectorAll<HTMLInputElement>('input[type=radio]')];
+    const choose = (index: number) => {
+      const input = radios()[index]!;
+      input.checked = true;
+      input.dispatchEvent(new Event('change'));
+    };
+    await redraw();
+    choose(1);
+    await redraw();
+    expect(radios().some((input) => input.checked)).toBe(false);
+    const result = reading.result!;
+    reading.result = { ...result, masks: [{ kind: 'concealed', span: [1, 2] }] };
+    target.outcome.readings = [reading];
+    await redraw();
+    choose(0);
+    await redraw();
+    expect(radios()[0]?.checked).toBe(false);
+    done();
+  });
+
   test('a re-lint that conceals a code in the answer masks it in the strip too', async () => {
     const { root, p, answer, done } = setup();
+    const evaluationBasis: EvaluationBasis = {
+      sourceRevisions: { memo: 'r1' },
+      selectionRevision: 'selection',
+      relationshipRevision: 'relations',
+      contextRevision: 'context',
+      policyRevision: 'policy',
+      declarationsRevision: 'declarations',
+      scope: 'paragraph3',
+      operation: 'query',
+      evaluationContextRevision: 'evaluation',
+      targetProfile: 'memo',
+      questionRevisions: { [P3]: 'q1' },
+      artifactRevisions: {},
+      replacements: {},
+    };
+    p.update({ doc: { ...memo, findings: memo.findings.map((x) => (x.id === P3 ? { ...x, evaluationBasis } : x)) } });
     await answer();
     const r = f(P3).outcome!.readings![0]!.result!;
     const at = r.text.indexOf('AUS');
     const result = { ...r, masks: [{ kind: 'concealed' as const, span: [at, at + 3] as [number, number] }] };
     const settled = {
       ...f(P3),
+      evaluationBasis,
       asks: undefined,
       needs_person: 'none' as const,
       blocks: 'never' as const,
@@ -1106,7 +1183,7 @@ describe('History (DECISIONS #24)', () => {
     done();
   });
 
-  test('every act, newest first; only the one in force can be taken back, with its marking', async () => {
+  test('every act, newest first; only the one in force can be taken back', async () => {
     const { act, answer, tab, rows, done } = setup();
     await act(P2, 'kept_as_written');
     await answer();
@@ -1116,7 +1193,7 @@ describe('History (DECISIONS #24)', () => {
     const [cab, p3, p2] = rows();
     expect(buttons(cab!)).toEqual([]);
     expect(buttons(p3!)).toEqual(['Take back']);
-    expect(p3!.querySelector('.mq-mark')).toBeTruthy();
+    expect(p3!.querySelector('.mq-mark')).toBeNull(); // No current historical disclosure for the answer.
     // An override stays listed, and can be taken back: Marque's fix goes in after all.
     expect(p2!.textContent).toContain('Kept as written');
     expect(buttons(p2!)).toEqual(['Take back']);
