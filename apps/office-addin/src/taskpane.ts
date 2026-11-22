@@ -29,6 +29,7 @@ import { locate, paragraphAt, written } from './locate.ts';
 import { banner, edits, made, relint, undoneSubject } from './write.ts';
 import { isSameWordDocument } from './workspace.ts';
 import { mountNativeWorkspace } from './native-workspace.ts';
+import { mountOrdinaryCabWorkspace } from './ordinary-cab-workspace.ts';
 import { mountCabPlacementWorkspace } from './cab-placement-workspace.ts';
 import { mountNativeSemanticResultsWorkspace } from './native-semantic-results-workspace.ts';
 import { mountSelectedAudienceWorkspace } from './selected-audience-workspace.ts';
@@ -202,13 +203,22 @@ void Office.onReady(async (info) => {
     // Source markings are privileged provider data. Never mount their binding or
     // capability beside the restricted semantic-results-only route.
     if (session && bound && 'kind' in session && session.kind === 'native_cab') {
-      mountPrivilegedSourceMarking();
-      mountNativeWorkspace(
-        document.querySelector<HTMLElement>('#pane')!,
-        session,
-        installation.wordHost,
-        installation.nativeMaxBytes,
-      );
+      if (session.ordinaryCab) {
+        mountOrdinaryCabWorkspace(
+          document.querySelector<HTMLElement>('#pane')!,
+          session,
+          installation.wordHost,
+          installation.nativeMaxBytes,
+        );
+      } else {
+        mountPrivilegedSourceMarking();
+        mountNativeWorkspace(
+          document.querySelector<HTMLElement>('#pane')!,
+          session,
+          installation.wordHost,
+          installation.nativeMaxBytes,
+        );
+      }
       return;
     }
     if (

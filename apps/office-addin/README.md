@@ -23,6 +23,12 @@ The sample route is read-only: the kit's pane shows the fictional memo findings 
 
 Without an installed trusted workspace provider, the pane is a read-only sample. Actions are not recorded or applied, and the optional sample button opens a separate document without changing the current one. The pane does not fall back to fixture relint for a real document.
 
+## Ordinary authority-block questions
+
+A trusted `native_cab` provider may opt into the read-only ordinary question route with `ordinaryCab`. The host must independently supply `readOrdinaryCabGrant` for the exact document, revision, contribution, viewer, current evaluation basis and layout. The grant must authorize both the complete evaluator input and its raw result; it separately lists the fields that may be shown. The evaluator is the engine's ordinary CAB questions operation. The pane validates the native result against the host's current basis and shows only static labels for granted fields; it does not write, answer questions, or report document readiness.
+
+`watchOrdinaryCabInvalidation` must revoke the view before a document, viewer, permission, provider, layout or formatting change, including reflow with unchanged text. Stale or missing grants, face readbacks, or layout bindings leave the view unavailable. The host must provide new readbacks after reflow. This route does not change the selected-audience artifact pairing. No live Word provider or host grant is supplied here; the included tests use a synthetic host and the separately built engine artifact.
+
 ## Trusted Word workspace integration
 
 The Office route accepts an installation-injected `window.marqueOfficeWorkspace` with a `provider` and the actual Word host adapter. The provider opens a document-scoped session with an authoritative document/chain binding, state, current snapshot and basis. Before any append attempt, `stageAppend(request)` must durably capture that exact immutable intent; `append(request)` then atomically commits or returns its refusal, and retries use the same key. Staged intents are returned with session state for the pane's normal recovery path. The provider keeps committed writes recoverable through both Word acknowledgement and fresh evaluation, so a restart after a saved write acknowledgement resumes evaluation without applying the edit twice. The host adapter must revalidate the exact active document while applying a committed entry and return a typed acknowledgement. The pane checks the same document before and after each asynchronous boundary.
