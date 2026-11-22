@@ -29,8 +29,14 @@ import { locate, paragraphAt, written } from './locate.ts';
 import { banner, edits, made, relint, undoneSubject } from './write.ts';
 import { isSameWordDocument } from './workspace.ts';
 import { mountNativeWorkspace } from './native-workspace.ts';
+import { mountNativeSemanticResultsWorkspace } from './native-semantic-results-workspace.ts';
 import { mountOfficeSourceMarking } from './source-marking.ts';
-import type { OfficeCurrentEvaluation, OfficeNativeWordSession, OfficeWordSession } from './workspace.ts';
+import type {
+  OfficeCurrentEvaluation,
+  OfficeNativeSemanticResultsSession,
+  OfficeNativeWordSession,
+  OfficeWordSession,
+} from './workspace.ts';
 
 /** In dev, what the pane would say to a console it doesn't have goes to the dev server's .dev.log. */
 const log = (event: 'error' | 'unhandled' | 'not the memo' | 'undone in Word', ...counts: number[]): void => {
@@ -136,15 +142,18 @@ const selected = (): Promise<{ index: number; texts: string[]; head: string }> =
 
 void Office.onReady(async (info) => {
   if (info.host !== Office.HostType.Word) return;
-  if (window.marqueOfficeSourceMarking) {
+  const installation = window.marqueOfficeWorkspace;
+  let sourceMarkingMounted = false;
+  const mountPrivilegedSourceMarking = (): void => {
+    if (sourceMarkingMounted || !window.marqueOfficeSourceMarking) return;
+    sourceMarkingMounted = true;
     const sourceRoot = document.createElement('section');
     document.querySelector<HTMLElement>('#pane')!.before(sourceRoot);
     const sourceView = mountOfficeSourceMarking(sourceRoot, window.marqueOfficeSourceMarking);
     addEventListener('pagehide', () => sourceView.destroy(), { once: true });
-  }
-  const installation = window.marqueOfficeWorkspace;
+  };
   if (installation) {
-    let session: OfficeWordSession | OfficeNativeWordSession | null;
+    let session: OfficeWordSession | OfficeNativeWordSession | OfficeNativeSemanticResultsSession | null;
     let bound = false;
     try {
       session = await installation.provider.openWord(installation.wordHost);
@@ -152,7 +161,19 @@ void Office.onReady(async (info) => {
     } catch {
       session = null;
     }
+    if (session && bound && 'kind' in session && session.kind === 'native_semantic_results') {
+      mountNativeSemanticResultsWorkspace(
+        document.querySelector<HTMLElement>('#pane')!,
+        session,
+        installation.wordHost,
+        installation.nativeMaxBytes,
+      );
+      return;
+    }
+    // Source markings are privileged provider data. Never mount their binding or
+    // capability beside the restricted semantic-results-only route.
     if (session && bound && 'kind' in session && session.kind === 'native_cab') {
+      mountPrivilegedSourceMarking();
       mountNativeWorkspace(
         document.querySelector<HTMLElement>('#pane')!,
         session,
@@ -168,10 +189,19 @@ void Office.onReady(async (info) => {
       isDisclosedState(session.state) &&
       sameBasis(session.doc.document.evaluation?.basis, session.basis)
     ) {
+      mountPrivilegedSourceMarking();
       mountWorkspace(session, installation.wordHost);
       return;
     }
+    // A failed, stale, or cross-document provider session cannot establish
+    // which privileged views belong here. Keep the pane unavailable and do
+    // not fall through to source marking or Word document reads.
+    document
+      .querySelector<HTMLElement>('#pane')
+      ?.replaceChildren(el('p', 'mq-p', 'This Word workspace is unavailable for the current document.'));
+    return;
   }
+  mountPrivilegedSourceMarking();
   const doc = (await (await fetch(findingsUrl)).json()) as Doc;
   const vocab = (await (await fetch(vocabUrl)).json()) as Vocab;
   const pane = mount(document.querySelector<HTMLElement>('#pane')!, {
@@ -319,7 +349,12 @@ function mountWorkspace(
   const stillBound = () => isSameWordDocument(wordHost, session);
   const canDispatch = (): boolean => {
     const current = pane?.view();
-    return !!current && !pane.host.readOnly && !('native_evaluation' in current.document);
+    return (
+      !!current &&
+      !pane.host.readOnly &&
+      !('native_evaluation' in current.document) &&
+      !('native_semantic_results' in current.document)
+    );
   };
   const applyPending = async (requestId: string): Promise<void> => {
     if (!canDispatch()) throw new Error('The current view cannot issue document writes.');

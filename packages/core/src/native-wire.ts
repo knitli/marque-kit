@@ -184,6 +184,27 @@ export type NativeEnvelopeV2 = Omit<NativeEnvelopeV1, 'schema' | 'version' | 'ev
 };
 export type NativeEnvelope = NativeEnvelopeV1 | NativeEnvelopeV2;
 
+export type NativeSemanticResultMeaning = { status: 'available'; field: NativeField } | { status: 'unavailable' };
+export type NativeSemanticResultSupportKind = (typeof SUPPORT_KINDS)[number];
+export type NativeSemanticResultDependency = { status: 'resolved'; row: string } | { status: 'unavailable' };
+export type NativeSemanticResultRow = {
+  ordinal: string;
+  meaning: NativeSemanticResultMeaning | null;
+  support_kinds: NativeSemanticResultSupportKind[] | null;
+  dependencies: { status: 'available' | 'unavailable'; items: NativeSemanticResultDependency[] } | null;
+};
+export type NativeSemanticResultsEnvelope = {
+  schema: 'knitli.native-semantic-results.v1';
+  version: 1;
+  scope: 'read_only_selected_results';
+  whole_document_finalize: 'unsupported';
+  disclosure: {
+    grant_id: string;
+    coverage: 'not_requested' | 'complete' | 'partial' | 'unavailable' | null;
+    items: NativeSemanticResultRow[];
+  };
+};
+
 /** A read-only, permission-filtered source view. Mask runs carry no offsets or lengths. */
 export type NativeSourceMarkingBinding = {
   chain_id: string;
@@ -702,6 +723,7 @@ const OMITTED = [
 // Only bounded JSON can enter the parser. A verified frozen object can then be
 // safely shared with docView without re-parsing or copying every evaluation.
 const accepted = new WeakSet<object>();
+const acceptedSemanticResults = new WeakSet<object>();
 function parseJson(text: string, maxBytes: number): unknown {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) return fail('invalid byte limit');
   if (typeof text !== 'string' || text.length > maxBytes) return fail('wire too large or not text');
@@ -768,6 +790,94 @@ export function parseNativeJson(text: string, maxBytes: number): NativeEnvelope 
     : { ...common, schema: 'knitli.native-evaluation.v1', version: 1, evaluation: base };
   freezeTree(result);
   accepted.add(result);
+  return result;
+}
+
+/** Parse a bounded, source-reference-free result disclosure emitted for one
+ * host grant. The opaque grant id is only a matching token, never authority. */
+export function isParsedNativeSemanticResults(value: unknown): value is NativeSemanticResultsEnvelope {
+  return value !== null && typeof value === 'object' && acceptedSemanticResults.has(value);
+}
+export function parseNativeSemanticResultsJson(text: string, maxBytes: number): NativeSemanticResultsEnvelope {
+  const envelope = keys(
+    parseJson(text, maxBytes),
+    ['schema', 'version', 'scope', 'whole_document_finalize', 'disclosure'],
+    'semantic results envelope',
+  );
+  if (
+    envelope.schema !== 'knitli.native-semantic-results.v1' ||
+    envelope.version !== 1 ||
+    envelope.scope !== 'read_only_selected_results' ||
+    envelope.whole_document_finalize !== 'unsupported'
+  )
+    fail('semantic results scope or version');
+  const disclosure = keys(envelope.disclosure, ['grant_id', 'coverage', 'items'], 'semantic disclosure');
+  const grantId = str(disclosure.grant_id, 'semantic grant id');
+  if (!/^[0-9a-f]{32}$/.test(grantId)) fail('semantic grant id');
+  const coverage =
+    disclosure.coverage === null
+      ? null
+      : oneOf(disclosure.coverage, ['not_requested', 'complete', 'partial', 'unavailable'] as const, 'result coverage');
+  const rawItems = arr(disclosure.items, 'semantic result items');
+  const items: NativeSemanticResultRow[] = rawItems.map((raw, index) => {
+    const item = keys(raw, ['ordinal', 'meaning', 'support_kinds', 'dependencies'], `semantic result ${index}`);
+    const ordinal = safeDecimal(item.ordinal, `semantic result ${index} ordinal`);
+    if (ordinal !== String(index + 1)) fail(`semantic result ${index} ordinal`);
+    let meaning: NativeSemanticResultMeaning | null = null;
+    if (item.meaning === null) meaning = null;
+    else {
+      const rawMeaning = object(item.meaning, `semantic result ${index} meaning`);
+      if (rawMeaning.status === 'available') {
+        keys(item.meaning, ['status', 'field'], `semantic result ${index} meaning`);
+        meaning = { status: 'available', field: field(rawMeaning.field, `semantic result ${index} field`) };
+      } else if (rawMeaning.status === 'unavailable') {
+        keys(item.meaning, ['status'], `semantic result ${index} meaning`);
+        meaning = { status: 'unavailable' };
+      } else fail(`semantic result ${index} meaning status`);
+    }
+    let supportKinds: NativeSemanticResultSupportKind[] | null;
+    if (item.support_kinds === null) supportKinds = null;
+    else {
+      const rawKinds = arr(item.support_kinds, `semantic result ${index} support kinds`);
+      supportKinds = rawKinds.map((kind, supportIndex) =>
+        oneOf(kind, SUPPORT_KINDS, `semantic result ${index} support kind ${supportIndex}`),
+      );
+      const indices = supportKinds.map((kind) => SUPPORT_KINDS.indexOf(kind));
+      if (indices.some((value, i) => i > 0 && value <= indices[i - 1]!))
+        fail(`semantic result ${index} support kind order`);
+    }
+    let dependencies: NativeSemanticResultRow['dependencies'];
+    if (item.dependencies === null) dependencies = null;
+    else {
+      const rawDependencies = keys(item.dependencies, ['status', 'items'], `semantic result ${index} dependencies`);
+      const status = oneOf(rawDependencies.status, ['available', 'unavailable'] as const, 'dependency status');
+      const rawEdges = arr(rawDependencies.items, `semantic result ${index} dependency items`);
+      if (status === 'unavailable' && rawEdges.length !== 0) fail('unavailable dependencies have rows');
+      const edges: NativeSemanticResultDependency[] = rawEdges.map((edge, edgeIndex) => {
+        const rawEdge = object(edge, `semantic result ${index} dependency ${edgeIndex}`);
+        const edgeStatus = oneOf(rawEdge.status, ['resolved', 'unavailable'] as const, 'dependency edge status');
+        if (edgeStatus === 'unavailable') {
+          keys(edge, ['status'], `semantic result ${index} dependency ${edgeIndex}`);
+          return { status: 'unavailable' };
+        }
+        keys(edge, ['status', 'row'], `semantic result ${index} dependency ${edgeIndex}`);
+        const row = safeDecimal(rawEdge.row, `semantic result ${index} dependency row`);
+        if (Number(row) === 0 || Number(row) > rawItems.length) fail('dependency row outside selected rows');
+        return { status: 'resolved', row };
+      });
+      dependencies = { status, items: edges };
+    }
+    return { ordinal, meaning, support_kinds: supportKinds, dependencies };
+  });
+  const result: NativeSemanticResultsEnvelope = {
+    schema: 'knitli.native-semantic-results.v1',
+    version: 1,
+    scope: 'read_only_selected_results',
+    whole_document_finalize: 'unsupported',
+    disclosure: { grant_id: grantId, coverage, items },
+  };
+  freezeTree(result);
+  acceptedSemanticResults.add(result);
   return result;
 }
 

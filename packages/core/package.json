@@ -44,6 +44,11 @@
       "source": "./src/native-cab.ts",
       "types": "./dist/native-cab.d.ts",
       "default": "./dist/native-cab.js"
+    },
+    "./native-results": {
+      "source": "./src/native-results.ts",
+      "types": "./dist/native-results.d.ts",
+      "default": "./dist/native-results.js"
     }
   },
   "publishConfig": {
