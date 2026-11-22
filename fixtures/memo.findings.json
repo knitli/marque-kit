@@ -3,7 +3,6 @@
   "note": "Hand-written oracle in the kit contract shape (docs/CONTRACT.md). All documents and markings are fictional examples.",
   "source": "fixtures/memo.txt",
   "document": {
-    "ready": false,
     "blocking": ["f-p3-ownership", "f-p4-portion-mark-absent", "a-cab"],
     "artifacts": [
       {
@@ -92,48 +91,7 @@
         ],
         "needs_person": "none",
         "blocks": "finalize",
-        "depends_on": ["f-p5-noforn-rel-conflict"],
-        "if_taken": {
-          "f-p5-noforn-rel-conflict": {
-            "text": "SECRET//FGI AUS GBR//REL TO USA, GBR",
-            "layers": [
-              {
-                "tokens": [
-                  {
-                    "t": "SECRET"
-                  }
-                ]
-              },
-              {
-                "tokens": [
-                  {
-                    "t": "//FGI "
-                  },
-                  {
-                    "t": "AUS "
-                  },
-                  {
-                    "t": "GBR"
-                  }
-                ]
-              },
-              {
-                "tokens": [
-                  {
-                    "t": "//REL TO "
-                  },
-                  {
-                    "t": "USA, "
-                  },
-                  {
-                    "t": "GBR"
-                  }
-                ]
-              }
-            ],
-            "masks": []
-          }
-        }
+        "depends_on": ["f-p5-noforn-rel-conflict"]
       },
       {
         "id": "a-cab",

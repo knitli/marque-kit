@@ -144,6 +144,7 @@ export interface Finding {
   needs_person: NeedsPerson;
   blocks: Blocks;
   depends_on?: string[];
+  evaluationBasis?: EvaluationBasis;
   scope?: string | null;
   seen?: boolean;
   // An artifact's own slots: never on a finding, so a finding and an artifact can be told apart by `kind`.
@@ -152,7 +153,6 @@ export interface Finding {
   derived_value?: undefined;
   placement?: undefined;
   fields?: undefined;
-  if_taken?: undefined;
   derivation?: undefined;
 }
 
@@ -164,6 +164,50 @@ export type ArtifactState =
   | 'present_not_required'
   | 'present_not_canonical';
 
+/** Exact inputs an evaluation and any act/preview are about (Fact contract §8). */
+export interface EvaluationBasis {
+  sourceRevisions: Record<string, string>;
+  selectionRevision: string;
+  relationshipRevision: string;
+  contextRevision: string;
+  policyRevision: string;
+  declarationsRevision: string;
+  scope: string;
+  operation: string;
+  evaluationContextRevision: string;
+  targetProfile: string;
+  questionRevisions: Record<string, string>;
+  /** Dependencies for fields/artifacts remain distinct even when the banner is unchanged. */
+  artifactRevisions: Record<string, string>;
+  /** The complete accepted hypothetical replacement set, keyed by its stable target. */
+  replacements: Record<string, HypotheticalReplacement>;
+}
+
+export type HypotheticalReplacement =
+  | { kind: 'reading'; reading: Reading }
+  | { kind: 'free_answer'; value: string }
+  | { kind: 'artifact_field'; field: string; value: string }
+  | { kind: 'artifact'; action: 'apply' | 'remove' };
+
+export interface RequirementStatus {
+  id: string;
+  status: 'unmet' | 'satisfied' | 'permitted' | 'unavailable';
+  mandatory: boolean;
+  scope: string;
+  evidence?: string[];
+  nextAction?: string;
+}
+
+export interface Evaluation {
+  basis: EvaluationBasis;
+  completion: 'complete' | 'incomplete' | 'unavailable';
+  requirements: RequirementStatus[];
+  /** The engine's semantic conclusion, independent of diagnostics and kit attention. */
+  snapshotReady: boolean;
+  /** A hypothetical joint evaluation; unavailable optional previews do not invalidate the base result. */
+  jointPreview?: { status: 'complete' | 'unavailable'; basis: EvaluationBasis };
+}
+
 /** A field a person fills on an artifact (the authority block). */
 export interface ArtifactField {
   state: 'known' | 'derived' | 'blank' | 'waiting';
@@ -174,6 +218,8 @@ export interface ArtifactField {
   waits_on?: string | null;
   /** On a view: the field as the lint gave it, so a later act is checked against that. */
   from?: string;
+  /** Basis of this field result, independently staleable from a banner result. */
+  evaluationBasis?: EvaluationBasis;
 }
 
 export interface DerivationStep {
@@ -201,8 +247,9 @@ export interface Artifact {
   needs_person: NeedsPerson;
   blocks: Blocks;
   depends_on?: string[];
+  evaluationBasis?: EvaluationBasis;
   /** The value if a finding's alternative is taken, by finding id. */
-  if_taken?: Record<string, MarkingLike> | null;
+  jointPreview?: { status: 'complete' | 'unavailable'; basis: EvaluationBasis; result?: DerivedValue };
   fields?: Record<string, ArtifactField>;
   seen?: boolean;
   // A finding's own slots: never on an artifact.
@@ -244,9 +291,12 @@ export interface Snapshot {
   blocks: Blocks;
   state?: ArtifactState;
   fields?: Record<string, ArtifactField>;
+  evaluationBasis?: EvaluationBasis;
 }
 
 export interface LogEntry {
+  /** Stable append position used to confirm exactly which accepted write the host completed. */
+  sequence: number;
   id: string;
   act: Act;
   value: ActValue | null;
@@ -293,10 +343,13 @@ export interface Withdrawn {
 }
 
 export interface DocumentState {
-  ready: boolean;
+  /** Legacy presentation ids are retained for cards; never used as readiness authority. */
   blocking: string[];
+  evaluation?: Evaluation;
   artifacts: ArtifactView[];
   pending?: string[];
+  /** Accepted physical changes remain host-confirmation obligations after a re-lint. */
+  awaitingWrites?: string[];
   withdrawn?: Withdrawn[];
 }
 
@@ -386,6 +439,15 @@ export interface Host {
   moment?: Moment | undefined;
   engine?: EngineState | undefined;
   readOnly?: boolean | undefined;
+  /** Host-measured current outgoing source/context/policy basis. It cannot repair an incomplete evaluation. */
+  currentBasis?: EvaluationBasis | undefined;
+  /** Required writes/placements for this operation, supplied by the host. */
+  requiredWrites?: string[] | undefined;
+  requiredAcceptanceChecks?: string[] | undefined;
+  /** Host-confirmed writes and named acceptance checks for this exact current basis. */
+  confirmedWrites?: string[] | undefined;
+  /** Each check value is its host acknowledgement token bound to this current basis. */
+  acceptanceChecks?: Record<string, string> | undefined;
   vocab?: Vocab | undefined;
   /** Under the width floor: rows only. */
   narrow?: boolean | undefined;

@@ -135,7 +135,20 @@ export function relint(doc: Doc, all: State): Doc {
     const x = v.findings[i]!;
     return answer(x) ? { ...strip(x), outcome: { ...x.outcome, ...(x.asked && { kind: 'applied' as const }) } } : f;
   });
-  const artifacts = v.document.artifacts.map(put);
+  // The banner follows the portions as they now read: NOFORN until no portion carries it, then the REL TO
+  // of an alternative taken on a portion it depends on.
+  // shortcut: the memo's one NOFORN-or-REL TO choice, not a banner derivation; it goes with the stand-in.
+  const nf = findings.some((f) => /\/\/(NF|NOFORN)\b/.test(shown(f as FindingView)));
+  const rebanner = (a: ArtifactView): ArtifactView => {
+    const was = textOf(a.derived_value);
+    if (a.kind !== 'front_marking' || nf || !was?.includes('//NOFORN')) return a;
+    const rel = findings
+      .filter((f) => a.depends_on?.includes(f.id) && answer(v.findings.find((x) => x.id === f.id)!))
+      .map((f) => /\/\/REL TO [^/)]+/.exec(shown(f as FindingView))?.[0])
+      .findLast(Boolean);
+    return rel ? { ...a, derived_value: { text: was.replace('//NOFORN', rel), masks: [] } } : a;
+  };
+  const artifacts = v.document.artifacts.map(put).map(rebanner);
   const blocking = [...findings, ...artifacts]
     .filter((x) => x.needs_person === 'required' && x.blocks !== 'never')
     .map((x) => x.id);

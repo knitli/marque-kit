@@ -8,7 +8,18 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { rung, sections } from '../src/attention.ts';
-import { empty, record, see, linted, snapshot, view, docView, ACTS } from '../src/state.ts';
+import {
+  empty,
+  record,
+  see,
+  linted,
+  snapshot,
+  view,
+  docView,
+  effectiveReady,
+  writeConfirmationToken,
+  ACTS,
+} from '../src/state.ts';
 import type {
   Act,
   ArtifactField,
@@ -21,6 +32,8 @@ import type {
   Moment,
   NeedsPerson,
   Rung,
+  EvaluationBasis,
+  RequirementStatus,
 } from '../src/types.ts';
 
 /* Table 2, row by row. */
@@ -59,6 +72,264 @@ const P3 = 'f-p3-ownership',
   P2 = 'f-p2-rel-to-separator';
 const f = (k: string): FindingView => doc.findings.find((x) => x.id === k)!;
 const art = (d: Doc, k: string): ArtifactView => d.document.artifacts.find((a) => a.id === k)!;
+const basis = (change: Partial<EvaluationBasis> = {}): EvaluationBasis => ({
+  sourceRevisions: { document: 'source-1' },
+  selectionRevision: 'selection-1',
+  relationshipRevision: 'relationships-1',
+  contextRevision: 'context-1',
+  policyRevision: 'policy-1',
+  declarationsRevision: 'declarations-1',
+  scope: 'document',
+  operation: 'send',
+  evaluationContextRevision: 'send-1',
+  targetProfile: 'default',
+  questionRevisions: { [P3]: 'question-1' },
+  artifactRevisions: { 'a-cab.derived_from': 'field-1' },
+  replacements: {},
+  ...change,
+});
+const readyEvaluation = (b = basis()) => ({
+  basis: b,
+  completion: 'complete' as const,
+  requirements: [],
+  snapshotReady: true,
+});
+
+// One real host consumer path: an incomplete/stale engine result or an unmet requirement
+// cannot become ready through attention overlays; optional preview availability is separate.
+{
+  const b = basis();
+  const blocked: Doc = {
+    ...doc,
+    findings: doc.findings.map((x) =>
+      x.id === P3
+        ? { ...x, severity: 'info', needs_person: 'none' as const, blocks: 'never' as const, evaluationBasis: b }
+        : x,
+    ),
+    document: {
+      ...doc.document,
+      blocking: [P3],
+      evaluation: {
+        ...readyEvaluation(b),
+        snapshotReady: false,
+        requirements: [{ id: 'portion-mark', status: 'unmet', mandatory: true, scope: 'portion:4' }],
+      },
+    },
+  };
+  const current = { currentBasis: b };
+  assert.ok(
+    !effectiveReady(blocked, current),
+    'a mandatory requirement stays blocking when severity/attention are quiet',
+  );
+  const question = blocked.findings.find((x) => x.id === P3)!;
+  const answered = record(
+    empty(),
+    P3,
+    'answered',
+    { reading: question.outcome.readings![0]!, index: 0 },
+    'act',
+    snapshot(question),
+  );
+  const overlaid = docView(blocked, answered);
+  assert.ok(overlaid.document.blocking.includes(P3), 'a local answer cannot clear the engine blocker');
+  assert.ok(!effectiveReady(overlaid, current));
+
+  const changedContext = basis({ contextRevision: 'context-2' });
+  const staleDoc: Doc = {
+    ...blocked,
+    findings: blocked.findings.map((x) => (x.id === P3 ? { ...x, evaluationBasis: changedContext } : x)),
+    document: {
+      ...blocked.document,
+      artifacts: blocked.document.artifacts.map((a) =>
+        a.id === 'a-cab' ? { ...a, evaluationBasis: changedContext } : a,
+      ),
+    },
+  };
+  assert.ok(
+    view(
+      staleDoc.findings.find((x) => x.id === P3)!,
+      answered,
+    ).stale,
+    'context changes stale a same-text question act',
+  );
+  assert.ok(
+    !effectiveReady(
+      { ...staleDoc, document: { ...staleDoc.document, blocking: [], evaluation: readyEvaluation(b) } },
+      { currentBasis: changedContext },
+    ),
+  );
+
+  const cabBase = {
+    ...art(doc, 'a-cab'),
+    evaluationBasis: b,
+    fields: {
+      ...art(doc, 'a-cab').fields!,
+      derived_from: { ...art(doc, 'a-cab').fields!.derived_from!, evaluationBasis: b },
+    },
+  };
+  const fieldAct = record(
+    empty(),
+    'a-cab',
+    'answered',
+    { fields: { derived_from: 'A source' } },
+    'field-act',
+    snapshot(cabBase),
+  );
+  const cabChanged = {
+    ...cabBase,
+    evaluationBasis: changedContext,
+    fields: { ...cabBase.fields, derived_from: { ...cabBase.fields.derived_from!, evaluationBasis: changedContext } },
+  };
+  assert.equal(
+    view(cabChanged, fieldAct).stale,
+    true,
+    'a context-only change stales a CAB field act independently of the banner',
+  );
+
+  const fresh = {
+    ...doc,
+    document: {
+      ...doc.document,
+      blocking: [],
+      evaluation: { ...readyEvaluation(b), jointPreview: { status: 'unavailable' as const, basis: b } },
+    },
+  };
+  assert.ok(
+    effectiveReady(fresh, current),
+    'an optional unavailable joint preview does not block a complete base evaluation',
+  );
+  assert.ok(
+    !effectiveReady(
+      {
+        ...fresh,
+        document: { ...fresh.document, evaluation: { ...readyEvaluation(b), completion: 'incomplete' as const } },
+      },
+      current,
+    ),
+  );
+  assert.ok(!effectiveReady(fresh, { ...current, requiredWrites: ['a-cab'], confirmedWrites: [] }));
+  assert.ok(
+    effectiveReady(fresh, {
+      ...current,
+      requiredWrites: ['a-cab'],
+      confirmedWrites: [writeConfirmationToken('a-cab', b)],
+      requiredAcceptanceChecks: ['outgoing-document'],
+      acceptanceChecks: { 'outgoing-document': writeConfirmationToken('outgoing-document', b) },
+    }),
+  );
+
+  const mandatoryUnavailable = {
+    ...fresh,
+    document: {
+      ...fresh.document,
+      evaluation: {
+        ...readyEvaluation(b),
+        requirements: [{ id: 'rel-audience', status: 'unavailable' as const, mandatory: true, scope: 'page:1' }],
+      },
+    },
+  };
+  assert.ok(
+    !effectiveReady(mandatoryUnavailable, current),
+    'a complete evaluation with an unavailable mandatory requirement is not ready',
+  );
+  const mandatoryUnknown = {
+    ...fresh,
+    document: {
+      ...fresh.document,
+      evaluation: {
+        ...readyEvaluation(b),
+        requirements: [
+          {
+            id: 'rel-audience',
+            status: 'future-status',
+            mandatory: true,
+            scope: 'page:1',
+          } as unknown as RequirementStatus,
+        ],
+      },
+    },
+  };
+  assert.ok(
+    !effectiveReady(mandatoryUnknown, current),
+    'an unrecognized mandatory requirement status cannot pass on snapshotReady alone',
+  );
+  const mandatoryMissingStatus = {
+    ...fresh,
+    document: {
+      ...fresh.document,
+      evaluation: {
+        ...readyEvaluation(b),
+        requirements: [
+          {
+            id: 'rel-audience',
+            mandatory: true,
+            scope: 'page:1',
+          } as unknown as RequirementStatus,
+        ],
+      },
+    },
+  };
+  assert.ok(
+    !effectiveReady(mandatoryMissingStatus, current),
+    'a missing mandatory requirement status cannot pass on snapshotReady alone',
+  );
+  const optionalUnavailable = {
+    ...fresh,
+    document: {
+      ...fresh.document,
+      evaluation: {
+        ...readyEvaluation(b),
+        requirements: [{ id: 'optional-preview', status: 'unavailable' as const, mandatory: false, scope: 'page:1' }],
+      },
+    },
+  };
+  assert.ok(
+    effectiveReady(optionalUnavailable, current),
+    'an optional unavailable requirement does not block an otherwise complete ready evaluation',
+  );
+  for (const status of ['satisfied', 'permitted'] as const) {
+    const resolvedRequirement = {
+      ...fresh,
+      document: {
+        ...fresh.document,
+        evaluation: {
+          ...readyEvaluation(b),
+          requirements: [{ id: 'rel-audience', status, mandatory: true, scope: 'page:1' }],
+        },
+      },
+    };
+    assert.ok(
+      effectiveReady(resolvedRequirement, {
+        ...current,
+        requiredWrites: ['a-cab'],
+        confirmedWrites: [writeConfirmationToken('a-cab', b)],
+        requiredAcceptanceChecks: ['outgoing-document'],
+        acceptanceChecks: { 'outgoing-document': writeConfirmationToken('outgoing-document', b) },
+      }),
+      `mandatory ${status} requirement passes with current basis and confirmed host work`,
+    );
+  }
+
+  const nextBasis = basis({ contextRevision: 'context-2' });
+  const nextEvaluation = { ...fresh, document: { ...fresh.document, evaluation: readyEvaluation(nextBasis) } };
+  const requiredCheck = { requiredAcceptanceChecks: ['outgoing-document'] };
+  assert.ok(
+    !effectiveReady(nextEvaluation, {
+      currentBasis: nextBasis,
+      ...requiredCheck,
+      acceptanceChecks: { 'outgoing-document': writeConfirmationToken('outgoing-document', b) },
+    }),
+    'a passed check at the previous context basis cannot carry forward',
+  );
+  assert.ok(
+    effectiveReady(nextEvaluation, {
+      currentBasis: nextBasis,
+      ...requiredCheck,
+      acceptanceChecks: { 'outgoing-document': writeConfirmationToken('outgoing-document', nextBasis) },
+    }),
+    'the same named check passes when confirmed against the current basis',
+  );
+}
 
 let g = sections(docView(doc, empty()), 'editing');
 assert.deepEqual(g.must.map(id), [P3]);
@@ -114,11 +385,11 @@ assert.ok(docView(doc, s).document.blocking.includes(P3), 'deferral never answer
 assert.ok(docView(doc, record(empty(), P3, 'declined')).document.blocking.includes(P3));
 assert.ok(sections(docView(doc, record(empty(), P3, 'declined')), 'editing').must.some((x) => x.id === P3));
 
-// Taking ¶5's alternative moves the banner (if_taken); undo moves it back.
+// An individual answer is never composed into an artifact preview by the kit.
 s = record(empty(), P5, 'changed', { reading: f(P5).outcome.readings![0]!, index: 0 });
 let banner = art(docView(doc, s), 'a-banner');
-assert.equal((banner.derived_value as MarkingInput).text, 'SECRET//FGI AUS GBR//REL TO USA, GBR');
-assert.equal(banner.if_taken, null);
+assert.equal((banner.derived_value as MarkingInput).text, 'SECRET//FGI AUS GBR//NOFORN');
+assert.equal(banner.jointPreview, undefined);
 s = record(s, P5, 'changed', null);
 banner = art(docView(doc, s), 'a-banner');
 assert.equal((banner.derived_value as MarkingInput).text, 'SECRET//FGI AUS GBR//NOFORN');
@@ -151,33 +422,48 @@ assert.equal(view(cab, s).needs_person, 'none');
 s = empty();
 s = record(s, P3, 'answered', { reading, index: 0 });
 s = record(s, P4, 'answered', { free: '(U)' });
-assert.equal(docView(doc, s).document.ready, false);
+assert.ok(!effectiveReady(docView(doc, s), { currentBasis: basis() }));
 assert.ok(
   sections(docView(doc, s), 'editing').done.some((x) => x.id === P4),
   'an answered missing mark is done, not waiting',
 );
 s = record(s, 'a-cab', 'answered', { fields: { derived_from: 'Multiple Sources', declassify_on: '20490115' } });
 let done = docView(doc, s);
-assert.deepEqual(done.document.blocking, []);
+assert.ok(done.document.blocking.includes(P3), 'an answer does not erase the semantic blocker');
 assert.deepEqual(done.document.pending, [P3, P4, 'a-cab'], 'answered is not applied');
-assert.equal(done.document.ready, false, 'not ready until the host applies the answers and re-lints');
+assert.ok(!effectiveReady(done, { currentBasis: basis() }), 'a missing fresh evaluation cannot establish readiness');
 // The host re-lints: the new findings carry the answers; the old ones are never replayed.
 // oxlint-disable-next-line no-unused-vars -- the overlay is what's dropped
 const strip = <T extends FindingView | ArtifactView>({ person, history, ...x }: T) => x;
 const relint = {
   ...done,
   findings: done.findings.map(strip),
-  document: { ...done.document, artifacts: done.document.artifacts.map(strip) },
+  document: {
+    ...done.document,
+    blocking: [],
+    evaluation: readyEvaluation(basis()),
+    artifacts: done.document.artifacts.map(strip),
+  },
 };
 s = linted(s);
 done = docView(relint, s);
 assert.deepEqual(done.document.pending, []);
-assert.equal(done.document.ready, true);
+assert.ok(
+  !effectiveReady(done, { currentBasis: basis() }),
+  'a fresh evaluation does not by itself confirm host writes',
+);
+assert.ok(
+  effectiveReady(done, {
+    currentBasis: basis(),
+    confirmedWrites: done.document.awaitingWrites!.map((token) => writeConfirmationToken(token, basis())),
+  }),
+  'the host confirms each accepted write against the same evaluation basis',
+);
 // A same-id finding that asks again after the lint is not settled by the old answer.
 assert.equal(view(f(P3), s).needs_person, 'required', "an answer before the lint is the engine's to report");
 assert.ok(docView(doc, s).document.blocking.includes(P3));
 // The engine's document is untouched.
-assert.equal(doc.document.ready, false);
+assert.ok(!doc.document.evaluation, 'the hand-written source fixture remains the legacy oracle');
 assert.equal(f(P3).needs_person, 'required');
 
 // Every edit waits for the lint, not only blockers.
@@ -358,7 +644,7 @@ assert.equal(
   assert.equal(v.overridden, undefined);
   assert.equal(v.stale, true);
   assert.ok(d.document.blocking.includes(P2), 'a new question is never answered by an old override');
-  assert.equal(d.document.ready, false);
+  assert.ok(!effectiveReady(d, { currentBasis: basis() }));
 }
 // A take-back of a written answer on a finding that has since changed restores nothing and isn't pending.
 {
@@ -601,13 +887,13 @@ assert.equal(
   assert.equal(now.stale, undefined);
   assert.equal(now.outcome.result!.text, f(P3).outcome.readings![1]!.result!.text);
 }
-// A stale answer moves no artifact: the banner keeps its own value.
+// Individual answers never move the banner; only a matching joint engine preview can do that.
 {
   const r0 = f(P5).outcome.readings![0]!;
   const s = record(empty(), P5, 'changed', { reading: r0, index: 0 }, undefined, snapshot(f(P5)));
   const ban = (d: Doc) => (art(d, 'a-banner').derived_value as MarkingInput).text;
   const base = ban(doc);
-  assert.notEqual(ban(docView(doc, s)), base);
+  assert.equal(ban(docView(doc, s)), base);
   const moved = { ...f(P5), outcome: { ...f(P5).outcome, readings: [{ ...r0, reading: 'something else' }] } };
   assert.equal(ban(docView({ ...doc, findings: doc.findings.map((x) => (x.id === P5 ? moved : x)) }, s)), base);
 }
@@ -637,7 +923,7 @@ for (const act of ['deferred', 'declined'] as const) {
   assert.equal(v.asks?.text, f(P3).asks!.text, act);
   assert.equal(v.needs_person, f(P3).needs_person, act);
   assert.ok(d.document.pending!.includes(P3), act);
-  assert.equal(d.document.ready, false, act);
+  assert.ok(!effectiveReady(d, { currentBasis: basis() }), act);
 }
 
 // A marking given as a plain string is a marking result, not typed content.

@@ -41,6 +41,8 @@ import type {
   ArtifactView,
   Doc,
   FindingView,
+  Host,
+  HypotheticalReplacement,
   LogEntry,
   MarkingLike,
   Snapshot,
@@ -74,6 +76,7 @@ export function record(
     log: [
       ...state.log,
       {
+        sequence: state.log.length,
         id,
         act,
         value: value == null ? value : structuredClone(value),
@@ -127,6 +130,7 @@ export const snapshot = (f: Subject): Snapshot =>
     blocks: f.blocks,
     ...(f.state && { state: f.state }),
     ...(f.fields && { fields: f.fields }),
+    ...(f.evaluationBasis && { evaluationBasis: f.evaluationBasis }),
   });
 
 /** Seen only quiets (docs/DERIVATION.md): a Noticeable becomes Quiet; nothing else moves. */
@@ -171,6 +175,18 @@ function writes(state: State, id: string): boolean {
   return settled(e) || e.act === 'kept_as_written' || (edits(e) && !!reversed(state, id, e));
 }
 
+/** The last still-live physical change; it remains outstanding past lint until the host confirms its token. */
+function writeIntent(state: State, id: string): LogEntry | null {
+  let e = last(state, id);
+  if (putOff(e)) e = history(state, id).findLast((x) => !putOff(x)) || null;
+  return edits(e) && (settled(e) || (e.value == null && !!reversed(state, id, e))) ? e : null;
+}
+
+/** A token is unique within the host-persisted append-only state. */
+export const writeToken = (e: LogEntry): string => `${e.id}@${e.sequence}`;
+/** Bind host acknowledgement to the exact evaluated source/context/policy basis. */
+export const writeConfirmationToken = (token: string, basis: unknown): string => `${token}#${canon(basis)}`;
+
 /** The written answer or override a null `changed` since the lint takes back, if any. */
 function reversed(state: State, id: string, e: LogEntry | null = last(state, id)): LogEntry | null {
   const n = state.linted ?? 0;
@@ -195,6 +211,35 @@ export const canon = (v: unknown): string =>
         )
       : x,
   );
+
+/** A basis equality check for question, artifact and host-currentness bindings. */
+export const sameBasis = (a: unknown, b: unknown): boolean => a != null && b != null && canon(a) === canon(b);
+
+/** Effective readiness is affirmative engine evidence plus host-confirmed current work. */
+export function effectiveReady(doc: Doc, host: Host = {}): boolean {
+  const evaluation = doc.document.evaluation;
+  if (
+    !evaluation ||
+    evaluation.completion !== 'complete' ||
+    !evaluation.snapshotReady ||
+    evaluation.requirements.some((r) => r.mandatory && r.status !== 'satisfied' && r.status !== 'permitted') ||
+    doc.document.blocking.length > 0 ||
+    (doc.document.pending?.length ?? 0) > 0 ||
+    !sameBasis(evaluation.basis, host.currentBasis)
+  )
+    return false;
+  const writeTokens = [...(doc.document.awaitingWrites ?? []), ...(host.requiredWrites ?? [])].map((token) =>
+    writeConfirmationToken(token, evaluation.basis),
+  );
+  if (writeTokens.some((token) => !(host.confirmedWrites ?? []).includes(token))) return false;
+  if (
+    (host.requiredAcceptanceChecks ?? []).some(
+      (id) => host.acceptanceChecks?.[id] !== writeConfirmationToken(id, evaluation.basis),
+    )
+  )
+    return false;
+  return true;
+}
 /** The finding isn't the one the act was taken on: another marking or question under the same id. */
 const moved = (e: LogEntry, f: Subject): boolean =>
   !!e.about &&
@@ -204,6 +249,7 @@ const moved = (e: LogEntry, f: Subject): boolean =>
     !sameAsWritten(e.about, f) ||
     canon(e.about.asks ?? null) !== canon(f.asks ?? null) ||
     !sameResult(e.about, f.outcome?.result) ||
+    canon(e.about.evaluationBasis ?? null) !== canon(f.evaluationBasis ?? null) ||
     // Another place is another finding; a span moves with edits above it, so only the paragraph or page counts.
     ('anchor' in e.about && place(e.about.anchor) !== place(f.anchor)));
 const place = (a: Anchor | null | undefined): string =>
@@ -239,6 +285,7 @@ function answeredOn(state: State, f: FindingView, e: LogEntry): FindingView {
 const staleOp = (e: LogEntry, a: ArtifactView): boolean =>
   !!e.about &&
   (e.about.state !== a.state ||
+    canon(e.about.evaluationBasis ?? null) !== canon(a.evaluationBasis ?? null) ||
     !sameResult(e.about, textOf(a.derived_value) != null ? (a.derived_value as MarkingLike) : null) ||
     (e.about.content ?? null) !== typed(a.derived_value) ||
     ('placement' in e.about && (e.about.placement !== (a.placement ?? null) || e.about.scope !== (a.scope ?? null))) ||
@@ -252,6 +299,7 @@ const staleOp = (e: LogEntry, a: ArtifactView): boolean =>
         !now ||
         (was &&
           (schema(was) !== schema(now) ||
+            canon(was.evaluationBasis ?? null) !== canon(now.evaluationBasis ?? null) ||
             (![was.from, source(was)].includes(source(now)) && now.value !== e.value?.fields?.[k])))
       );
     }));
@@ -284,18 +332,18 @@ export const decision = (f: Subject): LogEntry | null =>
 /** The person's own answer stands on this finding, live or already written. */
 export const answered = (f: Subject): boolean => decision(f)?.value != null;
 /** One finding or artifact as it stands with the person's acts on it. */
-export function view<T extends Subject>(f: T, state: State, took?: Set<string>): T {
-  const v = overlay(f, state, took);
+export function view<T extends Subject>(f: T, state: State): T {
+  const v = overlay(f, state);
   // Seen is of the result shown: a new one the person put there hasn't been looked at yet.
   // A copy: a host that edits the view mustn't reach into the log.
   return structuredClone(v.seen && shown(v) !== shown(f) ? { ...v, seen: wasSeen(state, v) } : v) as T;
 }
 
-function overlay(f: Subject, state: State, took?: Set<string>): Subject {
+function overlay(f: Subject, state: State): Subject {
   // `person` is the act still in force; `history` keeps every act for the audit.
   const e = live(state, f.id);
   const over = { seen: !!f.seen || wasSeen(state, f), person: e, history: history(state, f.id) };
-  if (isArtifact(f)) return artifactView({ ...f, ...over }, state, took);
+  if (isArtifact(f)) return artifactView({ ...f, ...over }, state);
   const v: FindingView = { ...f, ...over };
   if (!e) return v;
   switch (e.act) {
@@ -354,21 +402,8 @@ function overlay(f: Subject, state: State, took?: Set<string>): Subject {
   }
 }
 
-function artifactView(a: ArtifactView, state: State, took?: Set<string>): ArtifactView {
+function artifactView(a: ArtifactView, state: State): ArtifactView {
   let out = a;
-  // A banner moves with the alternatives taken, so the ops below are checked against the value shown.
-  if (a.if_taken) {
-    // `took`: the findings whose answer still holds (docView passes the checked views); a stale answer moves nothing.
-    const taken = Object.keys(a.if_taken).filter((fid) => (took ? took.has(fid) : settled(live(state, fid))));
-    if (taken.length) {
-      const rest = Object.fromEntries(Object.entries(a.if_taken).filter(([fid]) => !taken.includes(fid)));
-      out = {
-        ...out,
-        derived_value: a.if_taken[taken[taken.length - 1]!],
-        if_taken: Object.keys(rest).length ? rest : null,
-      };
-    }
-  }
   const ops = since(state).filter((e) => e.id === a.id);
   // An apply, a removal or a typed field taken on another value or state of this artifact doesn't carry over.
   // Each op is checked on its own: a stale later field leaves an earlier one that still holds.
@@ -432,15 +467,19 @@ export function docView(doc: Doc, state: State): Doc {
       m = moves(f.id);
     return m.length ? { ...v, moves: m } : v;
   });
-  const took = new Set(findings.filter((x) => settled(x.person)).map((x) => x.id));
-  const artifacts = doc.document.artifacts.map((a) => view(a, state, took));
+  const artifacts = doc.document.artifacts.map((a) => view(a, state));
   const all = new Map([...findings, ...artifacts].map((x) => [x.id, x]));
-  const blocking = doc.document.blocking.filter((id) => all.get(id)?.needs_person !== 'none');
+  // Semantic engine blockers are authoritative. Local presentation overlays never erase them.
+  const blocking = doc.document.blocking;
   // Every write since the lint waits for it, blocker or not: an alternative taken moves the banner too.
   // A write to a finding the lint withdrew has nowhere to go; its acts stay in `withdrawn`.
   const pending = [...new Set(since(state).map((e) => e.id))].filter(
     (id) => all.has(id) && !all.get(id)?.stale && writes(state, id),
   );
+  const awaitingWrites = [...all.keys()]
+    .map((id) => writeIntent(state, id))
+    .filter((e): e is LogEntry => !!e)
+    .map(writeToken);
   const withdrawn = [...new Set(state.log.map((e) => e.id))]
     .filter((id) => !all.has(id))
     .map((id) =>
@@ -449,6 +488,26 @@ export function docView(doc: Doc, state: State): Doc {
   return {
     ...doc,
     findings,
-    document: { ...doc.document, artifacts, blocking, pending, withdrawn, ready: !blocking.length && !pending.length },
+    document: { ...doc.document, artifacts, blocking, pending, awaitingWrites, withdrawn },
   };
+}
+
+/** Project the exact hypothetical replacements currently represented by the overlaid document view. */
+export function acceptedReplacements(doc: Doc): Record<string, HypotheticalReplacement> {
+  const replacements: Record<string, HypotheticalReplacement> = {};
+  for (const finding of doc.findings) {
+    const value = finding.person?.value;
+    if (value?.reading) replacements[finding.id] = { kind: 'reading', reading: value.reading };
+    else if (value?.free != null) replacements[finding.id] = { kind: 'free_answer', value: value.free };
+  }
+  for (const artifact of doc.document.artifacts) {
+    for (const [field, item] of Object.entries(artifact.fields ?? {})) {
+      if (item.source === 'person' && item.value != null)
+        replacements[`${artifact.id}.${field}`] = { kind: 'artifact_field', field, value: item.value };
+    }
+    const value = artifact.person?.value;
+    if (value?.apply) replacements[artifact.id] = { kind: 'artifact', action: 'apply' };
+    if (value?.remove) replacements[artifact.id] = { kind: 'artifact', action: 'remove' };
+  }
+  return replacements;
 }

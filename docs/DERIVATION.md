@@ -9,54 +9,54 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 All documents and markings in this repo are fictional examples.
 
-Attention lives in the kit, computed from the engine's facts (decision, 16 Oct 2026). Table 1 maps every engine outcome to the contract's three semantic fields; Table 2 is the whole function from those fields plus the host's moment to one of five rungs: Quiet, Noticeable, Advisory, Action required, Blocking. Matrix A says which slots each rung shows; Matrix B what each anchor kind carries. This file is the published spec for that derivation.
+Attention lives in the kit, computed from the engine's semantic facts and host moment. The adopted readiness contract separates this presentation rung from operation readiness. The tables below define the kit target.
 
 _Design specification for @knitli/marque-kit. Edit here._
 
+**Adoption and migration status:** the readiness model was adopted on 14 November 2026 and is recorded in Marque MD-0043. Coordinated engine/kit/caller migration and acceptance evidence remain pending, so this is the target contract rather than a conformance claim. An operation can remain unready while host work is pending even when `needs_person=none` and no person-facing action is shown.
+
 
 ---
 
-## needs_person and blocks — what Marque says; the rung — what the kit computes
-Table 1 maps every outcome the engine produces today onto the contract's three semantic fields. Table 2 is the whole function from those fields plus the host's moment to a rung. Rows marked "decide" are yours.
+## needs_person and blocks — attention is not readiness
 
-| Today's outcome | outcome.kind | needs_person | blocks | Rung while drafting → at finalize |
-|---|---|---|---|---|
-| Determined, promoted | applied | none | never | Quiet. Noticeable when the marking visibly changed, until seen. |
-| Determined, not promoted | available | optional | finalize if an error was left unapplied; else never | Advisory → Blocking only when an error was left unapplied. |
-| Ranked — prescribed or chosen promoted | chosen_over | optional | never | Noticeable; the runners-up on request. |
-| Ranked — most restrictive | chosen_over | optional | never | Advisory. The safe reading was taken and intent is unknown — exactly the blue dotted case. |
-| Plural — several lawful readings, none ranked | choices | required | finalize | Action required → Blocking. The JOINT case sits here. |
-| Withheld — needs a fact, with options or a prompt | needs_fact | required | finalize | Action required → Blocking. |
-| Withheld — needs a fact, with nothing to choose from | needs_fact | required | finalize | Action required → Blocking. Decide: can the person type a free answer, or only acknowledge? |
-| Withheld — acting automatically would be wrong; may be work in progress | withheld | optional | never | Advisory. Never blocks — "the warning stands permanently." |
-| Withheld — the remedy is an edit outside the engine | withheld | host decides: none if the host performs it, else required | finalize if an error is unapplied | Quiet when the host does the edit; Action required when it can't. |
-| Withheld — kept on purpose · needs a setting an administrator owns | withheld | none | never | Noticeable (info): kept on purpose · needs a setting an administrator owns. |
-| Withheld — internal guard | withheld | none | never | Noticeable at most. It should never reach a person. |
-| Withheld — too large to examine | withheld | required | finalize | Noticeable → Action required. Decide: a marking Marque couldn't read should not go out unexamined. |
-| Critical system-policy violation | withheld | required (an administrator) | now | Blocking immediately. Never auto-fixes. |
-| Covered — another finding's repair covers this span | covered_by | the owner's | the owner's | Collapsed into the owner's card. One span, one card. |
-| Artifact absent-but-required, fixable — a derived value and a placement exist | available → applied | none once the host places it; optional until then | finalize | Quiet when placed; "before you finalize" when the host can't place it. |
-| Artifact absent-but-required, flag-only — no edge can derive a value | needs_fact | required | finalize | "Before you finalize" → Blocking. The CAB with blanks lives here. |
-| Artifact present-non-canonical | applied / available | none | never | Noticeable. |
-| Artifact present-not-required — superfluous | withheld | optional | never | Advisory: may be work in progress; never deleted for you. |
-| basis = system_ideal — on any row above | unchanged | unchanged | unchanged | Tone only: "Marque adds this; nobody was required to." Never an error voice. |
-Table 2 · The rung, as a function
+The kit derives the attention rung from Marque's `needs_person` and `blocks`, plus the host's moment and kit interaction state. Rungs are presentation; they do not add or remove semantic requirements. Severity never sets a rung or readiness. `blocking` is an attention rung at the host's gate; semantic readiness is a separate calculation.
+
+| Engine result | Meaning presented | Readiness treatment |
+|---|---|---|
+| Current `applied` label | Revise producer/consumer meaning together to distinguish selected/proposed from host-written; `generated` is a proposed engine-side name. | No automatic pass. A required duty remains until host write and fresh evaluation. |
+| `available` | A supported proposal exists and could be accepted/applied. | Neither pass nor blocker by label. An unmet mandatory duty blocks even when a repair is available. |
+| `chosen_over` | Marque selected/ranked a reading; this does not prove author intent or a physical write. | Depends on whether the reading is a permitted disposition. Confirmed evaluation can satisfy a requirement; unresolved author choice may remain Advisory or required. |
+| `choices` / `needs_fact` | Multiple readings or a needed fact remain unresolved. | Block only when the underlying requirement is mandatory and no permitted disposition satisfies it. The kit offers a free answer and “Not my call.” |
+| `withheld` | No automatic result is offered, with a reason. | The reason and unmet requirement determine blocking; repair absence does not reduce diagnostic severity. |
+| `covered_by` | Another finding owns the overlapping correction. | Preserve the causal link; clear only when the owner's confirmed result satisfies the requirement. |
+| `kept_as_written` (kit view) | The person declined one proposed edit and kept the text. | Never a waiver. Preserve MD-0039 protection, normal-severity reporting and protective page/banner resolution. |
+
+The authored NF/REL reading and synthesized JOINT fallback remain distinct. The former may leave an optional intent question; the latter is not what the author wrote and remains a required question when a person is present. An unattended fallback is permitted only under policy and does not itself prove a host write. Required writes and artifact placement need confirmation followed by a complete current evaluation. A banner dependency is distinct from artifact-field dependencies: unchanged banner does not eliminate a changed CAB field or other artifact value.
+
+When multiple pending answers affect one artifact, show a preview only from a joint hypothetical engine evaluation at a matched snapshot, context and answer revision. Do not combine individual previews in the kit. If joint evaluation is unavailable, show pending/unavailable. A completed joint preview must agree with the confirming evaluation under the same accepted assertions and context; the fresh complete evaluation may settle acts even if no preview was available.
+
+## The rung, as a function
+
 | needs_person | blocks | moment | rung |
 |---|---|---|---|
-| none | never | any | Quiet — Noticeable while a visible change is unseen |
-| optional | never | any | Advisory — it never stops anything |
+| none | never, finalize or now | any | Quiet — Noticeable while a visible change is unseen; no person action is needed |
+| optional | never | any | Advisory |
+| optional | now | any | Blocking |
 | optional | finalize | drafting | Advisory |
 | optional | finalize | finalize | Blocking |
-| required | finalize | drafting | Action required — deferred, it waits under "before you finalize" |
+| required | never | any | Action required |
+| required | finalize | drafting | Action required |
 | required | finalize | finalize | Blocking |
 | required | now | any | Blocking |
-Blocking is the same finding at a different moment. Nothing appears at finalize that wasn't known while drafting; only the moment changed.
-Seen only quiets. Marking a Noticeable as seen makes it Quiet. Seen never touches a required finding.
-The moment is the host's. drafting · finalize · send — and a web app may have a fourth, navigate. Marque never knows which it is.
-Severity never sets a rung. It sets blocks for an unapplied error, and nothing else.
+
+Blocking is the same finding at a different moment. Nothing appears at finalize that wasn't known while drafting; only the moment changed. Seen only quiets; it never clears a requirement or blocker. The moment is the host's (`editing`, `finalize`, `send`, or a host-specific moment). Marque does not choose it.
+
+A missing envelope, partial response, stale revision, missing required scope or absent completeness signal is not readiness. An empty blocker list is not an affirmative result. Effective readiness also requires current outgoing state, confirmed accepted writes/placements, no accepted work awaiting evaluation, and any named host acceptance checks.
 
 
 ---
+
 
 ## Which slots show, by rung — and which exist, by anchor
 The same card, cut down differently at each rung; and the same contract, filled differently for a span, a portion, a banner, a CAB, a notice. U = shown by default · (U) = on request · — = absent · I = the host always has it.
