@@ -35,7 +35,7 @@ export interface OfficeWordHost {
     documentId: string,
     chain: string,
   ): Promise<Omit<NativeCabRequest, 'maxBasisBytes' | 'expectedChain'> | null>;
-  /** Revoke before document, viewer, grant, permission, provider, layout or formatting changes. */
+  /** Revoke before document, viewer, grant, permission, provider, layout, formatting or accepted-answer changes. */
   watchOrdinaryCabInvalidation?(
     documentId: string,
     chain: string,
@@ -44,6 +44,12 @@ export interface OfficeWordHost {
   ): () => void;
   /** Independently authorize this viewer, exact member and raw evaluator input/output. */
   readOrdinaryCabGrant?(documentId: string, chain: string, viewerId: string): Promise<OfficeOrdinaryCabGrant | null>;
+  /** Independently grant this exact viewer access to preview input and output. */
+  readOrdinaryCabPreviewGrant?(
+    documentId: string,
+    chain: string,
+    viewerId: string,
+  ): Promise<OfficeOrdinaryCabPreviewGrant | null>;
   /** Independent current owner, source text and layout revision. */
   readNativeCabPlacementScope?(documentId: string, chain: string): Promise<OfficeCabPlacementScope | null>;
   /** Revoke before any selected source, selection, viewer, grant or provider changes. */
@@ -121,10 +127,34 @@ export interface OfficeOrdinaryCabGrant {
   disclosedFields: NativeField[];
 }
 
+/** Separate permission for one independently supplied opaque answer group.
+ * Raw-output permission includes unkeyed receipt and fingerprint commitments,
+ * which can confirm guesses about source or answer references. Recipients must
+ * be authorized for those inputs; these digests do not authenticate or conceal them. */
+export interface OfficeOrdinaryCabPreviewGrant {
+  documentId: string;
+  chain: string;
+  viewerId: string;
+  grantId: string;
+  permissionRevision: string;
+  /** Independently qualified commitments to this exact base and answer group. */
+  expectedReceipt: string;
+  expectedPreviewFingerprint: string;
+  authorizeRawInput: true;
+  authorizeRawOutput: true;
+  /** Opaque references must distinguish changed values, or the host must revoke and reissue on every change. */
+  answersJson: string;
+  /** Independently observed source examination for this exact current target. */
+  sourceExaminationJson: string;
+  disclosedFields: NativeField[];
+}
+
 export interface OfficeOrdinaryCabProvider {
   viewerId: string;
   /** Executes the current ordinary CAB questions operation; no writes or accepted answers. */
   evaluate(requestJson: string): Promise<string>;
+  /** Optional separately granted read-only prepare/apply preview operation. */
+  preview?(this: void, requestJson: string): Promise<string>;
 }
 
 /** Native wire text and independently issued scope, without a legacy document. */
