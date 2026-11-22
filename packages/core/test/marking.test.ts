@@ -72,7 +72,8 @@ const hostile = [
   // Through every attribute: help, a fold label, the model a fold carries.
   html(
     {
-      text: evil,
+      // Layers are used only when they spell the text exactly, so the text is theirs.
+      text: '(S' + '//REL TO USA, AUS, CAN, GBR, NZL, "><script>x</script>)',
       layers: [
         { tokens: [{ t: '(S' }] },
         {

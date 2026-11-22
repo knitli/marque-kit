@@ -34,11 +34,6 @@
       "source": "./src/types.ts",
       "types": "./dist/types.d.ts",
       "default": "./dist/types.js"
-    },
-    "./marking": {
-      "source": "./src/marking.ts",
-      "types": "./dist/marking.d.ts",
-      "default": "./dist/marking.js"
     }
   },
   "publishConfig": {
