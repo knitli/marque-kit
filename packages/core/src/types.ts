@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { NativeEnvelopeV1 } from './native-wire.ts';
+import type { NativeEnvelope } from './native-wire.ts';
 import type { NativeCabRequest } from './native-cab.ts';
 
 /**
@@ -438,7 +438,7 @@ export interface DocumentState {
   blocking: string[];
   evaluation?: Evaluation;
   /** A CAB-only native evaluation cannot authorize whole-document readiness. */
-  native_evaluation?: NativeEnvelopeV1 | undefined;
+  native_evaluation?: NativeEnvelope | undefined;
   artifacts: ArtifactView[];
   pending?: string[];
   /** Accepted physical changes remain host-confirmation obligations after a re-lint. */

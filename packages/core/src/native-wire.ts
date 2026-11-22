@@ -108,6 +108,58 @@ export type NativeEnvelopeV1 = {
   evaluation: NativeEvaluation;
 };
 
+export type NativeSubject = { chain: string; serial: string };
+export type NativeMeaning = {
+  requested_fact: string;
+  scope: NativeScope | null;
+  answer_kinds: { kind: 'cab_field_replacement'; field: NativeField }[];
+  answer_effects: string[];
+};
+export type NativeFinding = {
+  subject: NativeSubject;
+  outcome: 'needs_fact' | 'unavailable';
+  needs_person: 'none' | 'optional' | 'required';
+  blocks: 'never' | 'finalize' | 'now';
+  requirement: { status: 'resolved'; index: string } | { status: 'not_supplied' | 'unavailable' };
+  question: {
+    chain: string;
+    serial: string;
+    revision: string;
+    subject: NativeSubject;
+    field: NativeField;
+    prompt: string;
+    meaning: NativeMeaning;
+    basis: NativeBasis;
+  } | null;
+  requested_action: NativeMeaning | null;
+  result: { subject_chain: string; subject_serial: string; serial: string } | null;
+  result_revision: string | null;
+  readings: 'unavailable';
+};
+export type NativeEvaluationV2 = NativeEvaluation & {
+  chain: string | null;
+  handles: {
+    last_subject: string;
+    last_question: string;
+    last_artifact: string;
+    last_act_sequence: string;
+    last_question_revision: string;
+    last_result_revision: string;
+  };
+  findings: {
+    unrepresented: string[];
+    status: 'partial';
+    coverage: NativeEvaluation['coverage'];
+    items: NativeFinding[];
+  };
+};
+export type NativeEnvelopeV2 = Omit<NativeEnvelopeV1, 'schema' | 'version' | 'evaluation'> & {
+  schema: 'knitli.native-cab-findings.v2';
+  version: 2;
+  evaluation: NativeEvaluationV2;
+};
+export type NativeEnvelope = NativeEnvelopeV1 | NativeEnvelopeV2;
+
 const fail = (where: string): never => {
   throw new TypeError(`invalid native evaluation wire: ${where}`);
 };
@@ -319,8 +371,14 @@ function evaluationBasis(x: unknown, where: string): NativeEvaluationBasis {
   });
   return { basis: basis(b.basis, where), accepted_answers: answers };
 }
-function evaluation(x: unknown, where: string): NativeEvaluation {
-  const o = keys(x, ['basis', 'coverage', 'readiness', 'requirements', 'artifacts', 'host_work'], where);
+function evaluation(x: unknown, where: string, v2 = false): NativeEvaluation {
+  const o = keys(
+    x,
+    v2
+      ? ['basis', 'coverage', 'readiness', 'requirements', 'artifacts', 'host_work', 'findings', 'chain', 'handles']
+      : ['basis', 'coverage', 'readiness', 'requirements', 'artifacts', 'host_work'],
+    where,
+  );
   let nativeBasis: NativeEvaluation['basis'] = null;
   if (o.basis !== null) {
     nativeBasis = evaluationBasis(o.basis, where);
@@ -431,6 +489,131 @@ function evaluation(x: unknown, where: string): NativeEvaluation {
     },
   };
 }
+function subject(x: unknown): NativeSubject {
+  const o = keys(x, ['chain', 'serial'], 'subject');
+  return { chain: str(o.chain, 'subject'), serial: safeDecimal(o.serial, 'subject') };
+}
+function meaning(x: unknown): NativeMeaning {
+  const o = keys(x, ['requested_fact', 'scope', 'answer_kinds', 'answer_effects'], 'meaning');
+  return {
+    requested_fact: str(o.requested_fact, 'meaning'),
+    scope: o.scope === null ? null : scope(o.scope, 'meaning'),
+    answer_kinds: arr(o.answer_kinds, 'meaning').map((x) => {
+      const a = keys(x, ['kind', 'field'], 'answer kind');
+      return {
+        kind: oneOf(a.kind, ['cab_field_replacement'] as const, 'answer kind'),
+        field: field(a.field, 'answer kind'),
+      };
+    }),
+    answer_effects: arr(o.answer_effects, 'meaning').map((x) => str(x, 'answer effect')),
+  };
+}
+function parseFindings(
+  e: Record<string, unknown>,
+  base: NativeEvaluation,
+): Pick<NativeEvaluationV2, 'chain' | 'handles' | 'findings'> {
+  const o = keys(e.findings, ['unrepresented', 'status', 'coverage', 'items'], 'findings');
+  const omitted = arr(o.unrepresented, 'unrepresented');
+  const expected = ['other_outcomes', 'readings', 'complete_finding_inventory'];
+  if (omitted.length !== expected.length || omitted.some((x, i) => x !== expected[i])) fail('unrepresented');
+  if (o.status !== 'partial') fail('finding status');
+  const c = keys(o.coverage, ['status', 'reason'], 'finding coverage');
+  if (c.status !== base.coverage.status || c.reason !== base.coverage.reason) fail('finding coverage');
+  const items = arr(o.items, 'findings').map((v): NativeFinding => {
+    const f = keys(
+      v,
+      [
+        'subject',
+        'outcome',
+        'needs_person',
+        'blocks',
+        'requirement',
+        'question',
+        'requested_action',
+        'result',
+        'result_revision',
+        'readings',
+      ],
+      'finding',
+    );
+    const r = object(f.requirement, 'requirement link');
+    const status = oneOf(r.status, ['resolved', 'not_supplied', 'unavailable'] as const, 'requirement link');
+    let requirement: NativeFinding['requirement'];
+    if (status === 'resolved') {
+      keys(r, ['status', 'index'], 'requirement link');
+      const index = safeDecimal(r.index, 'requirement index');
+      if (Number(index) >= base.requirements.length) fail('requirement index');
+      requirement = { status, index };
+    } else {
+      keys(r, ['status'], 'requirement link');
+      requirement = { status };
+    }
+    let question: NativeFinding['question'] = null;
+    if (f.question !== null) {
+      const q = keys(
+        f.question,
+        ['chain', 'serial', 'revision', 'subject', 'field', 'prompt', 'meaning', 'basis'],
+        'question',
+      );
+      question = {
+        chain: str(q.chain, 'question'),
+        serial: safeDecimal(q.serial, 'question'),
+        revision: safeDecimal(q.revision, 'question'),
+        subject: subject(q.subject),
+        field: field(q.field, 'question'),
+        prompt: str(q.prompt, 'question'),
+        meaning: meaning(q.meaning),
+        basis: basis(q.basis, 'question'),
+      };
+    }
+    let result: NativeFinding['result'] = null;
+    if (f.result !== null) {
+      const r = keys(f.result, ['subject_chain', 'subject_serial', 'serial'], 'result');
+      result = {
+        subject_chain: str(r.subject_chain, 'result'),
+        subject_serial: safeDecimal(r.subject_serial, 'result'),
+        serial: safeDecimal(r.serial, 'result'),
+      };
+    }
+    return {
+      subject: subject(f.subject),
+      outcome: oneOf(f.outcome, ['needs_fact', 'unavailable'] as const, 'outcome'),
+      needs_person: oneOf(f.needs_person, ['none', 'optional', 'required'] as const, 'needs person'),
+      blocks: oneOf(f.blocks, ['never', 'finalize', 'now'] as const, 'blocks'),
+      requirement,
+      question,
+      requested_action: f.requested_action === null ? null : meaning(f.requested_action),
+      result,
+      result_revision: f.result_revision === null ? null : safeDecimal(f.result_revision, 'result revision'),
+      readings: oneOf(f.readings, ['unavailable'] as const, 'readings'),
+    };
+  });
+  const h = keys(
+    e.handles,
+    [
+      'last_subject',
+      'last_question',
+      'last_artifact',
+      'last_act_sequence',
+      'last_question_revision',
+      'last_result_revision',
+    ],
+    'handles',
+  );
+  const handles = {
+    last_subject: safeDecimal(h.last_subject, 'handles'),
+    last_question: safeDecimal(h.last_question, 'handles'),
+    last_artifact: safeDecimal(h.last_artifact, 'handles'),
+    last_act_sequence: safeDecimal(h.last_act_sequence, 'handles'),
+    last_question_revision: safeDecimal(h.last_question_revision, 'handles'),
+    last_result_revision: safeDecimal(h.last_result_revision, 'handles'),
+  };
+  return {
+    chain: e.chain === null ? null : str(e.chain, 'chain'),
+    handles,
+    findings: { unrepresented: expected, status: 'partial', coverage: base.coverage, items },
+  };
+}
 const OMITTED = [
   'evaluation_chain',
   'handle_watermarks',
@@ -482,29 +665,39 @@ function freezeTree(value: unknown): void {
   for (const child of Object.values(value)) freezeTree(child);
   Object.freeze(value);
 }
-export function isParsedNativeEnvelope(value: unknown): value is NativeEnvelopeV1 {
+export function isParsedNativeEnvelope(value: unknown): value is NativeEnvelope {
   return value !== null && typeof value === 'object' && accepted.has(value);
 }
-export function parseNativeJson(text: string, maxBytes: number): NativeEnvelopeV1 {
+export function parseNativeJson(text: string, maxBytes: number): NativeEnvelope {
   const o = keys(
     parseJson(text, maxBytes),
     ['schema', 'version', 'route_scope', 'whole_document_finalize', 'omitted_lanes', 'evaluation'],
     'envelope',
   );
-  if (o.schema !== 'knitli.native-evaluation.v1' || o.version !== 1) fail('schema version');
+  const v2 = o.schema === 'knitli.native-cab-findings.v2' && o.version === 2;
+  if (!v2 && !(o.schema === 'knitli.native-evaluation.v1' && o.version === 1)) fail('schema version');
   if (o.route_scope !== 'cab_snapshot' || o.whole_document_finalize !== 'unsupported') fail('scope');
   const omittedValues = arr(o.omitted_lanes, 'omitted_lanes');
-  if (omittedValues.length !== OMITTED.length || omittedValues.some((value, i) => value !== OMITTED[i]))
+  const expected = v2
+    ? OMITTED.filter((lane) => lane !== 'findings' && lane !== 'evaluation_chain' && lane !== 'handle_watermarks')
+    : OMITTED;
+  if (omittedValues.length !== expected.length || omittedValues.some((value, i) => value !== expected[i]))
     fail('omitted lanes contract');
-  const omitted = OMITTED.slice();
-  const result: NativeEnvelopeV1 = {
-    schema: 'knitli.native-evaluation.v1',
-    version: 1,
-    route_scope: 'cab_snapshot',
-    whole_document_finalize: 'unsupported',
+  const omitted = expected.slice();
+  const common = {
+    route_scope: 'cab_snapshot' as const,
+    whole_document_finalize: 'unsupported' as const,
     omitted_lanes: omitted,
-    evaluation: evaluation(o.evaluation, 'evaluation'),
   };
+  const base = evaluation(o.evaluation, 'evaluation', v2);
+  const result: NativeEnvelope = v2
+    ? {
+        ...common,
+        schema: 'knitli.native-cab-findings.v2',
+        version: 2,
+        evaluation: { ...base, ...parseFindings(object(o.evaluation, 'evaluation'), base) },
+      }
+    : { ...common, schema: 'knitli.native-evaluation.v1', version: 1, evaluation: base };
   freezeTree(result);
   accepted.add(result);
   return result;
