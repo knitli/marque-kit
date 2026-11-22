@@ -31,6 +31,24 @@ const setup = (text: string) => {
   return { e, doc, request };
 };
 describe('native v2 read-only pane', () => {
+  test('renders the real derivative field and keeps source coverage distinct from readiness', () => {
+    const { e, doc, request } = setup(raw('derivative'));
+    expect(e.evaluation.readiness).toMatchObject({ kind: 'supported', status: 'incomplete' });
+    expect(effectiveReady(doc)).toBe(false);
+    expect(readCabSnapshot(doc, request)).not.toBeNull();
+    const root = document.createElement('div');
+    const pane = mount(root, { doc, nativeCabRequest: request });
+    expect(root.textContent).toContain('Derived from');
+    expect(root.textContent).not.toContain('Classification reason');
+    expect(root.textContent).toContain('Source coverage is complete.');
+    expect(root.textContent).toContain('Authority block evaluation is incomplete.');
+    expect(root.textContent).not.toContain('Authority block evaluation is ready.');
+    expect(root.querySelector('button')).toBeNull();
+    pane.update({ nativeCabRequest: { ...request, target: { ...request.target, revision_id: 'old' } } });
+    expect(root.textContent).toContain('evaluation is unavailable');
+    expect(root.textContent).not.toContain('Derived from');
+    pane.destroy();
+  });
   test('renders v3 tagged targets and clears a differently tagged scope', () => {
     const rawV3 = JSON.parse(raw('funded'));
     rawV3.schema = 'knitli.native-cab-findings.v3';

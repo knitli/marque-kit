@@ -11,9 +11,16 @@ export type NativeTarget = {
   contribution_id: string;
   scope_locator: string | NativeTargetLocator;
 };
-export type NativeField = 'classified_by' | 'agency_and_office_of_origin' | 'classification_reason' | 'declassify_on';
+export type NativeField =
+  | 'classified_by'
+  | 'agency_and_office_of_origin'
+  | 'classification_reason'
+  | 'derived_from'
+  | 'declassify_on';
 export type NativeProfile = {
-  profile: 'original_us_nsi_cab_required_field_missing_after_examination';
+  profile:
+    | 'original_us_nsi_cab_required_field_missing_after_examination'
+    | 'derivative_us_nsi_cab_required_field_missing_after_examination';
   declaration_id: string;
   declaration_version: number;
 };
@@ -273,7 +280,13 @@ const safeDecimal = (x: unknown, where: string): string => {
   if (!Number.isSafeInteger(n) || n < 0 || String(n) !== x) return fail(`${where} decimal`);
   return x;
 };
-const FIELD = ['classified_by', 'agency_and_office_of_origin', 'classification_reason', 'declassify_on'] as const;
+const FIELD = [
+  'classified_by',
+  'agency_and_office_of_origin',
+  'classification_reason',
+  'derived_from',
+  'declassify_on',
+] as const;
 const field = (x: unknown, where: string) => oneOf(x, FIELD, where);
 function target(x: unknown, where: string, v3: boolean): NativeTarget {
   const o = keys(x, ['document_id', 'revision_id', 'contribution_id', 'scope_locator'], where);
@@ -324,7 +337,10 @@ function profile(x: unknown, where: string): NativeProfile {
   return {
     profile: oneOf(
       o.profile,
-      ['original_us_nsi_cab_required_field_missing_after_examination'] as const,
+      [
+        'original_us_nsi_cab_required_field_missing_after_examination',
+        'derivative_us_nsi_cab_required_field_missing_after_examination',
+      ] as const,
       `${where}.profile`,
     ),
     declaration_id: str(o.declaration_id, where),
