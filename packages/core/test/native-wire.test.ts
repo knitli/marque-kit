@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { parseNativeJson } from '../src/native-wire.ts';
+import { parseNativeJson, parseNativeSourceMarkingJson } from '../src/native-wire.ts';
 import type { NativeEnvelopeV1 } from '../src/native-wire.ts';
 import { readCabSnapshot } from '../src/native-cab.ts';
 import { docView, effectiveReady, empty } from '../src/state.ts';
@@ -23,6 +23,59 @@ const request = {
   maxBasisBytes: 1_048_576,
 };
 const doc: Doc = { findings: [], document: { blocking: [], artifacts: [], native_evaluation: wire } };
+
+void test('source marking wire is read-only, offset-free and keeps mask kinds distinct', () => {
+  const source = {
+    schema: 'knitli.native-source-marking.v2',
+    binding: {
+      chain_id: 'review-chain',
+      source_id: 'doc-1',
+      revision_id: 'r-2',
+      contribution_id: 'portion-1',
+      scope_id: '0',
+      viewer_id: 'authorized-reviewer',
+    },
+    marking: {
+      text: 'S',
+      layers: [
+        {
+          tokens: [{ t: '', mask: { kind: 'concealed' } }, { t: 'S' }, { t: '', mask: { kind: 'unidentified' } }],
+        },
+      ],
+      masks: [],
+    },
+  };
+  const parsed = parseNativeSourceMarkingJson(JSON.stringify(source), 4096);
+  assert.equal(parsed.marking.text, 'S');
+  assert.deepEqual(parsed.marking.layers[0]?.tokens, source.marking.layers[0]?.tokens);
+  for (const mutate of [
+    (value: typeof source) => ((value.marking.layers[0]!.tokens[0]!.mask as Record<string, unknown>)['span'] = [0, 1]),
+    (value: typeof source) => ((value.marking.layers[0]!.tokens[0]!.mask as Record<string, unknown>)['len'] = 4),
+    (value: typeof source) => (value.marking.text = 'S SECRET-CANARY'),
+    (value: typeof source) => (value.binding.viewer_id = ''),
+    (value: typeof source) => Object.assign(value, { authorization: 'host_authorized' }),
+  ]) {
+    const invalid = structuredClone(source);
+    mutate(invalid);
+    assert.throws(() => parseNativeSourceMarkingJson(JSON.stringify(invalid), 4096), TypeError);
+  }
+  assert.throws(() => parseNativeSourceMarkingJson(JSON.stringify(source), 16), TypeError);
+});
+
+void test('trusted source marking envelope carries no synthetic authorization claim', () => {
+  const trustedText = readFileSync(new URL('./fixtures/native-source-marking-v2.fixture', import.meta.url), 'utf8');
+  const trusted = parseNativeSourceMarkingJson(trustedText, 4096);
+  assert.equal(trusted.schema, 'knitli.native-source-marking.v2');
+  assert.equal(Object.hasOwn(trusted, 'authorization'), false);
+  const syntheticText = readFileSync(
+    new URL('./fixtures/native-source-marking-synthetic-v1.fixture', import.meta.url),
+    'utf8',
+  );
+  assert.throws(() => parseNativeSourceMarkingJson(syntheticText, 4096), TypeError);
+  const forged = JSON.parse(trustedText) as Record<string, unknown>;
+  forged['authorization'] = 'host_authorized';
+  assert.throws(() => parseNativeSourceMarkingJson(JSON.stringify(forged), 4096), TypeError);
+});
 
 void test('native evaluation crosses normal document view and explicit CAB read', () => {
   const view = docView(doc, empty());
@@ -124,6 +177,16 @@ void test('parser rejects malformed values, unsafe integers, extra fields, and o
     () => parseNativeJson('{sensitive-invalid-wire', 1_048_576),
     (error: Error) => !error.message.includes('sensitive-invalid-wire'),
   );
+});
+
+void test('wire keeps unresolved occurrence references distinct from authored support', () => {
+  const raw = JSON.parse(text) as NativeEnvelopeV1;
+  const supports = raw.evaluation.requirements[0]!.supports;
+  supports.push({ kind: 'unresolved_occurrence', index: '3' });
+  const parsed = parseNativeJson(JSON.stringify(raw), 1_048_576);
+  assert.deepEqual(parsed.evaluation.requirements[0]!.supports, supports);
+  const unknownTag = JSON.stringify(raw).replace('"unresolved_occurrence"', '"unknown_spelling"');
+  assert.throws(() => parseNativeJson(unknownTag, 1_048_576), TypeError);
 });
 
 void test('wire IDs use canonical unsigned decimal and text supports Unicode scalars', () => {

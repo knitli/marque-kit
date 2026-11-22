@@ -50,3 +50,11 @@ Known limitations / Help wanted:
 - Whether classic Outlook's send runtime runs WebAssembly. If not, the gate works from the pane's last lint.
 - The hosting page's Content Security Policy must allow WebAssembly to compile (`'wasm-unsafe-eval'`).
 - A trusted authenticated Word workspace provider and live Word adapter, including their identity, retention, deletion and concurrency guarantees.
+
+## Read-only source marking
+
+A separate trusted installation may provide `window.marqueOfficeSourceMarking` before the pane starts. Its session binds the active Word document, chain, source and revision, contribution, scope, and viewer to a permission-filtered native source view. The installation must supply the current binding independently, revoke it on any document, revision, selection, viewer or permission change before further results are shown, and read only that current source. The pane checks the active document and all binding fields around asynchronous reads, revokes old views on invalidation and ignores late replies. It displays only the disclosed marking; this capability does not authorize a document edit or establish CAB readiness.
+
+This repository does not install that provider or authenticate a Word document or viewer. Without the separately supplied capability, no source marking is shown. The browser controls under `test/source-marking-browser/` use synthetic doubles and do not qualify a live Word or provider installation.
+
+After the workspace build, run `node apps/office-addin/test/source-marking-browser/run.mjs` from the workspace root to check the built pane in headless Chrome. Set `CHROME_BIN` if Chrome is installed elsewhere. The runner starts its own local server and test-only Office capability; it needs loopback ports 46881 and 46882.

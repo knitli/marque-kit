@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import type { OfficeSourceMarkingInstallation } from './source-marking.ts';
 import type { NativeCabRequest } from '@knitli/marque-kit-core/native-cab';
 import type {
   ActAppendRequest,
@@ -100,6 +101,7 @@ export interface OfficeWorkspaceProvider {
 
 declare global {
   interface Window {
+    marqueOfficeSourceMarking?: OfficeSourceMarkingInstallation;
     marqueOfficeWorkspace?: {
       provider: OfficeWorkspaceProvider;
       wordHost: OfficeWordHost;

@@ -59,7 +59,7 @@ for (const form of ['full', 'folded', 'summary', 'diff'] as const) {
 const unread = html({ text: '(TS//REL TO USA, KOR)', masks: [{ kind: 'unidentified', layer: 0, len: 5 }] });
 assert.match(
   unread,
-  /<span class="mq-mask" tabindex="0" title="5 characters Marque couldn&#39;t identify.">_____<\/span>/,
+  /<span class="mq-mask" tabindex="0" title="5 characters Marque could not identify.">_____<\/span>/,
 );
 
 // Hostile input: every text and attribute value is escaped, so nothing becomes markup.
