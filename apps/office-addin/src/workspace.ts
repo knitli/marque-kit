@@ -5,6 +5,7 @@
 import type { OfficeSourceMarkingInstallation } from './source-marking.ts';
 import type { WordCabOwnerGrant } from './cab-placement.ts';
 import type { NativeCabRequest } from '@knitli/marque-kit-core/native-cab';
+import type { NativeField } from '@knitli/marque-kit-core/native-wire';
 import type { NativeSemanticResultsRequest } from '@knitli/marque-kit-core/native-results';
 import type {
   ActAppendRequest,
@@ -34,6 +35,15 @@ export interface OfficeWordHost {
     documentId: string,
     chain: string,
   ): Promise<Omit<NativeCabRequest, 'maxBasisBytes' | 'expectedChain'> | null>;
+  /** Revoke before document, viewer, grant, permission, provider, layout or formatting changes. */
+  watchOrdinaryCabInvalidation?(
+    documentId: string,
+    chain: string,
+    viewerId: string,
+    invalidate: () => void,
+  ): () => void;
+  /** Independently authorize this viewer, exact member and raw evaluator input/output. */
+  readOrdinaryCabGrant?(documentId: string, chain: string, viewerId: string): Promise<OfficeOrdinaryCabGrant | null>;
   /** Independent current owner, source text and layout revision. */
   readNativeCabPlacementScope?(documentId: string, chain: string): Promise<OfficeCabPlacementScope | null>;
   /** Revoke before any selected source, selection, viewer, grant or provider changes. */
@@ -96,6 +106,27 @@ export interface OfficeCurrentEvaluation {
   confirmedWriteAcks: Record<string, string>;
 }
 
+/** Host grant; raw executor authorization and visible fields are separate permissions. */
+export interface OfficeOrdinaryCabGrant {
+  documentId: string;
+  chain: string;
+  viewerId: string;
+  grantId: string;
+  permissionRevision: string;
+  layoutRevision: string;
+  authorizeRawInput: true;
+  authorizeRawOutput: true;
+  requestJson: string;
+  current: Omit<NativeCabRequest, 'expectedChain' | 'maxBasisBytes'>;
+  disclosedFields: NativeField[];
+}
+
+export interface OfficeOrdinaryCabProvider {
+  viewerId: string;
+  /** Executes the current ordinary CAB questions operation; no writes or accepted answers. */
+  evaluate(requestJson: string): Promise<string>;
+}
+
 /** Native wire text and independently issued scope, without a legacy document. */
 export interface OfficeNativeCabSnapshot {
   documentId: string;
@@ -109,6 +140,8 @@ export interface OfficeNativeWordSession {
   readonly documentId: string;
   readonly chain: string;
   readonly nativeCab: OfficeNativeCabSnapshot;
+  /** Optional trusted executor; independently authorized by readOrdinaryCabGrant. */
+  readonly ordinaryCab?: OfficeOrdinaryCabProvider;
   /** Read-only refresh; must not apply or acknowledge a write. */
   readNativeCab?(): Promise<OfficeNativeCabSnapshot>;
 }

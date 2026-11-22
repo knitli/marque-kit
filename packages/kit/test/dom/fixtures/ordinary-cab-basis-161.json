@@ -1,0 +1,1147 @@
+{
+  "evaluation": {
+    "artifacts": [
+      {
+        "basis": {
+          "context_revision": null,
+          "field_revisions": [
+            {
+              "field": "classified_by",
+              "placement": {
+                "kind": "typed",
+                "value": "/members/0/cab_inspection/fields/0"
+              },
+              "revision": "r1",
+              "target": {
+                "contribution_id": "body",
+                "document_id": "synthetic-target",
+                "revision_id": "r1",
+                "scope_locator": {
+                  "kind": "text",
+                  "value": {
+                    "end": "91",
+                    "start": "0"
+                  }
+                }
+              }
+            },
+            {
+              "field": "classification_reason",
+              "placement": {
+                "kind": "typed",
+                "value": "/members/0/cab_inspection/fields/1"
+              },
+              "revision": "r1",
+              "target": {
+                "contribution_id": "body",
+                "document_id": "synthetic-target",
+                "revision_id": "r1",
+                "scope_locator": {
+                  "kind": "text",
+                  "value": {
+                    "end": "91",
+                    "start": "0"
+                  }
+                }
+              }
+            },
+            {
+              "field": "declassify_on",
+              "placement": {
+                "kind": "typed",
+                "value": "/members/0/cab_inspection/fields/2"
+              },
+              "revision": "r1",
+              "target": {
+                "contribution_id": "body",
+                "document_id": "synthetic-target",
+                "revision_id": "r1",
+                "scope_locator": {
+                  "kind": "text",
+                  "value": {
+                    "end": "91",
+                    "start": "0"
+                  }
+                }
+              }
+            },
+            {
+              "field": "agency_and_office_of_origin",
+              "placement": {
+                "kind": "typed",
+                "value": "/members/0/cab_inspection/fields/3"
+              },
+              "revision": "r1",
+              "target": {
+                "contribution_id": "body",
+                "document_id": "synthetic-target",
+                "revision_id": "r1",
+                "scope_locator": {
+                  "kind": "text",
+                  "value": {
+                    "end": "91",
+                    "start": "0"
+                  }
+                }
+              }
+            }
+          ],
+          "operation": "base",
+          "profile": {
+            "declaration_id": "original-us-nsi-cab-required-field-missing-after-examination",
+            "declaration_version": 1,
+            "profile": "original_us_nsi_cab_required_field_missing_after_examination"
+          },
+          "scopes": [
+            {
+              "contribution_id": "body",
+              "scope_id": "0"
+            }
+          ],
+          "source_revisions": [
+            {
+              "answer_id": null,
+              "contribution_id": "body",
+              "profile_id": null,
+              "revision_id": "r1",
+              "source_id": "synthetic-target"
+            }
+          ]
+        },
+        "fields": [
+          {
+            "applicability": "required",
+            "basis": {
+              "context_revision": null,
+              "field_revisions": [
+                {
+                  "field": "classified_by",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/0"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "classification_reason",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/1"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "declassify_on",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/2"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "agency_and_office_of_origin",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/3"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                }
+              ],
+              "operation": "base",
+              "profile": {
+                "declaration_id": "original-us-nsi-cab-required-field-missing-after-examination",
+                "declaration_version": 1,
+                "profile": "original_us_nsi_cab_required_field_missing_after_examination"
+              },
+              "scopes": [
+                {
+                  "contribution_id": "body",
+                  "scope_id": "0"
+                }
+              ],
+              "source_revisions": [
+                {
+                  "answer_id": null,
+                  "contribution_id": "body",
+                  "profile_id": null,
+                  "revision_id": "r1",
+                  "source_id": "synthetic-target"
+                }
+              ]
+            },
+            "coverage": "examined_absent",
+            "field": "classified_by",
+            "placement": {
+              "kind": "typed",
+              "value": "/members/0/cab_inspection/fields/0"
+            },
+            "revision": "1",
+            "satisfaction": "missing",
+            "supports": [
+              {
+                "index": "0",
+                "kind": "cab_proof"
+              }
+            ],
+            "value_reference": null
+          },
+          {
+            "applicability": "required",
+            "basis": {
+              "context_revision": null,
+              "field_revisions": [
+                {
+                  "field": "classified_by",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/0"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "classification_reason",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/1"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "declassify_on",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/2"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "agency_and_office_of_origin",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/3"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                }
+              ],
+              "operation": "base",
+              "profile": {
+                "declaration_id": "original-us-nsi-cab-required-field-missing-after-examination",
+                "declaration_version": 1,
+                "profile": "original_us_nsi_cab_required_field_missing_after_examination"
+              },
+              "scopes": [
+                {
+                  "contribution_id": "body",
+                  "scope_id": "0"
+                }
+              ],
+              "source_revisions": [
+                {
+                  "answer_id": null,
+                  "contribution_id": "body",
+                  "profile_id": null,
+                  "revision_id": "r1",
+                  "source_id": "synthetic-target"
+                }
+              ]
+            },
+            "coverage": "examined_absent",
+            "field": "classification_reason",
+            "placement": {
+              "kind": "typed",
+              "value": "/members/0/cab_inspection/fields/1"
+            },
+            "revision": "1",
+            "satisfaction": "missing",
+            "supports": [
+              {
+                "index": "1",
+                "kind": "cab_proof"
+              }
+            ],
+            "value_reference": null
+          },
+          {
+            "applicability": "required",
+            "basis": {
+              "context_revision": null,
+              "field_revisions": [
+                {
+                  "field": "classified_by",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/0"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "classification_reason",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/1"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "declassify_on",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/2"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "agency_and_office_of_origin",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/3"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                }
+              ],
+              "operation": "base",
+              "profile": {
+                "declaration_id": "original-us-nsi-cab-required-field-missing-after-examination",
+                "declaration_version": 1,
+                "profile": "original_us_nsi_cab_required_field_missing_after_examination"
+              },
+              "scopes": [
+                {
+                  "contribution_id": "body",
+                  "scope_id": "0"
+                }
+              ],
+              "source_revisions": [
+                {
+                  "answer_id": null,
+                  "contribution_id": "body",
+                  "profile_id": null,
+                  "revision_id": "r1",
+                  "source_id": "synthetic-target"
+                }
+              ]
+            },
+            "coverage": "present",
+            "field": "declassify_on",
+            "placement": {
+              "kind": "typed",
+              "value": "/members/0/cab_inspection/fields/2"
+            },
+            "revision": "1",
+            "satisfaction": "satisfied",
+            "supports": [
+              {
+                "index": "2",
+                "kind": "cab_proof"
+              }
+            ],
+            "value_reference": "member:0:bytes:38-46"
+          },
+          {
+            "applicability": "conditional_unresolved",
+            "basis": {
+              "context_revision": null,
+              "field_revisions": [
+                {
+                  "field": "classified_by",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/0"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "classification_reason",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/1"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "declassify_on",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/2"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "agency_and_office_of_origin",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/3"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                }
+              ],
+              "operation": "base",
+              "profile": {
+                "declaration_id": "original-us-nsi-cab-required-field-missing-after-examination",
+                "declaration_version": 1,
+                "profile": "original_us_nsi_cab_required_field_missing_after_examination"
+              },
+              "scopes": [
+                {
+                  "contribution_id": "body",
+                  "scope_id": "0"
+                }
+              ],
+              "source_revisions": [
+                {
+                  "answer_id": null,
+                  "contribution_id": "body",
+                  "profile_id": null,
+                  "revision_id": "r1",
+                  "source_id": "synthetic-target"
+                }
+              ]
+            },
+            "coverage": "present",
+            "field": "agency_and_office_of_origin",
+            "placement": {
+              "kind": "typed",
+              "value": "/members/0/cab_inspection/fields/3"
+            },
+            "revision": "1",
+            "satisfaction": "unverified",
+            "supports": [],
+            "value_reference": "member:0:bytes:76-90"
+          }
+        ],
+        "id": {
+          "chain": "neutral-chain-159",
+          "serial": "1"
+        },
+        "obligation": "required",
+        "target": {
+          "contribution_id": "body",
+          "document_id": "synthetic-target",
+          "revision_id": "r1",
+          "scope_locator": {
+            "kind": "text",
+            "value": {
+              "end": "91",
+              "start": "0"
+            }
+          }
+        }
+      }
+    ],
+    "basis": {
+      "accepted_answers": [],
+      "basis": {
+        "context_revision": null,
+        "field_revisions": [
+          {
+            "field": "classified_by",
+            "placement": {
+              "kind": "typed",
+              "value": "/members/0/cab_inspection/fields/0"
+            },
+            "revision": "r1",
+            "target": {
+              "contribution_id": "body",
+              "document_id": "synthetic-target",
+              "revision_id": "r1",
+              "scope_locator": {
+                "kind": "text",
+                "value": {
+                  "end": "91",
+                  "start": "0"
+                }
+              }
+            }
+          },
+          {
+            "field": "classification_reason",
+            "placement": {
+              "kind": "typed",
+              "value": "/members/0/cab_inspection/fields/1"
+            },
+            "revision": "r1",
+            "target": {
+              "contribution_id": "body",
+              "document_id": "synthetic-target",
+              "revision_id": "r1",
+              "scope_locator": {
+                "kind": "text",
+                "value": {
+                  "end": "91",
+                  "start": "0"
+                }
+              }
+            }
+          },
+          {
+            "field": "declassify_on",
+            "placement": {
+              "kind": "typed",
+              "value": "/members/0/cab_inspection/fields/2"
+            },
+            "revision": "r1",
+            "target": {
+              "contribution_id": "body",
+              "document_id": "synthetic-target",
+              "revision_id": "r1",
+              "scope_locator": {
+                "kind": "text",
+                "value": {
+                  "end": "91",
+                  "start": "0"
+                }
+              }
+            }
+          },
+          {
+            "field": "agency_and_office_of_origin",
+            "placement": {
+              "kind": "typed",
+              "value": "/members/0/cab_inspection/fields/3"
+            },
+            "revision": "r1",
+            "target": {
+              "contribution_id": "body",
+              "document_id": "synthetic-target",
+              "revision_id": "r1",
+              "scope_locator": {
+                "kind": "text",
+                "value": {
+                  "end": "91",
+                  "start": "0"
+                }
+              }
+            }
+          }
+        ],
+        "operation": "base",
+        "profile": {
+          "declaration_id": "original-us-nsi-cab-required-field-missing-after-examination",
+          "declaration_version": 1,
+          "profile": "original_us_nsi_cab_required_field_missing_after_examination"
+        },
+        "scopes": [
+          {
+            "contribution_id": "body",
+            "scope_id": "0"
+          }
+        ],
+        "source_revisions": [
+          {
+            "answer_id": null,
+            "contribution_id": "body",
+            "profile_id": null,
+            "revision_id": "r1",
+            "source_id": "synthetic-target"
+          }
+        ]
+      }
+    },
+    "chain": "neutral-chain-159",
+    "coverage": {
+      "reason": null,
+      "status": "partial"
+    },
+    "findings": {
+      "coverage": {
+        "reason": null,
+        "status": "partial"
+      },
+      "items": [
+        {
+          "blocks": "finalize",
+          "identity": {
+            "status": "issued",
+            "subject": {
+              "chain": "neutral-chain-159",
+              "serial": "1"
+            }
+          },
+          "needs_person": "required",
+          "outcome": "needs_fact",
+          "question": {
+            "basis": {
+              "context_revision": null,
+              "field_revisions": [
+                {
+                  "field": "classified_by",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/0"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "classification_reason",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/1"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "declassify_on",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/2"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "agency_and_office_of_origin",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/3"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                }
+              ],
+              "operation": "base",
+              "profile": {
+                "declaration_id": "original-us-nsi-cab-required-field-missing-after-examination",
+                "declaration_version": 1,
+                "profile": "original_us_nsi_cab_required_field_missing_after_examination"
+              },
+              "scopes": [
+                {
+                  "contribution_id": "body",
+                  "scope_id": "0"
+                }
+              ],
+              "source_revisions": [
+                {
+                  "answer_id": null,
+                  "contribution_id": "body",
+                  "profile_id": null,
+                  "revision_id": "r1",
+                  "source_id": "synthetic-target"
+                }
+              ]
+            },
+            "chain": "neutral-chain-159",
+            "field": "classified_by",
+            "meaning": {
+              "answer_effects": ["satisfy CAB required field ClassifiedBy"],
+              "answer_kinds": [
+                {
+                  "field": "classified_by",
+                  "kind": "cab_field_replacement"
+                }
+              ],
+              "requested_fact": "CAB required field ClassifiedBy",
+              "scope": {
+                "contribution_id": "body",
+                "scope_id": "0"
+              }
+            },
+            "prompt": "Provide the required CAB field ClassifiedBy.",
+            "revision": "1",
+            "serial": "1",
+            "subject": {
+              "chain": "neutral-chain-159",
+              "serial": "1"
+            }
+          },
+          "readings": "unavailable",
+          "requested_action": null,
+          "requirement": {
+            "index": "0",
+            "status": "resolved"
+          },
+          "result": {
+            "serial": "1",
+            "subject_chain": "neutral-chain-159",
+            "subject_serial": "1"
+          },
+          "result_revision": "1"
+        },
+        {
+          "blocks": "finalize",
+          "identity": {
+            "status": "issued",
+            "subject": {
+              "chain": "neutral-chain-159",
+              "serial": "2"
+            }
+          },
+          "needs_person": "required",
+          "outcome": "needs_fact",
+          "question": {
+            "basis": {
+              "context_revision": null,
+              "field_revisions": [
+                {
+                  "field": "classified_by",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/0"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "classification_reason",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/1"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "declassify_on",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/2"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                },
+                {
+                  "field": "agency_and_office_of_origin",
+                  "placement": {
+                    "kind": "typed",
+                    "value": "/members/0/cab_inspection/fields/3"
+                  },
+                  "revision": "r1",
+                  "target": {
+                    "contribution_id": "body",
+                    "document_id": "synthetic-target",
+                    "revision_id": "r1",
+                    "scope_locator": {
+                      "kind": "text",
+                      "value": {
+                        "end": "91",
+                        "start": "0"
+                      }
+                    }
+                  }
+                }
+              ],
+              "operation": "base",
+              "profile": {
+                "declaration_id": "original-us-nsi-cab-required-field-missing-after-examination",
+                "declaration_version": 1,
+                "profile": "original_us_nsi_cab_required_field_missing_after_examination"
+              },
+              "scopes": [
+                {
+                  "contribution_id": "body",
+                  "scope_id": "0"
+                }
+              ],
+              "source_revisions": [
+                {
+                  "answer_id": null,
+                  "contribution_id": "body",
+                  "profile_id": null,
+                  "revision_id": "r1",
+                  "source_id": "synthetic-target"
+                }
+              ]
+            },
+            "chain": "neutral-chain-159",
+            "field": "classification_reason",
+            "meaning": {
+              "answer_effects": ["satisfy CAB required field ClassificationReason"],
+              "answer_kinds": [
+                {
+                  "field": "classification_reason",
+                  "kind": "cab_field_replacement"
+                }
+              ],
+              "requested_fact": "CAB required field ClassificationReason",
+              "scope": {
+                "contribution_id": "body",
+                "scope_id": "0"
+              }
+            },
+            "prompt": "Provide the required CAB field ClassificationReason.",
+            "revision": "2",
+            "serial": "2",
+            "subject": {
+              "chain": "neutral-chain-159",
+              "serial": "2"
+            }
+          },
+          "readings": "unavailable",
+          "requested_action": null,
+          "requirement": {
+            "index": "1",
+            "status": "resolved"
+          },
+          "result": {
+            "serial": "2",
+            "subject_chain": "neutral-chain-159",
+            "subject_serial": "2"
+          },
+          "result_revision": "1"
+        }
+      ],
+      "status": "partial",
+      "unrepresented": ["other_outcomes", "readings", "complete_finding_inventory"]
+    },
+    "handles": {
+      "last_act_sequence": "0",
+      "last_artifact": "1",
+      "last_question": "2",
+      "last_question_revision": "2",
+      "last_result_revision": "4",
+      "last_subject": "4"
+    },
+    "host_work": {
+      "cause": null,
+      "coverage": "unavailable",
+      "rows": []
+    },
+    "readiness": {
+      "kind": "supported",
+      "profile": {
+        "declaration_id": "original-us-nsi-cab-required-field-missing-after-examination",
+        "declaration_version": 1,
+        "profile": "original_us_nsi_cab_required_field_missing_after_examination"
+      },
+      "status": "incomplete"
+    },
+    "requirements": [
+      {
+        "allowed_disposition": null,
+        "field": "classified_by",
+        "id": "cab-field-ClassifiedBy",
+        "scope": null,
+        "state": "unsatisfied",
+        "supports": [
+          {
+            "index": "0",
+            "kind": "cab_proof"
+          }
+        ]
+      },
+      {
+        "allowed_disposition": null,
+        "field": "classification_reason",
+        "id": "cab-field-ClassificationReason",
+        "scope": null,
+        "state": "unsatisfied",
+        "supports": [
+          {
+            "index": "1",
+            "kind": "cab_proof"
+          }
+        ]
+      },
+      {
+        "allowed_disposition": null,
+        "field": "declassify_on",
+        "id": "cab-field-DeclassifyOn",
+        "scope": null,
+        "state": "satisfied",
+        "supports": [
+          {
+            "index": "2",
+            "kind": "cab_proof"
+          }
+        ]
+      },
+      {
+        "allowed_disposition": null,
+        "field": "agency_and_office_of_origin",
+        "id": "cab-field-AgencyAndOfficeOfOrigin",
+        "scope": null,
+        "state": "unresolved",
+        "supports": []
+      }
+    ]
+  },
+  "omitted_lanes": [
+    "semantic_results",
+    "prior_continuity",
+    "continuity",
+    "continuity_cause",
+    "ambiguities",
+    "joint_preview",
+    "act_history",
+    "act_history_cause",
+    "acts",
+    "pending_responses",
+    "pending_responses_cause",
+    "response_bindings"
+  ],
+  "route_scope": "cab_snapshot",
+  "schema": "knitli.native-cab-findings.v3",
+  "version": 3,
+  "whole_document_finalize": "unsupported"
+}

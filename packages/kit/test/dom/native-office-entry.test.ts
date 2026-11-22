@@ -54,3 +54,38 @@ test('Office startup opens the provider native scope without falling back to sam
   delete window.marqueOfficeWorkspace;
   vi.unstubAllGlobals();
 });
+
+test('ordinary CAB entry does not mount unrelated privileged source markings', async () => {
+  vi.resetModules();
+  const sourceOpen = vi.fn();
+  window.marqueOfficeSourceMarking = { open: sourceOpen } as unknown as NonNullable<
+    typeof window.marqueOfficeSourceMarking
+  >;
+  const session: OfficeNativeWordSession = {
+    kind: 'native_cab',
+    documentId: 'synthetic-target',
+    chain: 'chain',
+    nativeCab: { documentId: 'synthetic-target', chain: 'chain', wire: '' },
+    ordinaryCab: { viewerId: 'viewer', evaluate: vi.fn() },
+  };
+  const wordHost = {
+    activeDocumentId: async () => session.documentId,
+    applyCommitted: vi.fn(),
+  } as OfficeWordHost;
+  document.body.innerHTML = '<div id="pane"></div><div id="note"></div><div id="sample"></div>';
+  window.marqueOfficeWorkspace = { provider: { openWord: async () => session }, wordHost, nativeMaxBytes: 1_048_576 };
+  let start!: (info: { host: string }) => Promise<void>;
+  vi.stubGlobal('Office', {
+    HostType: { Word: 'Word' },
+    onReady: (callback: typeof start) => {
+      start = callback;
+    },
+  });
+  await import('../../../../apps/office-addin/src/taskpane.ts');
+  await start({ host: 'Word' });
+  expect(sourceOpen).not.toHaveBeenCalled();
+  expect(document.querySelector('#pane')?.textContent).toContain('unavailable');
+  delete window.marqueOfficeSourceMarking;
+  delete window.marqueOfficeWorkspace;
+  vi.unstubAllGlobals();
+});
