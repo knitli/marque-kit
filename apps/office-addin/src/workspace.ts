@@ -36,6 +36,37 @@ export interface OfficeWordHost {
   ): Promise<Omit<NativeCabRequest, 'maxBasisBytes' | 'expectedChain'> | null>;
   /** Independent current owner, source text and layout revision. */
   readNativeCabPlacementScope?(documentId: string, chain: string): Promise<OfficeCabPlacementScope | null>;
+  /** Revoke before any selected source, selection, viewer, grant or provider changes. */
+  watchNativeSelectedAudienceInvalidation?(documentId: string, viewerId: string, invalidate: () => void): () => void;
+  /** Independently grant this viewer the current selected sources and permitted result fields. */
+  readNativeSelectedAudienceScope?(documentId: string, viewerId: string): Promise<OfficeSelectedAudienceScope | null>;
+}
+
+export interface OfficeSelectedAudienceIdentity {
+  source_id: string;
+  revision_id: string;
+  contribution_id: string;
+}
+
+/** Every source and selection is independently current and authorized by the host. */
+export interface OfficeSelectedAudienceScope {
+  documentId: string;
+  viewerId: string;
+  /** Digests measured from the deployed engine and its build-generated register. */
+  engineArtifactSha256: string;
+  recipientVocabularySha256: string;
+  permissionRevision: string;
+  selectionRevision: string;
+  grantId: string;
+  disclosure: {
+    foreign_receive: boolean;
+    foreign_show: boolean;
+    foreign_display_only: boolean;
+    implied_usa: boolean;
+    coverage: boolean;
+  };
+  documents: { identity: OfficeSelectedAudienceIdentity; source: string }[];
+  selections: { identity: OfficeSelectedAudienceIdentity; span: [number, number] }[];
 }
 
 export interface OfficeCabPlacementScope extends WordCabOwnerGrant {
@@ -89,6 +120,16 @@ export interface OfficeNativeCabPlacementSession {
   /** Read-only native/WASM comparison over Word's observed pages and the independent owner binding. */
   inspectCabPlacement(text: string, requestJson: string): Promise<string>;
 }
+/** The operation is read-only; host scope is the authority for source and result disclosure. */
+export interface OfficeNativeSelectedAudienceSession {
+  readonly kind: 'native_selected_audience';
+  readonly documentId: string;
+  readonly viewerId: string;
+  /** Digests measured from the engine artifact and its build-generated register. */
+  readonly engineArtifactSha256: string;
+  readonly recipientVocabularySha256: string;
+  evaluateSelectedAudience(requestJson: string): Promise<string>;
+}
 /** A restricted viewer receives only a sanitized semantic-results projection. */
 export interface OfficeNativeSemanticResultsSnapshot {
   documentId: string;
@@ -138,6 +179,7 @@ export interface OfficeWorkspaceProvider {
     | OfficeNativeWordSession
     | OfficeNativeCabPlacementSession
     | OfficeNativeSemanticResultsSession
+    | OfficeNativeSelectedAudienceSession
     | null
   >;
 }

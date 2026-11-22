@@ -31,11 +31,13 @@ import { isSameWordDocument } from './workspace.ts';
 import { mountNativeWorkspace } from './native-workspace.ts';
 import { mountCabPlacementWorkspace } from './cab-placement-workspace.ts';
 import { mountNativeSemanticResultsWorkspace } from './native-semantic-results-workspace.ts';
+import { mountSelectedAudienceWorkspace } from './selected-audience-workspace.ts';
 import { mountOfficeSourceMarking } from './source-marking.ts';
 import type {
   OfficeCurrentEvaluation,
   OfficeNativeCabPlacementSession,
   OfficeNativeSemanticResultsSession,
+  OfficeNativeSelectedAudienceSession,
   OfficeNativeWordSession,
   OfficeWordSession,
 } from './workspace.ts';
@@ -160,6 +162,7 @@ void Office.onReady(async (info) => {
       | OfficeNativeWordSession
       | OfficeNativeCabPlacementSession
       | OfficeNativeSemanticResultsSession
+      | OfficeNativeSelectedAudienceSession
       | null;
     let bound = false;
     try {
@@ -175,6 +178,16 @@ void Office.onReady(async (info) => {
         installation.wordHost,
         installation.nativeMaxBytes,
       );
+      return;
+    }
+    if (session && bound && 'kind' in session && session.kind === 'native_selected_audience') {
+      const audience = mountSelectedAudienceWorkspace(
+        document.querySelector<HTMLElement>('#pane')!,
+        session,
+        installation.wordHost,
+        installation.nativeMaxBytes,
+      );
+      addEventListener('pagehide', () => audience.destroy(), { once: true });
       return;
     }
     if (session && bound && 'kind' in session && session.kind === 'native_cab_placement') {
