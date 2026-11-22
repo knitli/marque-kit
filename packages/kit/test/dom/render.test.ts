@@ -11,6 +11,7 @@ import { render as mark, masked } from '../../src/marking.ts';
 import { artifact, card, gate, mount, pane, receipt, rung, UNDO_MS } from '../../src/render.ts';
 import { why } from '../../src/help.ts';
 import {
+  appendAct,
   acceptedReplacements,
   docView,
   empty,
@@ -18,7 +19,15 @@ import {
   snapshot,
   writeConfirmationToken,
 } from '@knitli/marque-kit-core/state';
-import type { Doc, EvaluationBasis, FindingView, Moment } from '@knitli/marque-kit-core/types';
+import type {
+  ActAppendRequest,
+  AppendActResult,
+  Doc,
+  EvaluationBasis,
+  FindingView,
+  Moment,
+  State,
+} from '@knitli/marque-kit-core/types';
 
 // By path: under happy-dom, URL is the page's, and won't open a file.
 const memo = JSON.parse(
@@ -32,6 +41,22 @@ const doc = docView(memo, empty());
 const f = (id: string, d: Doc = doc): FindingView => d.findings.find((x) => x.id === id)!;
 const buttons = (n: Element): string[] => [...n.querySelectorAll('button')].map((b) => b.textContent ?? '');
 const asking = doc.findings.filter((x) => x.asks);
+const inMemoryAppender = (initial: State = empty()) => {
+  let state = initial;
+  return {
+    get state() {
+      return state;
+    },
+    append: async (request: ActAppendRequest): Promise<AppendActResult> => {
+      const result = appendAct(state, request);
+      state = result.state;
+      return result;
+    },
+  };
+};
+const flushAppend = async (): Promise<void> => {
+  for (let i = 0; i < 8; i++) await Promise.resolve();
+};
 
 describe('question first', () => {
   test.each(asking.map((x) => [x.id, x]))('%s: the question is the heading, before what Marque says', (_, x) => {
@@ -75,7 +100,7 @@ describe('the pane follows the cursor (DECISIONS #8)', () => {
 describe('a free answer and "Not my call" are always there', () => {
   for (const moment of ['editing', 'finalize', 'send'] as Moment[])
     test.each(asking.map((x) => [x.id, x]))(`%s at ${moment}`, (_, x) => {
-      const c = card(x, { moment });
+      const c = card(x, { moment, onAct: () => {} });
       expect(c.querySelector('form.mq-ask input[type=text]')).toBeTruthy();
       expect(buttons(c)).toContain('Not my call');
       // Blocking is the same card with defer removed.
@@ -89,7 +114,7 @@ describe('no Undo on a fix the person must own', () => {
     expect(buttons(card(f(id)))).not.toContain('Undo');
   });
   test.each([P2, P5])('%s, Noticeable or Advisory, can be kept as written', (id) => {
-    expect(buttons(card(f(id)))).toContain('Keep as written');
+    expect(buttons(card(f(id), { onAct: () => {} }))).toContain('Keep as written');
   });
 });
 
@@ -381,19 +406,21 @@ describe('the undo window (DECISIONS #23)', () => {
     for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
     box.append(root);
     document.body.append(box);
-    const p = mount(root, { doc: memo });
-    const answer = () => {
+    const host = inMemoryAppender();
+    const p = mount(root, { doc: memo, state: host.state, onAppend: host.append });
+    const answer = async () => {
       const x = p.view()!.findings.find((y) => y.id === P3)!;
       p.host.onAct?.(x, 'answered', { reading: x.outcome!.readings![0]! });
+      await flushAppend();
     };
-    return { root, p, answer, done: () => (p.destroy(), box.remove()) };
+    return { root, p, answer, host, done: () => (p.destroy(), box.remove()) };
   };
   const strip = (root: Element) => root.querySelector(`.mq-undo[data-undo="${P3}"]`);
 
-  test('an answer leaves Undo in its place for 8 seconds; a redraw keeps it there', () => {
+  test('an answer leaves Undo in its place for 8 seconds; a redraw keeps it there', async () => {
     vi.useFakeTimers();
     const { root, p, answer, done } = setup();
-    answer();
+    await answer();
     expect(strip(root)?.textContent).toContain('Answered');
     expect(buttons(strip(root)!)).toEqual(['Undo']);
     // ¶3 was all Action required held while editing: its section went with it, so the strip stands where it was.
@@ -409,10 +436,10 @@ describe('the undo window (DECISIONS #23)', () => {
     vi.useRealTimers();
   });
 
-  test('hovering stops the clock; leaving starts it again with what was left', () => {
+  test('hovering stops the clock; leaving starts it again with what was left', async () => {
     vi.useFakeTimers();
     const { root, answer, done } = setup();
-    answer();
+    await answer();
     vi.advanceTimersByTime(5000);
     strip(root)!.dispatchEvent(new MouseEvent('mouseenter'));
     vi.advanceTimersByTime(60_000);
@@ -426,8 +453,9 @@ describe('the undo window (DECISIONS #23)', () => {
 
   test('Undo on an answer to a must-act question brings the question back', async () => {
     const { root, p, answer, done } = setup();
-    answer();
+    await answer();
     strip(root)!.querySelector('button')!.click();
+    await flushAppend();
     expect(strip(root)).toBeNull();
     expect(p.view()!.findings.find((y) => y.id === P3)!.asks).toBeTruthy();
     await new Promise((r) => setTimeout(r));
@@ -435,12 +463,13 @@ describe('the undo window (DECISIONS #23)', () => {
     done();
   });
 
-  test('deferred where its section stays: the strip stays beside it, and focus on Undo survives a redraw', () => {
+  test('deferred where its section stays: the strip stays beside it, and focus on Undo survives a redraw', async () => {
     vi.useFakeTimers();
     const { root, p, done } = setup();
     const x = p.view()!.findings.find((y) => y.id === P3)!;
     p.update({ moment: 'finalize' });
     p.host.onAct?.(x, 'declined');
+    await flushAppend();
     expect(strip(root)?.closest('.mq-section')).toBeTruthy();
     const undo = strip(root)!.querySelector('button')!;
     undo.focus();
@@ -452,18 +481,18 @@ describe('the undo window (DECISIONS #23)', () => {
     vi.useRealTimers();
   });
 
-  test('a re-lint that asks something new under the same id takes the strip away', () => {
+  test('a re-lint that asks something new under the same id takes the strip away', async () => {
     const { root, p, answer, done } = setup();
-    answer();
+    await answer();
     const asks = { ...f(P3).asks!, text: 'Whose information is this now?' };
     p.update({ doc: { ...memo, findings: memo.findings.map((x) => (x.id === P3 ? { ...x, asks } : x)) } });
     expect(strip(root)).toBeNull();
     done();
   });
 
-  test('a re-lint that conceals a code in the answer masks it in the strip too', () => {
+  test('a re-lint that conceals a code in the answer masks it in the strip too', async () => {
     const { root, p, answer, done } = setup();
-    answer();
+    await answer();
     const r = f(P3).outcome!.readings![0]!.result!;
     const at = r.text.indexOf('AUS');
     const result = { ...r, masks: [{ kind: 'concealed' as const, span: [at, at + 3] as [number, number] }] };
@@ -485,7 +514,7 @@ describe('the undo window (DECISIONS #23)', () => {
 
   test('from the keyboard, Undo puts focus back on the reopened card', async () => {
     const { root, answer, done } = setup();
-    answer();
+    await answer();
     const undo = strip(root)!.querySelector('button')!;
     undo.focus();
     undo.click();
@@ -495,29 +524,556 @@ describe('the undo window (DECISIONS #23)', () => {
     done();
   });
 
-  test('kept as written from Done: the section opens to show Undo, and the marking is full size', () => {
+  test('kept as written from Done: the section opens to show Undo, and the marking is full size', async () => {
     const { root, p, done } = setup();
     p.host.onAct?.(
       p.view()!.findings.find((y) => y.id === P2)!,
       'kept_as_written',
     );
+    await flushAppend();
     const s = root.querySelector(`.mq-undo[data-undo="${P2}"]`)!;
     expect(s.closest('details')?.open).toBe(true);
     expect(s.querySelector('.mq-mark.xs')).toBeNull();
     done();
   });
 
-  test('an apply is asked for, not done; a typed field gets no Undo', () => {
+  test('an apply is asked for, not done; a typed field gets no Undo', async () => {
     const { root, p, done } = setup();
     const art = (id: string) => p.view()!.document.artifacts.find((a) => a.id === id)!;
     p.host.onAct?.(art('a-banner'), 'answered', { apply: true });
+    await flushAppend();
     expect(root.querySelector('.mq-undo[data-undo="a-banner"]')?.textContent).toContain('Will be applied');
-    // Once the host writes it, there's no taking it back: the strip goes.
+    // A simulated host re-lint after apply removes the temporary strip.
     p.update({ doc: memo });
     expect(root.querySelector('.mq-undo[data-undo="a-banner"]')).toBeNull();
     p.host.onAct?.(art('a-cab'), 'answered', { fields: { derived_from: 'Memo 12' } });
+    await flushAppend();
     expect(root.querySelector('.mq-undo[data-undo="a-cab"]')).toBeNull();
     done();
+  });
+});
+
+describe('host-acknowledged append', () => {
+  const clickAnswer = async (root: HTMLElement, p: ReturnType<typeof mount>) => {
+    p.update({ open: P3 });
+    await new Promise((resolve) => setTimeout(resolve));
+    const radio = root.querySelector<HTMLInputElement>('form.mq-ask input[type="radio"]')!;
+    radio.click();
+    [...root.querySelectorAll<HTMLButtonElement>('button')].find((item) => item.textContent === 'Answer')!.click();
+  };
+
+  test('without an act owner, navigation and details remain but answer/edit actions are absent', async () => {
+    const box = document.createElement('div');
+    const root = document.createElement('div');
+    for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
+    box.append(root);
+    document.body.append(box);
+    const initial = empty();
+    const p = mount(root, { doc: memo, state: initial });
+
+    p.update({ open: P3 });
+    await new Promise((resolve) => setTimeout(resolve));
+
+    expect(p.state.log).toEqual(initial.log);
+    expect(root.querySelector('.mq-card h3.mq-q')?.textContent).toContain('Who collected or produced');
+    expect(root.querySelector('.mq-card form.mq-ask')).toBeNull();
+    expect(root.querySelector('.mq-card input')).toBeNull();
+    for (const action of ['Answer', 'Ask me at finalize', 'Not my call', 'Apply'])
+      expect(buttons(root)).not.toContain(action);
+    expect(root.querySelector('.mq-undo')).toBeNull();
+    p.destroy();
+    box.remove();
+  });
+
+  test('a read-only host with an append owner can route a question but cannot answer or take back writes', async () => {
+    const box = document.createElement('div');
+    const root = document.createElement('div');
+    for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
+    box.append(root);
+    document.body.append(box);
+    const saved = record(empty(), P3, 'answered', { free: 'saved answer' }, 't0', snapshot(f(P3)));
+    const host = inMemoryAppender(saved);
+    const p = mount(root, { doc: memo, state: saved, readOnly: true, onAppend: host.append });
+
+    p.update({ open: P3 });
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(root.querySelector('.mq-card input')).toBeNull();
+    expect(buttons(root)).not.toContain('Answer');
+    expect(buttons(root)).not.toContain('Change my answer');
+
+    p.host.onTab?.('history');
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(buttons(root)).not.toContain('Take back');
+    p.destroy();
+    box.remove();
+
+    const nextBox = document.createElement('div');
+    const nextRoot = document.createElement('div');
+    for (const n of [nextBox, nextRoot]) Object.defineProperty(n, 'clientWidth', { value: 360 });
+    nextBox.append(nextRoot);
+    document.body.append(nextBox);
+    const routeHost = inMemoryAppender();
+    const routed = mount(nextRoot, { doc: memo, state: routeHost.state, readOnly: true, onAppend: routeHost.append });
+    routed.update({ open: P3 });
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(nextRoot.querySelector('.mq-card input')).toBeNull();
+    expect(buttons(nextRoot)).not.toContain('Answer');
+    expect(buttons(nextRoot)).toContain('Not my call');
+    nextRoot.querySelector<HTMLButtonElement>('.mq-acts button:last-child')!.click();
+    await flushAppend();
+    expect(routeHost.state.log.at(-1)?.act).toBe('declined');
+    routed.destroy();
+    nextBox.remove();
+  });
+
+  test('exhaustion keeps the request outside unchanged history and never dispatches a write', async () => {
+    const box = document.createElement('div');
+    const root = document.createElement('div');
+    for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
+    box.append(root);
+    document.body.append(box);
+    const prior = record(empty(), P2, 'kept_as_written', null, 't0', snapshot(f(P2)));
+    const initial: State = {
+      ...prior,
+      actSequence: Number.MAX_SAFE_INTEGER,
+      actHistoryCoverage: { state: 'complete', sequenceRange: [1, 1] },
+    };
+    const host = inMemoryAppender(initial);
+    const binding = { documentId: 'memo-fixture', chain: 'chain-A' };
+    const requests: ActAppendRequest[] = [];
+    const dispatched: unknown[] = [];
+    const p = mount(root, {
+      doc: memo,
+      state: initial,
+      actBinding: binding,
+      onAppend: async (request) => {
+        requests.push(request);
+        return host.append(request);
+      },
+      onChange: (_state, action) => {
+        if (action) dispatched.push(action);
+      },
+    });
+
+    await clickAnswer(root, p);
+    await flushAppend();
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.binding).toEqual(binding);
+    expect(host.state.log).toEqual(initial.log);
+    expect(host.state.actSequence).toBe(Number.MAX_SAFE_INTEGER);
+    expect(host.state.pendingAppends).toHaveLength(1);
+    expect(host.state.pendingAppends?.[0]).toMatchObject({
+      id: P3,
+      sequence: null,
+      state: 'pending_sequence',
+      reason: 'sequence-exhausted',
+    });
+    expect(p.view()!.findings.find((x) => x.id === P3)?.asks).toBeTruthy();
+    expect(root.querySelector('.mq-undo')).toBeNull();
+    expect(root.textContent).toContain('This action remains pending outside history and has not been applied.');
+    expect(dispatched).toEqual([]);
+    p.destroy();
+    box.remove();
+  });
+
+  test('a restarted pane retries exact staged requests and advances through the saved queue', async () => {
+    const box = document.createElement('div');
+    const root = document.createElement('div');
+    for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
+    box.append(root);
+    document.body.append(box);
+    const staged = [
+      {
+        requestId: 'restart-first',
+        id: P3,
+        act: 'answered' as const,
+        value: null,
+        at: 't1',
+        about: snapshot(f(P3)),
+        sequence: null,
+        state: 'staged' as const,
+      },
+      {
+        requestId: 'restart-second',
+        id: P2,
+        act: 'kept_as_written' as const,
+        value: null,
+        at: 't2',
+        about: snapshot(f(P2)),
+        sequence: null,
+        state: 'staged' as const,
+      },
+    ];
+    const initial: State = { ...empty(), pendingAppends: staged };
+    const host = inMemoryAppender(initial);
+    const requests: ActAppendRequest[] = [];
+    const changes: unknown[] = [];
+    const p = mount(root, {
+      doc: memo,
+      state: initial,
+      onAppend: async (request) => {
+        requests.push(structuredClone(request));
+        return host.append(request);
+      },
+      onChange: (_state, action) => {
+        if (action) changes.push(action);
+      },
+    });
+
+    expect(root.textContent).toContain('A saved action is waiting to be recorded.');
+    root.querySelector<HTMLButtonElement>('.mq-pane-foot button')!.click();
+    await flushAppend();
+    expect(requests.map((request) => request.requestId)).toEqual(['restart-first']);
+    expect(p.state.pendingAppends?.map((item) => item.requestId)).toEqual(['restart-second']);
+    expect(root.textContent).toContain('Another saved action is ready to retry.');
+
+    root.querySelector<HTMLButtonElement>('.mq-pane-foot button')!.click();
+    await flushAppend();
+    expect(requests.map((request) => request.requestId)).toEqual(['restart-first', 'restart-second']);
+    expect(host.state.log.map((entry) => entry.requestId)).toEqual(['restart-first', 'restart-second']);
+    expect(p.state.pendingAppends).toEqual([]);
+    expect(changes).toHaveLength(2);
+    p.destroy();
+    box.remove();
+  });
+
+  test('terminal sequence refusals stay visible while the pane advances to other staged requests', async () => {
+    const box = document.createElement('div');
+    const root = document.createElement('div');
+    for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
+    box.append(root);
+    document.body.append(box);
+    const stagedRequest = (requestId: string, id: string) => ({
+      requestId,
+      id,
+      act: 'answered' as const,
+      value: null,
+      at: requestId,
+      sequence: null,
+      state: 'staged' as const,
+    });
+    const terminal = {
+      ...stagedRequest('already-exhausted', P4),
+      state: 'pending_sequence' as const,
+      reason: 'sequence-exhausted' as const,
+    };
+    const initial: State = {
+      ...empty(),
+      actSequence: Number.MAX_SAFE_INTEGER,
+      actHistoryCoverage: { state: 'complete', sequenceRange: [1, 1] },
+      pendingAppends: [terminal, stagedRequest('exhausted-first', P3), stagedRequest('exhausted-second', P2)],
+    };
+    const host = inMemoryAppender(initial);
+    const requests: string[] = [];
+    const p = mount(root, {
+      doc: memo,
+      state: initial,
+      onAppend: async (request) => {
+        requests.push(request.requestId);
+        return host.append(request);
+      },
+    });
+
+    expect(root.textContent).toContain('sequence limit');
+    expect(buttons(root)).toContain('Retry pending action');
+    root.querySelector<HTMLButtonElement>('.mq-pane-foot button')!.click();
+    await flushAppend();
+    expect(requests).toEqual(['exhausted-first']);
+    expect(root.textContent).toContain('Another saved action is ready to retry.');
+    expect(buttons(root)).toContain('Retry pending action');
+
+    root.querySelector<HTMLButtonElement>('.mq-pane-foot button')!.click();
+    await flushAppend();
+    expect(requests).toEqual(['exhausted-first', 'exhausted-second']);
+    expect(root.textContent).toContain('sequence limit');
+    expect(buttons(root)).not.toContain('Retry pending action');
+    expect(p.state.pendingAppends?.filter((item) => item.state === 'pending_sequence')).toHaveLength(3);
+    p.destroy();
+    box.remove();
+  });
+
+  test('invalid committed acknowledgement never changes local history or dispatches a write', async () => {
+    const box = document.createElement('div');
+    const root = document.createElement('div');
+    for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
+    box.append(root);
+    document.body.append(box);
+    const host = inMemoryAppender();
+    let malformed = true;
+    const changes: unknown[] = [];
+    const p = mount(root, {
+      doc: memo,
+      state: host.state,
+      onAppend: async (request): Promise<AppendActResult> => {
+        if (malformed) {
+          malformed = false;
+          const entry = { ...request, id: request.id!, sequence: 0, at: request.at ?? 'invalid-at' };
+          return {
+            status: 'committed',
+            entry,
+            replayed: false,
+            state: {
+              ...empty(),
+              log: [entry],
+              actSequence: 0,
+              actHistoryCoverage: { state: 'complete', sequenceRange: null },
+            },
+          };
+        }
+        return host.append(request);
+      },
+      onChange: (_state, action) => {
+        if (action) changes.push(action);
+      },
+    });
+
+    await clickAnswer(root, p);
+    await flushAppend();
+    expect(p.state.log).toEqual([]);
+    expect(changes).toEqual([]);
+    expect(root.textContent).toContain('history position or ordered rows are invalid');
+    expect(buttons(root)).toContain('Retry pending action');
+
+    root.querySelector<HTMLButtonElement>('.mq-pane-foot button')!.click();
+    await flushAppend();
+    expect(p.state.log).toHaveLength(1);
+    expect(changes).toHaveLength(1);
+    p.destroy();
+    box.remove();
+  });
+
+  test('missing history coverage and a request-key conflict get distinct retry explanations', async () => {
+    const makeRoot = () => {
+      const box = document.createElement('div');
+      const root = document.createElement('div');
+      for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
+      box.append(root);
+      document.body.append(box);
+      return { box, root };
+    };
+    const missing = makeRoot();
+    const noCoverage: State = { ...empty(), actHistoryCoverage: undefined };
+    const coverageHost = inMemoryAppender(noCoverage);
+    const coveragePane = mount(missing.root, { doc: memo, state: noCoverage, onAppend: coverageHost.append });
+    await clickAnswer(missing.root, coveragePane);
+    await flushAppend();
+    expect(missing.root.textContent).toContain('no history coverage');
+    expect(buttons(missing.root)).toContain('Retry pending action');
+    expect(missing.root.textContent).not.toContain('request key conflicts');
+    coveragePane.destroy();
+    missing.box.remove();
+
+    const conflict = makeRoot();
+    const initial = empty();
+    const conflictPane = mount(conflict.root, {
+      doc: memo,
+      state: initial,
+      onAppend: async () => ({ status: 'refused', reason: 'request-id-conflict', state: initial }),
+    });
+    await clickAnswer(conflict.root, conflictPane);
+    await flushAppend();
+    expect(conflict.root.textContent).toContain('request key conflicts with a stored request');
+    expect(buttons(conflict.root)).toContain('Retry pending action');
+    expect(conflict.root.textContent).not.toContain('no history coverage');
+    conflictPane.destroy();
+    conflict.box.remove();
+  });
+
+  test('an ack-lost retry uses the same request and dispatches the exact replayed entry once', async () => {
+    const box = document.createElement('div');
+    const root = document.createElement('div');
+    for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
+    box.append(root);
+    document.body.append(box);
+    const host = inMemoryAppender();
+    const requests: ActAppendRequest[] = [];
+    const dispatches: NonNullable<Parameters<NonNullable<ReturnType<typeof mount>['host']['onChange']>>[1]>[] = [];
+    let loseAck = true;
+    const p = mount(root, {
+      doc: memo,
+      state: host.state,
+      onAppend: async (request) => {
+        requests.push(structuredClone(request));
+        if (loseAck) {
+          loseAck = false;
+          const committed = await host.append(request);
+          expect(committed.status).toBe('committed');
+          throw new Error('simulated lost acknowledgement');
+        }
+        return host.append(request);
+      },
+      onChange: (_state, action) => {
+        if (action) dispatches.push(action);
+      },
+    });
+
+    await clickAnswer(root, p);
+    await flushAppend();
+    expect(host.state.log).toHaveLength(1);
+    expect(p.state.log).toHaveLength(0);
+    expect(dispatches).toHaveLength(0);
+    expect(root.textContent).toContain('retry will use the same request');
+
+    root.querySelector<HTMLButtonElement>('.mq-pane-foot button')!.click();
+    await flushAppend();
+
+    expect(requests).toHaveLength(2);
+    expect(requests[1]?.requestId).toBe(requests[0]?.requestId);
+    expect(host.state.log).toHaveLength(1);
+    expect(p.state.log).toHaveLength(1);
+    expect(dispatches).toHaveLength(1);
+    expect(dispatches[0]).toMatchObject({
+      id: P3,
+      requestId: requests[0]?.requestId,
+      entry: host.state.log[0],
+      replayed: true,
+    });
+    p.destroy();
+    box.remove();
+  });
+
+  test('an unrelated seen update survives an acknowledgement started from an older state', async () => {
+    const box = document.createElement('div');
+    const root = document.createElement('div');
+    for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
+    box.append(root);
+    document.body.append(box);
+    const host = inMemoryAppender();
+    let release!: () => void;
+    const p = mount(root, {
+      doc: memo,
+      state: host.state,
+      onAppend: async (request) => {
+        const result = await host.append(request);
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return result;
+      },
+    });
+
+    p.update({ open: P3 });
+    await new Promise((resolve) => setTimeout(resolve));
+    root.querySelector<HTMLInputElement>('form.mq-ask input[type="radio"]')!.click();
+    [...root.querySelectorAll<HTMLButtonElement>('button')].find((item) => item.textContent === 'Answer')!.click();
+    await flushAppend();
+
+    p.update({ open: P2 });
+    await new Promise((resolve) => setTimeout(resolve));
+    const seen = p.state.seen.find((item) => item.id === P2);
+    expect(seen).toBeTruthy();
+    expect(host.state.seen).toEqual([]);
+
+    release();
+    await flushAppend();
+    expect(p.state.log).toHaveLength(1);
+    expect(p.state.seen).toContainEqual(seen);
+    p.destroy();
+    box.remove();
+  });
+
+  test('an old same-owner acknowledgement cannot roll back a newer adopted history', async () => {
+    const box = document.createElement('div');
+    const root = document.createElement('div');
+    for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
+    box.append(root);
+    document.body.append(box);
+    const host = inMemoryAppender();
+    let release!: () => void;
+    const dispatches: unknown[] = [];
+    const p = mount(root, {
+      doc: memo,
+      state: host.state,
+      actBinding: { documentId: 'memo-fixture', chain: 'chain-A' },
+      onAppend: async (request) => {
+        const result = await host.append(request);
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return result;
+      },
+      onChange: (_state, action) => {
+        if (action) dispatches.push(action);
+      },
+    });
+
+    await clickAnswer(root, p);
+    await flushAppend();
+    expect(host.state.log).toHaveLength(1);
+    const newer = appendAct(host.state, {
+      requestId: 'concurrent-same-owner-act',
+      id: P2,
+      act: 'kept_as_written',
+      value: null,
+      at: 't2',
+    });
+    expect(newer.status).toBe('committed');
+    const { log, actSequence, actHistoryCoverage } = newer.state;
+    if (actSequence === undefined || !actHistoryCoverage) throw new Error('expected a sequenced host history');
+    p.state.log = log;
+    p.state.actSequence = actSequence;
+    p.state.actHistoryCoverage = actHistoryCoverage;
+
+    release();
+    await flushAppend();
+    expect(p.state.log.map((entry) => entry.requestId)).toEqual([
+      host.state.log[0]?.requestId,
+      'concurrent-same-owner-act',
+    ]);
+    expect(dispatches).toHaveLength(1);
+    p.destroy();
+    box.remove();
+  });
+
+  test('an async acknowledgement for an old chain cannot dispatch work into the new context', async () => {
+    const box = document.createElement('div');
+    const root = document.createElement('div');
+    for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
+    box.append(root);
+    document.body.append(box);
+    const host = inMemoryAppender();
+    let finish!: (result: AppendActResult) => void;
+    const requests: ActAppendRequest[] = [];
+    const dispatches: unknown[] = [];
+    const p = mount(root, {
+      doc: memo,
+      state: host.state,
+      actBinding: { documentId: 'memo-fixture', chain: 'chain-A' },
+      onAppend: (request) => {
+        requests.push(structuredClone(request));
+        return new Promise((resolve) => {
+          finish = (result) => resolve(result);
+          void host.append(request).then((result) => {
+            finish(result);
+          });
+        });
+      },
+      onChange: (_state, action) => {
+        if (action) dispatches.push(action);
+      },
+    });
+
+    await clickAnswer(root, p);
+    p.update({ actBinding: { documentId: 'memo-fixture', chain: 'chain-B' } });
+    await flushAppend();
+
+    expect(host.state.log).toHaveLength(1);
+    expect(dispatches).toEqual([]);
+    expect(p.state.log).toHaveLength(0);
+    expect(p.state.pendingAppends).toHaveLength(0);
+    expect(root.textContent).toContain('document or chain changed');
+    expect(root.textContent).toContain('same request remains pending');
+    expect(root.querySelector('.mq-undo')).toBeNull();
+    expect(buttons(root)).toContain('Retry pending action');
+    root.querySelector<HTMLButtonElement>('.mq-pane-foot button')!.click();
+    await flushAppend();
+    expect(requests).toHaveLength(1);
+    expect(p.state.log).toHaveLength(0);
+    expect(dispatches).toEqual([]);
+    expect(root.textContent).toContain('Restore its original context');
+    p.destroy();
+    box.remove();
   });
 });
 
@@ -528,10 +1084,12 @@ describe('History (DECISIONS #24)', () => {
     for (const n of [box, root]) Object.defineProperty(n, 'clientWidth', { value: 360 });
     box.append(root);
     document.body.append(box);
-    const p = mount(root, { doc: memo });
-    const act = (id: string, a: Parameters<NonNullable<typeof p.host.onAct>>[1], value?: object) => {
+    const host = inMemoryAppender();
+    const p = mount(root, { doc: memo, state: host.state, onAppend: host.append });
+    const act = async (id: string, a: Parameters<NonNullable<typeof p.host.onAct>>[1], value?: object) => {
       const x = [...p.view()!.findings, ...p.view()!.document.artifacts].find((y) => y.id === id)!;
       p.host.onAct?.(x, a, value ?? null);
+      await flushAppend();
     };
     const answer = () => act(P3, 'answered', { reading: f(P3).outcome!.readings![0]! });
     const tab = (k: string) => root.querySelector<HTMLElement>(`.mq-tab[data-tab="${k}"]`);
@@ -539,20 +1097,20 @@ describe('History (DECISIONS #24)', () => {
     return { root, p, act, answer, tab, rows, done: () => (p.destroy(), box.remove()) };
   };
 
-  test('no tabs until something is done; then Findings, chosen', () => {
+  test('no tabs until something is done; then Findings, chosen', async () => {
     const { tab, answer, done } = setup();
     expect(tab('history')).toBeNull();
-    answer();
+    await answer();
     expect(tab('findings')?.getAttribute('aria-selected')).toBe('true');
     expect(tab('history')?.getAttribute('aria-selected')).toBe('false');
     done();
   });
 
-  test('every act, newest first; only the one in force can be taken back, with its marking', () => {
+  test('every act, newest first; only the one in force can be taken back, with its marking', async () => {
     const { act, answer, tab, rows, done } = setup();
-    act(P2, 'kept_as_written');
-    answer();
-    act('a-cab', 'answered', { fields: { derived_from: 'Memo 12' } });
+    await act(P2, 'kept_as_written');
+    await answer();
+    await act('a-cab', 'answered', { fields: { derived_from: 'Memo 12' } });
     tab('history')!.click();
     expect(rows().map((r) => r.querySelector('.where')?.textContent)).toEqual(['CAB', '¶3', '¶2']);
     const [cab, p3, p2] = rows();
@@ -567,9 +1125,10 @@ describe('History (DECISIONS #24)', () => {
 
   test('taking an answer back asks the question again, on Findings, with its card open', async () => {
     const { root, p, answer, tab, rows, done } = setup();
-    answer();
+    await answer();
     tab('history')!.click();
     rows()[0]!.querySelector('button')!.click();
+    await flushAppend();
     expect(tab('findings')?.getAttribute('aria-selected')).toBe('true');
     expect(p.view()!.findings.find((y) => y.id === P3)!.asks).toBeTruthy();
     await new Promise((r) => setTimeout(r));
@@ -580,10 +1139,10 @@ describe('History (DECISIONS #24)', () => {
     done();
   });
 
-  test('a routing act has nothing to take back; a written answer still does', () => {
+  test('a routing act has nothing to take back; a host-confirmed answer still does', async () => {
     const { p, act, answer, tab, rows, done } = setup();
-    answer();
-    // The host wrote it: the re-lint has ¶3 settled on the reading chosen.
+    await answer();
+    // A simulated host re-lint settles ¶3 on the reading chosen.
     const result = f(P3).outcome!.readings![0]!.result!;
     const settled = {
       ...f(P3),
@@ -597,7 +1156,7 @@ describe('History (DECISIONS #24)', () => {
       linted: p.state.log.length,
     });
     expect(p.view()!.findings.find((y) => y.id === P3)!.person).toBeNull();
-    act(P4, 'deferred');
+    await act(P4, 'deferred');
     tab('history')!.click();
     expect(rows()[0]!.textContent).toContain('Will ask at finalize');
     expect(buttons(rows()[0]!)).toEqual([]);
@@ -607,7 +1166,7 @@ describe('History (DECISIONS #24)', () => {
 
   test('what was typed on Findings is still there after a look at History', async () => {
     const { root, p, act, tab, done } = setup();
-    act(P2, 'kept_as_written');
+    await act(P2, 'kept_as_written');
     p.update({ open: P4 });
     await new Promise((r) => setTimeout(r));
     const input = () => root.querySelector<HTMLInputElement>(`input[type="text"][data-draft^="${P4}:"]`);
@@ -621,9 +1180,9 @@ describe('History (DECISIONS #24)', () => {
     done();
   });
 
-  test('arrow keys move between the tabs, and focus goes with them', () => {
+  test('arrow keys move between the tabs, and focus goes with them', async () => {
     const { answer, tab, done } = setup();
-    answer();
+    await answer();
     tab('findings')!.focus();
     tab('findings')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     expect(tab('history')?.getAttribute('aria-selected')).toBe('true');

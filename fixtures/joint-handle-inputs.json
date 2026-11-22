@@ -1,0 +1,301 @@
+{
+  "control": "act-sequence-exhausted",
+  "purpose": "ordinary common evaluation input",
+  "input": {
+    "basis_ref": "replacement/acceptance/joint-protocol-v3/records.json#/bases/b0",
+    "chain": "chain-A",
+    "current": {
+      "source": {
+        "document": "doc-A",
+        "ref": "src-A",
+        "revision": 1
+      },
+      "coverage": {
+        "state": "complete",
+        "extent": "scope-doc-A/all-bytes",
+        "row_count": 4,
+        "population": "all current semantic rows rows in the named scope and snapshot"
+      },
+      "subjects": [
+        {
+          "row_id": "subject-1",
+          "handle": {
+            "chain": "chain-A",
+            "serial": 1
+          },
+          "state": "active",
+          "anchor": "anchor-subject-1",
+          "occurrence": "occ-1",
+          "source": {
+            "document": "doc-A",
+            "ref": "src-A",
+            "revision": "src-A@1"
+          },
+          "scope": "scope-doc-A",
+          "supports": ["support-subject-1"]
+        }
+      ],
+      "questions": [
+        {
+          "row_id": "question-1",
+          "handle": {
+            "chain": "chain-A",
+            "serial": 1
+          },
+          "state": "active",
+          "revision": 1,
+          "requested_fact": "purpose",
+          "meaning": "What is the purpose for subject-1?",
+          "answer_effect": "purpose assertion for subject-1",
+          "subject_row": "subject-1",
+          "subject_handle": {
+            "chain": "chain-A",
+            "serial": 1
+          }
+        }
+      ],
+      "results": [
+        {
+          "row_id": "result-1",
+          "ref": "result-result-1",
+          "revision": 1,
+          "state": "active",
+          "meaning": "outcome-A",
+          "banner": "B0",
+          "dependencies": [],
+          "question_row": "question-1",
+          "supports": ["support-result-1"]
+        }
+      ],
+      "artifacts": [
+        {
+          "row_id": "artifact-1",
+          "handle": {
+            "chain": "chain-A",
+            "serial": 1
+          },
+          "state": "active",
+          "target": "doc-A/artifact-1-target",
+          "obligation": "required",
+          "trigger_proof": ["proof-artifact-1"],
+          "supports": ["proof-artifact-1"],
+          "basis": "b0",
+          "fields": [
+            {
+              "row_id": "artifact-1-field",
+              "field": "field-1",
+              "revision": 1,
+              "applicability": "applicable",
+              "coverage": "complete",
+              "examined_extent": "artifact-1/complete",
+              "observation": "present",
+              "value_ref": "value-artifact-1",
+              "value_semantics": "neutral-value-artifact-1",
+              "supports": ["support-artifact-1"],
+              "satisfaction": "unverified",
+              "dependencies": [],
+              "placement_basis": "b0"
+            }
+          ]
+        }
+      ],
+      "basis_ref": "replacement/acceptance/joint-protocol-v3/records.json#/bases/b0"
+    },
+    "prior": {
+      "source": {
+        "document": "doc-A",
+        "ref": "src-A",
+        "revision": 1
+      },
+      "coverage": {
+        "state": "complete",
+        "extent": "scope-doc-A/all-bytes",
+        "row_count": 4,
+        "population": "all prior semantic rows rows in the named scope and snapshot"
+      },
+      "subjects": [
+        {
+          "row_id": "subject-1",
+          "handle": {
+            "chain": "chain-A",
+            "serial": 1
+          },
+          "state": "active",
+          "anchor": "anchor-subject-1",
+          "occurrence": "occ-1",
+          "source": {
+            "document": "doc-A",
+            "ref": "src-A",
+            "revision": "src-A@1"
+          },
+          "scope": "scope-doc-A",
+          "supports": ["support-subject-1"]
+        }
+      ],
+      "questions": [
+        {
+          "row_id": "question-1",
+          "handle": {
+            "chain": "chain-A",
+            "serial": 1
+          },
+          "state": "active",
+          "revision": 1,
+          "requested_fact": "purpose",
+          "meaning": "What is the purpose for subject-1?",
+          "answer_effect": "purpose assertion for subject-1",
+          "subject_row": "subject-1",
+          "subject_handle": {
+            "chain": "chain-A",
+            "serial": 1
+          }
+        }
+      ],
+      "results": [
+        {
+          "row_id": "result-1",
+          "ref": "result-result-1",
+          "revision": 1,
+          "state": "active",
+          "meaning": "outcome-A",
+          "banner": "B0",
+          "dependencies": [],
+          "question_row": "question-1",
+          "supports": ["support-result-1"]
+        }
+      ],
+      "artifacts": [
+        {
+          "row_id": "artifact-1",
+          "handle": {
+            "chain": "chain-A",
+            "serial": 1
+          },
+          "state": "active",
+          "target": "doc-A/artifact-1-target",
+          "obligation": "required",
+          "trigger_proof": ["proof-artifact-1"],
+          "supports": ["proof-artifact-1"],
+          "basis": "b0",
+          "fields": [
+            {
+              "row_id": "artifact-1-field",
+              "field": "field-1",
+              "revision": 1,
+              "applicability": "applicable",
+              "coverage": "complete",
+              "examined_extent": "artifact-1/complete",
+              "observation": "present",
+              "value_ref": "value-artifact-1",
+              "value_semantics": "neutral-value-artifact-1",
+              "supports": ["support-artifact-1"],
+              "satisfaction": "unverified",
+              "dependencies": [],
+              "placement_basis": "b0"
+            }
+          ]
+        }
+      ],
+      "basis_ref": "replacement/acceptance/joint-protocol-v3/records.json#/bases/b0"
+    },
+    "act_history": {
+      "chain": "chain-A",
+      "basis_ref": "replacement/acceptance/joint-protocol-v3/records.json#/bases/b0",
+      "coverage": {
+        "state": "complete",
+        "sequence_range": [1, 1],
+        "row_count": 1,
+        "population": "all listed ordered acts through the explicit lane watermark"
+      },
+      "ordered_acts": [
+        {
+          "row_id": "act-1",
+          "chain": "chain-A",
+          "sequence": 1,
+          "action": "answered",
+          "subject": {
+            "chain": "chain-A",
+            "serial": 1
+          },
+          "question": {
+            "chain": "chain-A",
+            "serial": 1
+          },
+          "question_revision": 1,
+          "result_revision": 1,
+          "payload_ref": "payload-act-1",
+          "source_revisions": ["src-A@1"],
+          "basis": "b0",
+          "supersedes": null,
+          "takes_back": null
+        }
+      ]
+    },
+    "host_operations": [],
+    "population_counts": {
+      "prior": {
+        "subjects": 1,
+        "questions": 1,
+        "results": 1,
+        "artifacts": 1
+      },
+      "current": {
+        "subjects": 1,
+        "questions": 1,
+        "results": 1,
+        "artifacts": 1
+      },
+      "acts": 1,
+      "host_operations": 0
+    },
+    "append_request": {
+      "raw_allocation_request_ref": "replacement/acceptance/joint-protocol-v3/records.json#/integrity_cases/act-sequence-exhausted/allocation_request",
+      "watermark_ref": "replacement/acceptance/joint-protocol-v3/records.json#/integrity_cases/act-sequence-exhausted/watermarks/act_sequence",
+      "unsequenced_act": {
+        "row_id": "unsequenced-append",
+        "chain": "chain-A",
+        "sequence": null,
+        "action": "answered",
+        "subject": {
+          "chain": "chain-A",
+          "serial": 1
+        },
+        "question": {
+          "chain": "chain-A",
+          "serial": 1
+        },
+        "question_revision": 1,
+        "result_revision": 1,
+        "payload_ref": "payload-unsequenced-append",
+        "source_revisions": ["src-A@1"],
+        "basis": "b0",
+        "supersedes": null,
+        "takes_back": null,
+        "state": "pending_sequence"
+      },
+      "subject_ref": {
+        "chain": "chain-A",
+        "serial": 1
+      },
+      "question_ref": {
+        "chain": "chain-A",
+        "serial": 1
+      },
+      "question_revision": 1,
+      "result_revision": 1,
+      "basis_ref": "replacement/acceptance/joint-protocol-v3/records.json#/bases/b0"
+    },
+    "caller_control": {
+      "chain": "chain-A",
+      "watermarks": {
+        "subject": 1,
+        "question": 1,
+        "artifact": 1,
+        "act_sequence": 9007199254740991
+      },
+      "allocation_request": "append one ordered act"
+    }
+  },
+  "raw_control_ref": "replacement/acceptance/joint-protocol-v3/records.json#/integrity_cases/act-sequence-exhausted",
+  "expected_separate_ref": "replacement/acceptance/joint-protocol-v3/cases.json#/handle_integrity_controls/9/expected"
+}

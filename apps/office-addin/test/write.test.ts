@@ -61,16 +61,19 @@ assert.ok(text(s).includes('4. (U) Analysts'), '¶4 untouched');
 [shown, s] = lint(s);
 assert.ok(asks(shown, s, P3), 'still asked after the re-lint');
 
-// The banner: Marque's derived value once applied; REL TO once ¶5's alternative is taken.
+// The sample has a banner from the original lint. The changed portion needs a new joint evaluation.
 s = act(shown, s, 'a-banner', 'answered', { apply: true });
 assert.equal(top(s), 'SECRET//FGI AUS GBR//NOFORN');
 [shown, s] = lint(s);
 assert.equal(top(s), 'SECRET//FGI AUS GBR//NOFORN', 'still there after the re-lint');
 const alt = doc.findings.find((f) => f.id === P5)!.outcome!.readings!.find((r) => r.result?.text.includes('REL TO'))!;
 s = act(shown, s, P5, 'answered', { reading: alt });
-assert.ok(text(s).includes(`5. ${alt.result!.text} British`), '¶5 takes REL TO back');
-assert.equal(top(s), 'SECRET//FGI AUS GBR//REL TO USA, GBR', 'and the banner follows');
-// Taken back after the re-lint wrote it: ¶5 and the banner go back to NOFORN.
+assert.ok(held(doc, s).has(P5), 'the requested change remains pending');
+assert.ok(relint(doc, s).document.pending?.includes(P5), 'the simulated re-lint preserves the held change');
+assert.deepEqual(relint(doc, s).document.blocking, doc.document.blocking, 'only the engine can discharge its blockers');
+assert.ok(text(s).includes('5. (S//NF) British'), 'the existing portion remains in Word');
+assert.equal(top(s), 'SECRET//FGI AUS GBR//NOFORN', 'the existing banner remains in Word');
+// Withdrawing the held request leaves both original markings in place.
 [shown, s] = lint(s);
 s = act(shown, s, P5, 'changed', null);
 assert.ok(text(s).includes('5. (S//NF) British'), '¶5 NOFORN again');

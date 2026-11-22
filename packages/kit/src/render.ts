@@ -34,8 +34,9 @@
 
 import { render as mark, settle, resettle, relabel, masked, el, button } from './marking.ts';
 import {
+  appendAcknowledgementIssue,
   empty,
-  record,
+  newActRequestId,
   see,
   linted,
   snapshot,
@@ -55,6 +56,10 @@ import { cite, hasTip, tips, closeWithin } from './help.ts';
 import { check, watch, release } from './theme.ts';
 import type {
   Act,
+  ActAppendBinding,
+  ActAppendRefusal,
+  ActAppendRequest,
+  AppendActResult,
   ActValue,
   Anchor,
   ArtifactField,
@@ -67,6 +72,7 @@ import type {
   LogEntry,
   MarkingLike,
   Moment,
+  PendingAppend,
   Rule,
   Rung,
   Snapshot,
@@ -130,6 +136,8 @@ export interface Update {
   engine?: EngineState;
   moment?: Moment;
   readOnly?: boolean;
+  /** The host's latest known document/chain/basis binding; null clears it to unknown. */
+  actBinding?: ActAppendBinding | null;
   /** The log length when this lint began. */
   linted?: number | undefined;
   /** The host's request counter. */
@@ -229,9 +237,25 @@ function stampOf(f: Subject, r: Rung, moment?: Moment): Stamp {
 }
 
 /* ── C4 · the asks renderer ──────────────────────────────────────────── */
-function asks(f: FindingView, host: Host, r: Rung, help: string[]): HTMLFormElement | null {
+const canRecordAct = (host: Host): boolean => typeof host.onAct === 'function';
+const canWriteDocument = (host: Host): boolean => canRecordAct(host) && !host.readOnly;
+
+function asks(f: FindingView, host: Host, r: Rung, help: string[]): HTMLElement | null {
   const a = f.asks;
   if (!a) return null;
+  if (!canRecordAct(host)) return el('p', 'mq-p', 'This host cannot record actions.');
+  if (host.readOnly) {
+    const routes = el('div', 'mq-ask');
+    routes.append(
+      el('p', 'mq-p', 'This document is read-only. You can route the question, but cannot answer it here.'),
+    );
+    const actions = el('div', 'mq-acts');
+    if (r !== 'blocking' && f.deferred !== 'deferred')
+      actions.append(button('ghost', 'Ask me at finalize', () => host.onAct?.(f, 'deferred')));
+    if (f.deferred !== 'declined') actions.append(button('ghost', 'Not my call', () => host.onAct?.(f, 'declined')));
+    if (actions.childElementCount) routes.append(actions);
+    return routes;
+  }
   const form = el('form', 'mq-ask');
   const name = `ask-${f.id}-${++uid}`;
   let chosen: ActValue | null = null;
@@ -414,7 +438,13 @@ export function card(f: FindingView, host: Host = {}): HTMLElement {
   }
 
   // The alternative the author also wrote (advisory): one action away.
-  if (f.outcome?.kind === 'chosen_over' && f.outcome.readings?.length && !f.overridden && !answered(f)) {
+  if (
+    canWriteDocument(host) &&
+    f.outcome?.kind === 'chosen_over' &&
+    f.outcome.readings?.length &&
+    !f.overridden &&
+    !answered(f)
+  ) {
     const alt = f.outcome.readings[0]!;
     const dep = el('div', 'mq-dep');
     dep.append(el('span', null, 'Or, as you also wrote:'));
@@ -427,7 +457,7 @@ export function card(f: FindingView, host: Host = {}): HTMLElement {
   if (ask) c.append(ask);
 
   // Conservative fallback, named, for the unattended boundary.
-  if (f.outcome?.fallback && r === 'blocking') {
+  if (canWriteDocument(host) && f.outcome?.fallback && r === 'blocking') {
     const fb = el('div', 'mq-dep');
     fb.append(el('span', null, "If no one can answer, Marque's most restrictive form keeps every stated equity:"));
     fb.append(placed(mark(f.outcome.fallback.result, { size: 'sm' })));
@@ -447,18 +477,20 @@ export function card(f: FindingView, host: Host = {}): HTMLElement {
   if (ct) foot.append(ct);
   // Back to what Marque said: "Change my answer", "Undo" on a choice the
   // person made, "Fix it after all" on an override. Each is a new line in the log.
-  if (answered(f))
+  if (canWriteDocument(host) && answered(f))
     foot.append(button('ghost', wasAsked(f) ? 'Change my answer' : 'Undo', () => host.onAct?.(f, 'changed', null)));
-  else if (f.overridden) foot.append(button('ghost', 'Fix it after all', () => host.onAct?.(f, 'changed', null)));
+  else if (canRecordAct(host) && f.overridden)
+    foot.append(button('ghost', 'Fix it after all', () => host.onAct?.(f, 'changed', null)));
   // No Undo on a fix the person must own; an override is recorded, not hidden.
   // Only a fix Marque made or chose can be kept against: an available one isn't applied, a withheld one is none.
   else if (
+    canRecordAct(host) &&
     (r === 'noticeable' || r === 'advisory') &&
     (f.outcome?.kind === 'applied' || f.outcome?.kind === 'chosen_over')
   )
     foot.append(button('ghost', 'Keep as written', () => host.onAct?.(f, 'kept_as_written')));
   // Available: Marque has the fix and the person applies it (CONTRACT: available → apply); the host writes it.
-  if (f.outcome?.kind === 'available' && f.outcome.result && !answered(f) && !f.overridden && !host.readOnly) {
+  if (canWriteDocument(host) && f.outcome?.kind === 'available' && f.outcome.result && !answered(f) && !f.overridden) {
     const acts = el('div', 'mq-acts');
     acts.append(button('act', 'Apply', () => host.onAct?.(f, 'answered', { apply: true })));
     c.append(acts);
@@ -796,7 +828,7 @@ function history(doc: Doc, log: readonly LogEntry[], host: Host): HTMLElement {
       (e.act === 'kept_as_written' || ((e.act === 'answered' || e.act === 'changed') && e.value != null));
     if (back) {
       const end = el('div', 'end');
-      end.append(button('ghost', 'Take back', () => host.onAct?.(x, 'changed', null)));
+      if (canWriteDocument(host)) end.append(button('ghost', 'Take back', () => host.onAct?.(x, 'changed', null)));
       li.append(end);
     }
     rows.append(li);
@@ -936,14 +968,14 @@ export function artifact(a: ArtifactView, host: Host = {}, doc?: Doc | null): HT
     // Generated, not applied: the person can apply it; the host writes it (docs/COMPONENTS.md, C9).
     const fixes = a.state === 'absent_but_required' || a.state === 'present_not_canonical';
     if (a.applying && fixes) c.append(el('p', 'mq-p', 'Waiting to be written into the document.'));
-    else if (a.fixability === 'fixable' && fixes && !host.readOnly) {
+    else if (a.fixability === 'fixable' && fixes && canWriteDocument(host)) {
       const acts = el('div', 'mq-acts');
       acts.append(button('act', 'Apply', () => host.onAct?.(a, 'answered', { apply: true })));
       c.append(acts);
     }
   }
   // Present but not required: an Advisory in its own right, one optional action. Leaving it is the other choice.
-  if (a.state === 'present_not_required' && !a.applying && !host.readOnly) {
+  if (a.state === 'present_not_required' && !a.applying && canWriteDocument(host)) {
     const acts = el('div', 'mq-acts');
     acts.append(button('act', 'Remove it', () => host.onAct?.(a, 'answered', { remove: true })));
     c.append(acts);
@@ -953,6 +985,11 @@ export function artifact(a: ArtifactView, host: Host = {}, doc?: Doc | null): HT
     const dl = el('div', 'mq-cab');
     // A field a person fills: labeled by its key, committed on Enter or Fill in.
     const entry = (k: string, fld: ArtifactField, key: HTMLElement): HTMLSpanElement => {
+      if (!canWriteDocument(host)) {
+        const value = el('span', `v ${fld.state === 'blank' ? 'blank' : ''}`.trim(), fld.value || 'Not provided');
+        value.setAttribute('aria-label', `${k.replace(/_/g, ' ')}: ${fld.value || 'not provided'}`);
+        return value;
+      }
       const v = el('span', 'v blank mq-field');
       const inp = el('input', 'mono');
       inp.type = 'text';
@@ -1293,11 +1330,13 @@ export function receipt(doc: Doc, session: Session = {}): HTMLDivElement {
  * Help on tokens is bound inside the pane; a host that renders gate() or a
  * card elsewhere binds tips(surface, vocab, p.host) on that surface too.
  *
- * The kit records each act in `state` (src/state.js) and hands it to
- * `onChange(state, act)` for the host to persist and apply; `act` is null
- * when only bookkeeping changed (the seen list, the lint checkpoint). An answer stays pending, and the document
- * not ready, until the host re-lints and passes the new `doc`. A new Action
- * required is announced in a polite live region; Quiet changes are not.
+ * A user action reaches `onAppend` first. The kit adopts only its acknowledged
+ * state; a new committed act is then handed to `onChange(state, act)` for host
+ * work. A refusal remains pending outside ordered history and never dispatches
+ * a write. `onChange` with a null act is still used for bookkeeping only.
+ * An answer stays pending, and the document not ready, until the host re-lints
+ * and passes the new `doc`. A new Action required is announced in a polite live
+ * region; Quiet changes are not.
  */
 export function mount(
   root: HTMLElement,
@@ -1309,10 +1348,21 @@ export function mount(
     moment: Moment;
     engine: EngineState;
     readOnly: boolean;
+    actBinding: ActAppendBinding | null;
     open: string | null;
     tab: Tab;
     seq: number | null;
-  } = { doc, state, moment, engine, readOnly, open: null, tab: 'findings', seq: null };
+  } = {
+    doc,
+    state,
+    moment,
+    engine,
+    readOnly,
+    actBinding: host.actBinding ?? null,
+    open: null,
+    tab: 'findings',
+    seq: null,
+  };
   // Findings already there at mount aren't news; the first ones to arrive later are.
   let said: Set<string> | null = doc ? null : new Set(),
     unseen = false;
@@ -1382,6 +1432,9 @@ export function mount(
     get readOnly() {
       return cur.readOnly;
     },
+    get actBinding() {
+      return cur.actBinding ?? undefined;
+    },
     get open() {
       return cur.open;
     },
@@ -1420,34 +1473,9 @@ export function mount(
       }
       host.onOpen?.(f);
     },
-    onAct(f: Subject, act: Act, value: ActValue | null = null) {
-      cur.state = record(cur.state, f.id, act, value, undefined, snapshot(f));
-      const inPane = body.contains(document.activeElement);
-      // Putting it back to what Marque said reopens the card where the finding now lives, focus kept.
-      // Any other act leaves what was done and an Undo in the card's place (DECISIONS #23).
-      // A typed field has no Undo yet: core can't take one back (field answers accumulate).
-      const back = (act === 'changed' && value == null) || !cur.doc || !!value?.fields;
-      // Taken back from History: the question is the point, so the findings come back with its card open.
-      if (back) {
-        cur.open = f.id;
-        cur.tab = 'findings';
-      } else {
-        cur.open = null;
-        undoable(f, act, value);
-      }
-      // A host that re-lints at once redraws inside onChange; this finding's draft went with the act.
-      acting = f.id;
-      try {
-        host.onChange?.(cur.state, { id: f.id, act, value });
-      } finally {
-        acting = null;
-      }
-      draw(back && inPane ? f.id : null, { fresh: true });
-      if (!back && recent) {
-        if (inPane) recent.strip.querySelector('button')?.focus();
-        live.textContent = `${live.textContent} ${recent.say}`.trim();
-      }
-    },
+    onAct: host.onAppend
+      ? (f: Subject, act: Act, value: ActValue | null = null) => void submitAct(f, act, value)
+      : undefined,
   };
 
   /** The undo window: for UNDO_MS after an act, the card's place says what was done and offers Undo.
@@ -1468,7 +1496,7 @@ export function mount(
     /** Focus isn't on it: start the clock again if focus was what stopped it. */
     left: () => void;
   } | null = null;
-  function undoable(f: Subject, act: Act, value: ActValue | null): void {
+  function undoable(f: Subject, act: Act, value: ActValue | null, appended?: LogEntry): void {
     recent?.end();
     const li = body.querySelector<HTMLElement>(`.mq-row-item[data-finding="${CSS.escape(f.id)}"]`);
     const sec = li?.closest('.mq-section');
@@ -1483,19 +1511,16 @@ export function mount(
     const end = el('div', 'end');
     end.append(
       button('ghost', 'Undo', () => {
-        const id = f.id,
-          had = strip.contains(document.activeElement);
         const ok = holds();
-        stop();
         // A re-lint may have withdrawn it since: the act is taken back on what it was taken on.
-        if (ok) h.onAct?.(target() ?? f, 'changed', null);
-        if (had) refocus(id);
+        if (ok) void submitAct(target() ?? f, 'changed', null);
+        else stop();
       }),
     );
     strip.append(end);
     // The act this strip undoes, and whether it is still the one in force: a re-lint may have put another
     // question or marking under the same id, and Undo must not bring the old one back over it.
-    const entry = canon(cur.state.log[cur.state.log.length - 1]);
+    const entry = canon(appended ?? cur.state.log[cur.state.log.length - 1]);
     const target = (): Subject | undefined => {
       const v = cur.doc && docView(cur.doc, cur.state);
       return [...(v?.findings ?? []), ...(v?.document.artifacts ?? [])].find((y) => y.id === f.id);
@@ -1617,6 +1642,24 @@ export function mount(
   /** What the person has picked or typed and not yet sent, by a key that survives a redraw. */
   let acting: string | null = null,
     gen = 0; // the finding being acted on (its draft is spent); which draw is current
+  const canRetryPending = (item: PendingAppend): boolean =>
+    item.state === 'staged' || item.reason !== 'sequence-exhausted';
+  const nextPendingRequest = (state: State): PendingAppend | undefined => state.pendingAppends?.find(canRetryPending);
+  const terminalPendingRequest = (state: State): PendingAppend | undefined =>
+    state.pendingAppends?.find((item) => item.state === 'pending_sequence' && item.reason === 'sequence-exhausted');
+  const initialTerminalPending = terminalPendingRequest(cur.state);
+  let pendingRequest: ActAppendRequest | null = nextPendingRequest(cur.state) ?? null;
+  let appendStatus = pendingRequest
+    ? initialTerminalPending
+      ? 'A prior action remains outside history because the chain sequence limit was reached. Another saved action is ready to retry.'
+      : host.onAppend
+        ? 'A saved action is waiting to be recorded. It has not been applied.'
+        : 'A saved action remains outside the ordered history. This host cannot retry it; it has not been applied.'
+    : initialTerminalPending
+      ? 'A saved action remains outside history because the chain sequence limit was reached. It has not been applied.'
+      : '';
+  let appendRetryable = !!pendingRequest;
+  let appendInFlight: string | null = null;
   const drafts = (): Draft[] =>
     [...body.querySelectorAll<HTMLInputElement>('[data-draft]')]
       .filter((x) => !acting || !x.dataset.draft?.startsWith(`${acting}:`))
@@ -1693,7 +1736,17 @@ export function mount(
     if (focusId === undefined) focusId = focusedId();
     if (recent) recent.focused = recent.strip.contains(document.activeElement);
     const onTab = body.contains(document.activeElement) && document.activeElement?.closest<HTMLElement>('.mq-tab');
-    body.replaceChildren(pane(v, h));
+    const view = pane(v, h);
+    if (appendStatus) {
+      const notice = el('div', 'mq-pane-foot');
+      notice.setAttribute('role', 'status');
+      notice.append(el('p', 'mq-p', appendStatus));
+      if (pendingRequest && appendRetryable && !appendInFlight && host.onAppend) {
+        notice.append(button('ghost', 'Retry pending action', () => void submitPending()));
+      }
+      view.insertBefore(notice, view.children[1] ?? null);
+    }
+    body.replaceChildren(view);
     replace();
     if (onTab) body.querySelector<HTMLElement>(`.mq-tab[data-tab="${onTab.dataset.tab}"]`)?.focus();
     if (host.vocab) relabel(body, host.vocab); // this pane's own vocabulary
@@ -1708,6 +1761,233 @@ export function mount(
         }),
       );
   }
+  const actOwnerKey = (binding: ActAppendBinding | null): string =>
+    canon({ documentId: binding?.documentId ?? null, chain: binding?.chain ?? null });
+  const adoptHostState = (next: State, resolvedRequestId?: string): void => {
+    // A concurrent acknowledgement can arrive with an older same-owner snapshot.
+    // Keep the newer history unless the incoming log contains it exactly.
+    const incomingContainsCurrent = cur.state.log.every((entry) =>
+      next.log.some((candidate) => candidate.sequence === entry.sequence && canon(candidate) === canon(entry)),
+    );
+    const incomingFrontier = next.actSequence;
+    const currentFrontier = cur.state.actSequence;
+    const incomingIsAtLeastAsNew =
+      currentFrontier === undefined ||
+      (incomingFrontier !== undefined && Number.isSafeInteger(incomingFrontier) && incomingFrontier >= currentFrontier);
+    const base = incomingContainsCurrent && incomingIsAtLeastAsNew ? next : cur.state;
+    // `seen` and `linted` are independent local bookkeeping. Preserve pending
+    // host intents too, while letting a fresh refusal update a staged row.
+    const seen = [...base.seen];
+    for (const item of cur.state.seen) {
+      if (!seen.some((known) => canon(known) === canon(item))) seen.push(item);
+    }
+    const pending = new Map<string, PendingAppend>();
+    for (const item of [...(cur.state.pendingAppends ?? []), ...(next.pendingAppends ?? [])])
+      pending.set(item.requestId, item);
+    if (resolvedRequestId) pending.delete(resolvedRequestId);
+    const linted = Math.min(Math.max(cur.state.linted ?? 0, next.linted ?? 0), base.log.length);
+    cur.state = {
+      ...base,
+      seen,
+      pendingAppends: [...pending.values()],
+      ...(linted > 0 && { linted }),
+    };
+  };
+  const currentAppendBinding = (): ActAppendBinding | null => {
+    let binding = cur.actBinding ? structuredClone(cur.actBinding) : null;
+    if (host.currentBasis && !binding?.basis) {
+      binding = { ...binding, basis: structuredClone(host.currentBasis) };
+    }
+    return binding;
+  };
+  const appendRefusalMessage = (reason: ActAppendRefusal): string => {
+    switch (reason) {
+      case 'sequence-exhausted':
+        return 'The history reached its sequence limit. This action remains pending outside history and has not been applied.';
+      case 'missing-frontier':
+        return 'The host has no trusted history position. This action remains pending outside history and has not been applied.';
+      case 'missing-coverage':
+        return 'The host has no history coverage to check this request. It remains pending; restore coverage before retrying.';
+      case 'history-incomplete':
+        return 'The host history is incomplete or inconsistent. This action remains pending; repair history before retrying.';
+      case 'invalid-frontier':
+        return 'The host history position or ordered rows are invalid. This action remains pending outside history.';
+      case 'missing-target':
+        return 'The host could not bind this action to a finding. It remains pending and has not been applied.';
+      case 'request-id-conflict':
+        return 'This request key conflicts with a stored request. Resolve the conflict before retrying; no write was dispatched.';
+    }
+  };
+
+  async function submitPending(): Promise<void> {
+    if (!pendingRequest || appendInFlight) return;
+    if (!host.onAppend) {
+      appendRetryable = false;
+      appendStatus = 'The host cannot retry this pending action. It remains unapplied outside history.';
+      draw();
+      return;
+    }
+    const current = cur.doc && docView(cur.doc, cur.state);
+    const target = pendingRequest.id
+      ? [...(current?.findings ?? []), ...(current?.document.artifacts ?? [])].find(
+          (item) => item.id === pendingRequest!.id,
+        )
+      : undefined;
+    await submitAppend(pendingRequest, target);
+  }
+
+  async function submitAct(f: Subject, act: Act, value: ActValue | null): Promise<void> {
+    if (appendInFlight) return;
+    if (!host.onAppend) {
+      appendStatus = 'The host cannot record this action. It has not been applied or added to history.';
+      draw();
+      return;
+    }
+    if (pendingRequest) {
+      appendStatus = 'An earlier action is still pending. Retry it before starting another action.';
+      draw();
+      return;
+    }
+    const binding = currentAppendBinding() ?? undefined;
+    const request: ActAppendRequest = {
+      requestId: newActRequestId(),
+      id: f.id,
+      act,
+      value: value == null ? value : structuredClone(value),
+      at: new Date().toISOString(),
+      about: snapshot(f),
+      ...(binding && { binding }),
+    };
+    await submitAppend(request, f);
+  }
+
+  async function submitAppend(request: ActAppendRequest, original?: Subject): Promise<void> {
+    const append = host.onAppend;
+    if (!append || appendInFlight) return;
+    const ownerBinding = currentAppendBinding();
+    const ownerKey = actOwnerKey(ownerBinding);
+    const ownerKnown = !!(ownerBinding?.documentId || ownerBinding?.chain);
+    const documentAtRequest = cur.doc;
+    const documentBasisKey = canon(documentAtRequest?.document.evaluation?.basis ?? null);
+    const bindingKey = canon(ownerBinding);
+    if (canon(request.binding ?? null) !== bindingKey) {
+      pendingRequest = request;
+      appendRetryable = false;
+      appendStatus =
+        'This pending action belongs to a different document or chain. Restore its original context before retrying.';
+      draw();
+      return;
+    }
+    const contextIsCurrent = (): boolean =>
+      cur.doc === documentAtRequest &&
+      canon(currentAppendBinding()) === bindingKey &&
+      canon(cur.doc?.document.evaluation?.basis ?? null) === documentBasisKey;
+    const sameOwner = (): boolean =>
+      actOwnerKey(cur.actBinding ?? null) === ownerKey && (ownerKnown || cur.doc === documentAtRequest);
+    const focusId = focusedId();
+    appendInFlight = request.requestId;
+    pendingRequest = request;
+    appendRetryable = false;
+    appendStatus = 'Sending this action to the host for recording.';
+    draw(focusId);
+
+    let result: AppendActResult;
+    try {
+      result = await append(structuredClone(request));
+    } catch {
+      if (dead) return;
+      appendInFlight = null;
+      appendRetryable = true;
+      appendStatus = 'The host did not acknowledge this action. It remains pending; retry will use the same request.';
+      draw(focusId);
+      return;
+    }
+    if (dead) return;
+    appendInFlight = null;
+    if (result.status === 'refused') {
+      if (sameOwner() && contextIsCurrent()) adoptHostState(result.state);
+      const storedRequest = nextPendingRequest(cur.state);
+      pendingRequest = storedRequest ?? (result.reason === 'sequence-exhausted' ? null : (result.pending ?? request));
+      // A refusal belongs to the exact document/basis it was issued against.
+      // If that context moved while the host was working, leave it untouched
+      // and let the person retry the same request against the current context.
+      appendRetryable = !sameOwner() || !contextIsCurrent();
+      appendStatus =
+        !sameOwner() || !contextIsCurrent()
+          ? 'The document or chain changed before the host response. No state was adopted; this action remains pending with the same request for retry.'
+          : appendRefusalMessage(result.reason);
+      if (pendingRequest && pendingRequest.requestId !== request.requestId)
+        appendStatus += ' Another saved action is ready to retry.';
+      appendRetryable = appendRetryable || !!pendingRequest;
+      draw(focusId);
+      return;
+    }
+
+    const acknowledgementIssue = appendAcknowledgementIssue(request, result, cur.state);
+    if (acknowledgementIssue) {
+      appendRetryable = true;
+      appendStatus = `${appendRefusalMessage(acknowledgementIssue)} No host state was adopted.`;
+      draw(focusId);
+      return;
+    }
+
+    const { entry, replayed } = result;
+    if (!sameOwner() || !contextIsCurrent()) {
+      appendStatus =
+        'The action was recorded, but the document or chain changed before it could be applied. The same request remains pending; retry it after restoring its document.';
+      appendRetryable = true;
+      draw(focusId);
+      return;
+    }
+
+    // Adopt only after the host's exact acknowledgement is bound to the still
+    // current document, chain, and evaluation basis.
+    adoptHostState(result.state, request.requestId);
+    pendingRequest = nextPendingRequest(cur.state) ?? null;
+    appendRetryable = !!pendingRequest;
+
+    appendStatus = pendingRequest
+      ? terminalPendingRequest(cur.state)
+        ? 'This action was recorded. A prior action remains outside history at the chain sequence limit; another saved action is ready to retry.'
+        : 'This action was recorded. Another saved action is ready to retry.'
+      : terminalPendingRequest(cur.state)
+        ? appendRefusalMessage('sequence-exhausted')
+        : '';
+    const current = cur.doc && docView(cur.doc, cur.state);
+    const target = request.id
+      ? [...(current?.findings ?? []), ...(current?.document.artifacts ?? [])].find((item) => item.id === request.id)
+      : undefined;
+    const subject = target ?? original;
+    const back = (entry.act === 'changed' && entry.value == null) || !cur.doc || !!entry.value?.fields;
+    const inPane = body.contains(document.activeElement);
+    recent?.end();
+    if (back) {
+      cur.open = entry.id;
+      cur.tab = 'findings';
+    } else {
+      cur.open = null;
+      if (subject) undoable(subject, entry.act, entry.value, entry);
+    }
+    acting = entry.id;
+    try {
+      host.onChange?.(cur.state, {
+        id: entry.id,
+        act: entry.act,
+        value: entry.value,
+        requestId: request.requestId,
+        entry,
+        replayed,
+      });
+    } finally {
+      acting = null;
+    }
+    draw(back && inPane ? entry.id : null, { fresh: true });
+    if (!back && recent) {
+      if (inPane) recent.strip.querySelector('button')?.focus();
+      live.textContent = `${live.textContent} ${recent.say}`.trim();
+    }
+  }
+
   draw();
 
   return {
@@ -1728,7 +2008,7 @@ export function mount(
       if (added) root.classList.remove('mq');
       if (mirrors && mine) root.removeAttribute('data-mq-theme');
     },
-    update({ linted: upTo, seq, open, ...next }: Update) {
+    update({ linted: upTo, seq, open, actBinding, ...next }: Update) {
       // A lint that began before the one already shown is stale: keep the newer document.
       // `seq` orders lints that began at the same point in the log. A stale lint's
       // failure is as stale as its document: neither replaces the newer one.
@@ -1742,6 +2022,7 @@ export function mount(
         delete next.engine;
       } else if (lint && seq != null) cur.seq = seq;
       Object.assign(cur, next);
+      if (actBinding !== undefined) cur.actBinding = actBinding;
       if (open !== undefined) {
         const v = cur.doc && docView(cur.doc, cur.state);
         h.onOpen?.((open && v && [...v.findings, ...v.document.artifacts].find((x) => x.id === open)) || null);

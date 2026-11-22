@@ -6,9 +6,10 @@
  * State — the kit's half of the ladder (docs/CONTRACT.md §F): what the person
  * did, keyed by finding id. Never on Marque's wire; the host persists it.
  *
- * A state is plain JSON so a host can keep it anywhere (document properties,
- * a server, localStorage):
- *   { log: [{ id, act, value, at, about }], seen: [{ id, result }], linted: n }
+ * A state is plain JSON persisted by the trusted host workspace. It contains
+ * private interaction history; do not copy it into document metadata or a
+ * portable provenance seal:
+ *   { log, seen, linted, actSequence, actHistoryCoverage, pendingAppends }
  * `about` is what the act was about when it was taken (snapshot()), so the
  * receipt can name a finding a later lint withdrew and an override is
  * reopened when the marking it kept changes.
@@ -34,8 +35,11 @@
 
 import type {
   Act,
+  ActAppendRequest,
   ActValue,
+  AppendActResult,
   Anchor,
+  ActHistoryCoverage,
   ArtifactField,
   ArtifactKind,
   ArtifactView,
@@ -45,6 +49,7 @@ import type {
   HypotheticalReplacement,
   LogEntry,
   MarkingLike,
+  PendingAct,
   Snapshot,
   State,
   Subject,
@@ -58,7 +63,264 @@ export const ACTS: readonly Act[] = Object.freeze([
   'declined',
 ] as const);
 
-export const empty = (): State => ({ log: [], seen: [] });
+export const empty = (): State => ({
+  log: [],
+  seen: [],
+  actSequence: 0,
+  actHistoryCoverage: { state: 'complete', sequenceRange: null },
+  pendingAppends: [],
+});
+
+/** A transport key for retrying the same host-owned append; it is not a semantic identity. */
+export const newActRequestId = (): string => globalThis.crypto.randomUUID();
+
+const appendRequestValue = (request: ActAppendRequest) => ({
+  requestId: request.requestId,
+  ...(request.id !== undefined && { id: request.id }),
+  act: request.act,
+  value: request.value,
+  ...(request.at !== undefined && { at: request.at }),
+  ...(request.about !== undefined && { about: request.about }),
+  ...(request.binding !== undefined && { binding: request.binding }),
+});
+
+const sameAppendRequest = (a: ActAppendRequest, b: ActAppendRequest): boolean => {
+  const left = appendRequestValue(a);
+  const right = appendRequestValue(b);
+  // A caller may omit the timestamp on a retry. The original committed time is
+  // returned from the entry; it is not a reason to issue a second act.
+  if (a.at === undefined) delete (right as { at?: string }).at;
+  if (b.at === undefined) delete (left as { at?: string }).at;
+  return canon(left) === canon(right);
+};
+
+const copyRequest = (request: ActAppendRequest): ActAppendRequest => structuredClone(appendRequestValue(request));
+
+function refusal(
+  state: State,
+  request: ActAppendRequest,
+  reason: 'sequence-exhausted' | 'missing-frontier' | 'missing-coverage' | 'history-incomplete' | 'invalid-frontier',
+): AppendActResult {
+  const pending: PendingAct = {
+    ...copyRequest(request),
+    sequence: null,
+    state: 'pending_sequence',
+    reason,
+  };
+  const existing = state.pendingAppends ?? [];
+  const index = existing.findIndex((entry) => entry.requestId === request.requestId);
+  return {
+    status: 'refused',
+    reason,
+    pending,
+    state: {
+      ...state,
+      pendingAppends: index < 0 ? [...existing, pending] : existing.map((entry, i) => (i === index ? pending : entry)),
+    },
+  };
+}
+
+type AppendHistoryIssue = 'missing-frontier' | 'invalid-frontier' | 'missing-coverage' | 'history-incomplete';
+
+/** Rows retained by any history lane must still have ordered, in-frontier coordinates. */
+function retainedHistoryIssue(state: State, frontier: number): 'invalid-frontier' | 'request-id-conflict' | null {
+  let previous = 0;
+  const requestIds = new Set<string>();
+  const sequences = new Set<number>();
+  for (const entry of state.log) {
+    if (!Number.isSafeInteger(entry.sequence) || entry.sequence <= previous || entry.sequence > frontier)
+      return 'invalid-frontier';
+    previous = entry.sequence;
+    if (sequences.has(entry.sequence)) return 'invalid-frontier';
+    sequences.add(entry.sequence);
+    if (entry.requestId !== undefined) {
+      if (typeof entry.requestId !== 'string' || entry.requestId.length === 0 || requestIds.has(entry.requestId))
+        return 'request-id-conflict';
+      requestIds.add(entry.requestId);
+    }
+  }
+  return null;
+}
+
+/** A `complete` declaration is valid only when the retained ordered rows prove every sequence. */
+function completeHistoryIssue(state: State): AppendHistoryIssue | 'request-id-conflict' | null {
+  const frontier = state.actSequence;
+  if (frontier === undefined) return 'missing-frontier';
+  if (!Number.isSafeInteger(frontier) || frontier < 0) return 'invalid-frontier';
+  const coverage = state.actHistoryCoverage;
+  if (coverage === undefined) return 'missing-coverage';
+  const range = coverage.sequenceRange;
+  if (
+    coverage.state !== 'complete' ||
+    !((frontier === 0 && range === null) || (frontier > 0 && range !== null && range[0] === 1 && range[1] === frontier))
+  )
+    return 'history-incomplete';
+  if (state.log.length !== frontier) return 'history-incomplete';
+  const retainedIssue = retainedHistoryIssue(state, frontier);
+  if (retainedIssue === 'request-id-conflict') return retainedIssue;
+  if (retainedIssue) return 'history-incomplete';
+  for (let i = 0; i < state.log.length; i++) {
+    if (state.log[i]?.sequence !== i + 1) return 'history-incomplete';
+  }
+  return null;
+}
+
+const requestFromEntry = (entry: LogEntry): ActAppendRequest => ({
+  requestId: entry.requestId ?? '',
+  id: entry.id,
+  act: entry.act,
+  value: entry.value,
+  at: entry.at,
+  ...(entry.about !== undefined && { about: entry.about }),
+  ...(entry.binding !== undefined && { binding: entry.binding }),
+});
+
+function knownRequestIssue(
+  state: State,
+  request: ActAppendRequest,
+  entry: LogEntry,
+): 'missing-frontier' | 'invalid-frontier' | 'request-id-conflict' | null {
+  const frontier = state.actSequence;
+  if (frontier === undefined) return 'missing-frontier';
+  if (!Number.isSafeInteger(frontier) || frontier < 0) return 'invalid-frontier';
+  const retainedIssue = retainedHistoryIssue(state, frontier);
+  if (retainedIssue) return retainedIssue;
+  if (!Number.isSafeInteger(entry.sequence) || entry.sequence <= 0 || entry.sequence > frontier)
+    return 'invalid-frontier';
+  if (!sameAppendRequest(requestFromEntry(entry), request)) return 'request-id-conflict';
+  return null;
+}
+
+/**
+ * Validate a host's committed acknowledgement before the UI adopts it or dispatches a write.
+ * Exact retained replays need only a unique valid row within the known frontier, so partial
+ * coverage remains sufficient for a request the host can prove it already committed.
+ */
+export function appendAcknowledgementIssue(
+  request: ActAppendRequest,
+  result: AppendActResult,
+  current?: State,
+): 'request-id-conflict' | 'missing-frontier' | 'invalid-frontier' | 'missing-coverage' | 'history-incomplete' | null {
+  if (result.status !== 'committed') return null;
+  const { entry, state } = result;
+  if (entry.requestId !== request.requestId || !sameAppendRequest(requestFromEntry(entry), request))
+    return 'request-id-conflict';
+  const requestRows = state.log.filter((item) => item.requestId === request.requestId);
+  if (requestRows.length !== 1 || canon(requestRows[0]) !== canon(entry)) return 'request-id-conflict';
+  if ((state.pendingAppends ?? []).some((item) => item.requestId === request.requestId)) return 'request-id-conflict';
+  const retainedIssue = knownRequestIssue(state, request, entry);
+  if (retainedIssue) return retainedIssue;
+  if (current) {
+    const currentRowsForRequest = current.log.filter((item) => item.requestId === request.requestId);
+    if (currentRowsForRequest.length > 1) return 'request-id-conflict';
+    if (currentRowsForRequest.length === 1 && canon(currentRowsForRequest[0]) !== canon(entry))
+      return 'request-id-conflict';
+    if (current.log.some((item) => item.sequence === entry.sequence && canon(item) !== canon(entry)))
+      return 'invalid-frontier';
+    if (
+      current.actSequence !== undefined &&
+      Number.isSafeInteger(current.actSequence) &&
+      current.actSequence > state.actSequence! &&
+      currentRowsForRequest.length !== 1
+    )
+      return 'history-incomplete';
+  }
+  if (result.replayed) return null;
+  return completeHistoryIssue(state);
+}
+
+/**
+ * Pure checked append transition for a caller-owned ordered act log.
+ * Hosts persist every returned state; a committed append also atomically records its recoverable write intent.
+ * The frontier is the last issued one-based sequence; it is never inferred from log length.
+ */
+export function appendAct(state: State, request: ActAppendRequest): AppendActResult {
+  if (!ACTS.includes(request.act)) throw new Error(`Unknown act "${request.act}"; expected one of ${ACTS.join(', ')}`);
+
+  if (typeof request.requestId !== 'string' || request.requestId.length === 0) {
+    return { status: 'refused', reason: 'request-id-conflict', state };
+  }
+
+  const priorEntries = state.log.filter((entry) => entry.requestId === request.requestId);
+  if (priorEntries.length > 1) return { status: 'refused', reason: 'request-id-conflict', state };
+  const priorEntry = priorEntries[0];
+  if (priorEntry) {
+    const issue = knownRequestIssue(state, request, priorEntry);
+    if (issue === 'request-id-conflict') {
+      return { status: 'refused', reason: 'request-id-conflict', state };
+    }
+    if (issue) return refusal(state, request, issue);
+    return { status: 'committed', state, entry: priorEntry, replayed: true };
+  }
+
+  const pending = state.pendingAppends ?? [];
+  const pendingEntries = pending.filter((entry) => entry.requestId === request.requestId);
+  if (pendingEntries.length > 1) return { status: 'refused', reason: 'request-id-conflict', state };
+  const pendingEntry = pendingEntries[0];
+  if (pendingEntry) {
+    if (!sameAppendRequest(pendingEntry, request)) {
+      return { status: 'refused', reason: 'request-id-conflict', state };
+    }
+    // Exhaustion is terminal for this chain. Other refusals can be retried with
+    // the same captured request after the trusted owner repairs unknown state.
+    if (pendingEntry.state === 'pending_sequence' && pendingEntry.reason === 'sequence-exhausted') {
+      return { status: 'refused', reason: pendingEntry.reason, state, pending: pendingEntry };
+    }
+  }
+
+  if (state.actSequence === undefined) return refusal(state, request, 'missing-frontier');
+  if (!Number.isSafeInteger(state.actSequence) || state.actSequence < 0) {
+    return refusal(state, request, 'invalid-frontier');
+  }
+  if (state.actSequence === Number.MAX_SAFE_INTEGER) return refusal(state, request, 'sequence-exhausted');
+  const sequence = state.actSequence + 1;
+  if (!Number.isSafeInteger(sequence) || sequence <= state.actSequence) {
+    return refusal(state, request, 'sequence-exhausted');
+  }
+  if (state.log.some((entry) => entry.sequence === sequence)) {
+    return refusal(state, request, 'invalid-frontier');
+  }
+  const historyIssue = completeHistoryIssue(state);
+  if (historyIssue === 'request-id-conflict') return { status: 'refused', reason: historyIssue, state };
+  if (historyIssue) return refusal(state, request, historyIssue);
+
+  if (request.id === undefined) return { status: 'refused', reason: 'missing-target', state };
+
+  const entry: LogEntry = {
+    sequence,
+    requestId: request.requestId,
+    id: request.id,
+    act: request.act,
+    value: request.value == null ? request.value : structuredClone(request.value),
+    at: request.at ?? new Date().toISOString(),
+    ...(request.about !== undefined && { about: structuredClone(request.about) }),
+    ...(request.binding !== undefined && { binding: structuredClone(request.binding) }),
+  };
+
+  const next = {
+    ...state,
+    log: [...state.log, entry],
+    actSequence: sequence,
+    pendingAppends: pending.filter((item) => item.requestId !== request.requestId),
+    ...(state.actHistoryCoverage !== undefined && {
+      actHistoryCoverage: nextActHistoryCoverage(state.actHistoryCoverage, state.actSequence, sequence),
+    }),
+  };
+  return { status: 'committed', state: next, entry, replayed: false };
+}
+
+function nextActHistoryCoverage(coverage: ActHistoryCoverage, frontier: number, sequence: number): ActHistoryCoverage {
+  const range = coverage.sequenceRange;
+  if (range === null && coverage.state === 'complete' && frontier === 0) {
+    return { state: 'complete', sequenceRange: [sequence, sequence] };
+  }
+  if (range && coverage.state === 'complete' && range[1] === frontier) {
+    return { state: 'complete', sequenceRange: [range[0], sequence] };
+  }
+  const low = range ? Math.min(range[0], sequence) : sequence;
+  const high = range ? Math.max(range[1], sequence) : sequence;
+  return { state: 'partial', sequenceRange: [low, high] };
+}
 
 /** Append one act. Returns a new state; the old one is untouched. */
 export function record(
@@ -69,22 +331,11 @@ export function record(
   at: string = new Date().toISOString(),
   about?: Snapshot,
 ): State {
-  if (!ACTS.includes(act)) throw new Error(`Unknown act "${act}"; expected one of ${ACTS.join(', ')}`);
-  // The log owns its values: a host editing its document in place can't rewrite an act.
-  return {
-    ...state,
-    log: [
-      ...state.log,
-      {
-        sequence: state.log.length,
-        id,
-        act,
-        value: value == null ? value : structuredClone(value),
-        at,
-        ...(about && { about: structuredClone(about) }),
-      },
-    ],
-  };
+  const result = appendAct(state, { requestId: newActRequestId(), id, act, value, at, ...(about && { about }) });
+  if (result.status === 'refused') {
+    throw new Error(`Cannot record act without a checked sequence append: ${result.reason}`);
+  }
+  return result.state;
 }
 
 /** What an act is about, kept with it: markings, rule and place, never body text. */
@@ -473,13 +724,23 @@ export function docView(doc: Doc, state: State): Doc {
   const blocking = doc.document.blocking;
   // Every write since the lint waits for it, blocker or not: an alternative taken moves the banner too.
   // A write to a finding the lint withdrew has nowhere to go; its acts stay in `withdrawn`.
-  const pending = [...new Set(since(state).map((e) => e.id))].filter(
-    (id) => all.has(id) && !all.get(id)?.stale && writes(state, id),
-  );
-  const awaitingWrites = [...all.keys()]
-    .map((id) => writeIntent(state, id))
-    .filter((e): e is LogEntry => !!e)
-    .map(writeToken);
+  const pending = [
+    ...new Set([
+      ...(doc.document.pending ?? []),
+      ...since(state)
+        .map((e) => e.id)
+        .filter((id) => all.has(id) && !all.get(id)?.stale && writes(state, id)),
+    ]),
+  ];
+  const awaitingWrites = [
+    ...new Set([
+      ...(doc.document.awaitingWrites ?? []),
+      ...[...all.keys()]
+        .map((id) => writeIntent(state, id))
+        .filter((e): e is LogEntry => !!e)
+        .map(writeToken),
+    ]),
+  ];
   const withdrawn = [...new Set(state.log.map((e) => e.id))]
     .filter((id) => !all.has(id))
     .map((id) =>
