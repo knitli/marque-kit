@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Knitli Inc.
 // SPDX-License-Identifier: AGPL-3.0-only
 
-// Run the two ordinary-CAB DOM suites against the qualified #159 Node package.
+// Run ordinary-CAB DOM suites against the specified qualified Node package.
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
@@ -94,6 +94,7 @@ const files = [
   'packages/kit/test/dom/ordinary-cab-161.test.ts',
   'packages/kit/test/dom/ordinary-cab-preview-adversarial.test.ts',
   'packages/kit/test/dom/ordinary-cab-questions-adversarial.test.ts',
+  'packages/kit/test/dom/ordinary-cab-confirmation.test.ts',
   'packages/kit/test/dom/ordinary-source-evidence-165.test.ts',
   'packages/kit/test/dom/native-office-entry.test.ts',
   'packages/kit/test/dom/selected-audience.test.ts',
@@ -101,6 +102,8 @@ const files = [
   'packages/kit/test/dom/fixtures/ordinary-cab-basis-161.json',
   'packages/kit/test/dom/fixtures/ordinary-source-link-166.json',
   'packages/kit/test/dom/fixtures/ordinary-source-link-166.json.license',
+  'packages/kit/test/dom/fixtures/ordinary-successor-171.json',
+  'packages/kit/test/dom/fixtures/ordinary-successor-171.json.license',
   'packages/kit/test/dom/run-ordinary-cab-161.mjs',
 ];
 async function sourceHashes() {
@@ -141,6 +144,9 @@ try {
           '--run',
           'test/dom/ordinary-cab-161.test.ts',
           'test/dom/ordinary-cab-questions-adversarial.test.ts',
+          'test/dom/ordinary-cab-preview-adversarial.test.ts',
+          'test/dom/ordinary-source-evidence-165.test.ts',
+          'test/dom/ordinary-cab-confirmation.test.ts',
         ];
   const test = spawnSync(process.execPath, testArgs, {
     cwd: mode === 'full' ? root : kit,

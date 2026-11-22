@@ -158,9 +158,10 @@ export async function executePreview(
 ): Promise<Record<string, unknown>> {
   const encoder = new TextEncoder();
   const input = JSON.stringify(request);
-  if (encoder.encode(input).length > Math.min(maxBytes, 1_048_576)) throw new Error();
+  const limit = Math.min(maxBytes, 1_048_576);
+  if (input.length > limit || encoder.encode(input).length > limit) throw new Error();
   const output = await operation(input);
-  if (typeof output !== 'string' || encoder.encode(output).length > Math.min(maxBytes, 1_048_576)) throw new Error();
+  if (typeof output !== 'string' || output.length > limit || encoder.encode(output).length > limit) throw new Error();
   const value: unknown = JSON.parse(output);
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error();
   return value as Record<string, unknown>;

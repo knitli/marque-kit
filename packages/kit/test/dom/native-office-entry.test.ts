@@ -58,6 +58,7 @@ test('Office startup opens the provider native scope without falling back to sam
 test('ordinary CAB entry does not mount unrelated privileged source markings', async () => {
   vi.resetModules();
   const sourceOpen = vi.fn();
+  const unsubscribe = vi.fn();
   window.marqueOfficeSourceMarking = { open: sourceOpen } as unknown as NonNullable<
     typeof window.marqueOfficeSourceMarking
   >;
@@ -71,6 +72,8 @@ test('ordinary CAB entry does not mount unrelated privileged source markings', a
   const wordHost = {
     activeDocumentId: async () => session.documentId,
     applyCommitted: vi.fn(),
+    readOrdinaryCabGrant: async () => null,
+    watchOrdinaryCabInvalidation: () => unsubscribe,
   } as OfficeWordHost;
   document.body.innerHTML = '<div id="pane"></div><div id="note"></div><div id="sample"></div>';
   window.marqueOfficeWorkspace = { provider: { openWord: async () => session }, wordHost, nativeMaxBytes: 1_048_576 };
@@ -85,6 +88,8 @@ test('ordinary CAB entry does not mount unrelated privileged source markings', a
   await start({ host: 'Word' });
   expect(sourceOpen).not.toHaveBeenCalled();
   expect(document.querySelector('#pane')?.textContent).toContain('unavailable');
+  window.dispatchEvent(new Event('pagehide'));
+  expect(unsubscribe).toHaveBeenCalledOnce();
   delete window.marqueOfficeSourceMarking;
   delete window.marqueOfficeWorkspace;
   vi.unstubAllGlobals();

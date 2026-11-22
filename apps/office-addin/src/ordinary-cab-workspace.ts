@@ -18,6 +18,7 @@ import {
 import { isSameWordDocument } from './workspace.ts';
 import type {
   OfficeNativeWordSession,
+  OfficeOrdinaryCabConfirmationGrant,
   OfficeOrdinaryCabGrant,
   OfficeOrdinaryCabPreviewGrant,
   OfficeOrdinaryCabSourceLinkGrant,
@@ -184,9 +185,14 @@ type SourceLink = {
     cab_inspection?: {
       basis?: unknown;
       target?: unknown;
+      candidate?: unknown;
       layout_revision?: unknown;
       face_page?: unknown;
-      fields?: { readback?: { target?: unknown; layout_revision?: unknown; face_page?: unknown } | null }[];
+      fields?: {
+        field?: unknown;
+        occurrence?: unknown;
+        readback?: { target?: unknown; layout_revision?: unknown; face_page?: unknown } | null;
+      }[];
     };
   };
   source_examination?: unknown;
@@ -217,10 +223,9 @@ function hasSourcePermission(
   );
 }
 
-function matchesSourceCurrent(current: SourceCurrent, targetDocumentId: string): boolean {
+function matchesMemberCurrent(current: SourceCurrent): boolean {
   if (
     !id(current.documentId) ||
-    current.documentId === targetDocumentId ||
     !id(current.revisionId) ||
     !id(current.contributionId) ||
     !id(current.layoutRevision) ||
@@ -274,8 +279,7 @@ function matchesSourceFace(
   );
 }
 
-function matchesSourceLink(link: SourceLink, current: SourceCurrent, target: unknown): boolean {
-  const member = link?.member;
+function matchesMember(member: SourceLink['member'], current: SourceCurrent): boolean {
   const identity = {
     document_id: current.documentId,
     revision_id: current.revisionId,
@@ -299,7 +303,21 @@ function matchesSourceLink(link: SourceLink, current: SourceCurrent, target: unk
     canon(member.owner.intrinsic_classification_locator) === canon(current.owner.intrinsicClassificationLocator) &&
     member.format === 'document_content' &&
     member.source === current.text &&
-    matchesSourceFace(member.cab_inspection, current, sourceTarget) &&
+    matchesSourceFace(member.cab_inspection, current, sourceTarget)
+  );
+}
+
+function matchesSourceLink(link: SourceLink, current: SourceCurrent, target: unknown): boolean {
+  const member = link?.member;
+  const sourceTarget = {
+    document_id: current.documentId,
+    revision_id: current.revisionId,
+    contribution_id: current.contributionId,
+    scope_locator: current.scopeLocator,
+  };
+  return (
+    !!member &&
+    matchesMember(member, current) &&
     matchesSourceExamination({ member }, link.source_examination) &&
     !!target &&
     canon(link.target_use?.target) === canon(target) &&
@@ -318,7 +336,7 @@ function checkedSourceLinkGrant(
 ): string | null {
   if (!hasSourcePermission(grant, session, grantId, maxBytes)) return null;
   try {
-    if (!matchesSourceCurrent(grant.current, session.documentId)) return null;
+    if (grant.current.documentId === session.documentId || !matchesMemberCurrent(grant.current)) return null;
     const link = JSON.parse(grant.sourceLinkJson) as SourceLink;
     return matchesSourceLink(link, grant.current, target) ? JSON.stringify(grant) : null;
   } catch {
@@ -366,6 +384,275 @@ function checkedPreviewGrant(
   }
 }
 
+type ConfirmationPreview = {
+  mode?: unknown;
+  question_request?: { chain_id?: unknown; member?: SourceLink['member'] };
+  source_examination?: unknown;
+  preview_receipt?: unknown;
+  answers?: unknown;
+  source_link?: unknown;
+};
+type ConfirmationIdentities = {
+  target?: unknown;
+  preview_receipt?: unknown;
+  preview_fingerprint?: unknown;
+  candidate?: unknown;
+  layout_revision?: unknown;
+  observations?: unknown;
+};
+type ConfirmationMapping = {
+  target_id?: unknown;
+  target_revision_id?: unknown;
+  successor_source_id?: unknown;
+  successor_revision_id?: unknown;
+  successor_contribution?: unknown;
+};
+
+function acceptedConfirmationFields(preview: ConfirmationPreview, identities: ConfirmationIdentities, chain: string) {
+  if (!Array.isArray(preview.answers) || !Array.isArray(identities.observations)) return null;
+  if (preview.answers.length < 1 || preview.answers.length > fields.length) return null;
+  const accepted = new Set<string>();
+  const selected = new Set<NativeField>();
+  for (const value of preview.answers) {
+    if (!value || typeof value !== 'object') return null;
+    const answer = value as {
+      question?: { chain?: unknown; serial?: unknown; revision?: unknown; field?: unknown };
+      answer_id?: unknown;
+      value_reference?: unknown;
+    };
+    const q = answer.question;
+    if (
+      !q ||
+      q.chain !== chain ||
+      !id(q.serial) ||
+      !id(q.revision) ||
+      !fields.includes(q.field as NativeField) ||
+      selected.has(q.field as NativeField) ||
+      !id(answer.answer_id) ||
+      !id(answer.value_reference)
+    )
+      return null;
+    selected.add(q.field as NativeField);
+    accepted.add(canon([q, answer.answer_id, answer.value_reference]));
+  }
+  for (const value of identities.observations) {
+    if (!value || typeof value !== 'object') return null;
+    const row = value as { question?: unknown; answer_id?: unknown; value_reference?: unknown; locator?: unknown };
+    if (!id(row.locator) || !accepted.delete(canon([row.question, row.answer_id, row.value_reference]))) return null;
+  }
+  return accepted.size === 0 ? [...selected] : null;
+}
+
+function matchesSuccessorIdentities(
+  member: SourceLink['member'],
+  current: SourceCurrent,
+  value: ConfirmationIdentities,
+) {
+  const face = member?.cab_inspection;
+  if (
+    !face ||
+    canon(value.target) !== canon(face.target) ||
+    canon(value.candidate) !== canon(face.candidate) ||
+    value.layout_revision !== current.layoutRevision ||
+    !Array.isArray(value.observations) ||
+    value.observations.length > fields.length
+  )
+    return false;
+  const seen = new Set<unknown>();
+  for (const observation of value.observations) {
+    if (!observation || typeof observation !== 'object') return false;
+    const row = observation as { field?: unknown; occurrence?: unknown; value_reference?: unknown; locator?: unknown };
+    const matches = face.fields?.filter((field) => field.field === row.field);
+    if (
+      !fields.includes(row.field as NativeField) ||
+      seen.has(row.field) ||
+      !id(row.value_reference) ||
+      !id(row.locator) ||
+      matches?.length !== 1 ||
+      canon(matches[0]?.occurrence) !== canon(row.occurrence)
+    )
+      return false;
+    seen.add(row.field);
+  }
+  return true;
+}
+
+function hasConfirmationPermission(
+  grant: OfficeOrdinaryCabConfirmationGrant | null,
+  session: OfficeNativeWordSession,
+  maxBytes: number,
+) {
+  if (
+    !grant ||
+    grant.documentId !== session.documentId ||
+    grant.chain !== session.chain ||
+    grant.viewerId !== session.ordinaryCab?.viewerId ||
+    !id(grant.viewerId) ||
+    !id(grant.grantId) ||
+    !id(grant.permissionRevision) ||
+    !id(grant.logicalTargetId) ||
+    grant.authorizeRawInput !== true ||
+    grant.authorizeRawOutput !== true ||
+    grant.authorizeGroupOutcome !== true ||
+    !validDigest(grant.expectedReceipt) ||
+    !validDigest(grant.expectedPreviewFingerprint) ||
+    !validDigest(grant.expectedConfirmationReceipt) ||
+    (grant.sourceLinkGrantId !== undefined && !id(grant.sourceLinkGrantId)) ||
+    !Array.isArray(grant.disclosedFields) ||
+    grant.disclosedFields.length > fields.length ||
+    new Set(grant.disclosedFields).size !== grant.disclosedFields.length ||
+    grant.disclosedFields.some((field) => !fields.includes(field))
+  )
+    return false;
+  const jsons = [
+    grant.acceptedPreviewJson,
+    grant.acceptedValueIdentitiesJson,
+    grant.successorMemberJson,
+    grant.successorValueIdentitiesJson,
+    grant.correspondenceJson,
+  ];
+  if (grant.successorExaminationJson !== null) jsons.push(grant.successorExaminationJson);
+  if (grant.successorDirectUseJson !== undefined) jsons.push(grant.successorDirectUseJson);
+  const limit = Math.min(maxBytes, 1_048_576);
+  if (jsons.some((value) => typeof value !== 'string' || value.length > limit)) return false;
+  return jsons.reduce((total, value) => total + encoder.encode(value).length, 0) <= limit;
+}
+
+function checkedConfirmationGrant(
+  grant: OfficeOrdinaryCabConfirmationGrant | null,
+  session: OfficeNativeWordSession,
+  maxBytes: number,
+) {
+  if (!grant || !hasConfirmationPermission(grant, session, maxBytes)) return null;
+  try {
+    if (
+      !matchesMemberCurrent(grant.base) ||
+      !matchesMemberCurrent(grant.successor) ||
+      grant.base.documentId !== session.documentId ||
+      grant.successor.documentId !== session.documentId ||
+      grant.base.revisionId === grant.successor.revisionId
+    )
+      return null;
+    const preview = JSON.parse(grant.acceptedPreviewJson) as ConfirmationPreview;
+    const accepted = JSON.parse(grant.acceptedValueIdentitiesJson) as ConfirmationIdentities;
+    const member = JSON.parse(grant.successorMemberJson) as SourceLink['member'];
+    const examination: unknown =
+      grant.successorExaminationJson === null ? null : JSON.parse(grant.successorExaminationJson);
+    const identities = JSON.parse(grant.successorValueIdentitiesJson) as ConfirmationIdentities;
+    const mapping = JSON.parse(grant.correspondenceJson) as ConfirmationMapping;
+    const directUse: unknown =
+      grant.successorDirectUseJson === undefined ? undefined : JSON.parse(grant.successorDirectUseJson);
+    const baseMember = preview?.question_request?.member;
+    const target = baseMember?.cab_inspection?.target;
+    const successorTarget = member?.cab_inspection?.target;
+    const linked = preview?.source_link !== undefined;
+    if (
+      preview?.mode !== 'apply' ||
+      preview.question_request?.chain_id !== session.chain ||
+      !matchesMember(baseMember, grant.base) ||
+      !matchesSourceExamination(preview.question_request, preview.source_examination) ||
+      preview.preview_receipt !== grant.expectedReceipt ||
+      accepted?.preview_receipt !== grant.expectedReceipt ||
+      accepted.preview_fingerprint !== grant.expectedPreviewFingerprint ||
+      canon(accepted.target) !== canon(target) ||
+      !matchesMember(member, grant.successor) ||
+      (examination !== null && !matchesSourceExamination({ member }, examination)) ||
+      !matchesSuccessorIdentities(member, grant.successor, identities) ||
+      mapping?.target_id !== grant.logicalTargetId ||
+      mapping.target_revision_id !== grant.base.revisionId ||
+      mapping.successor_source_id !== grant.successor.documentId ||
+      mapping.successor_revision_id !== grant.successor.revisionId ||
+      mapping.successor_contribution !== grant.successor.contributionId ||
+      linked !== !!grant.sourceLinkGrantId ||
+      linked !== (directUse !== undefined) ||
+      (directUse !== undefined && canon((directUse as { target?: unknown } | null)?.target) !== canon(successorTarget))
+    )
+      return null;
+    const selected = acceptedConfirmationFields(preview, accepted, session.chain);
+    if (!selected) return null;
+    const successor = {
+      member,
+      source_examination: examination,
+      value_identities: identities,
+      ...(directUse === undefined ? {} : { direct_use: directUse }),
+    };
+    return {
+      key: JSON.stringify(grant),
+      selected,
+      target,
+      sourceLink: preview.source_link,
+      request: { preview, accepted_value_identities: accepted, successor, correspondence: mapping },
+    };
+  } catch {
+    return null;
+  }
+}
+
+function confirmationResult(
+  value: Record<string, unknown>,
+  selected: NativeField[],
+  expectedReceipt: string,
+): { status: 'confirmed'; fields: NativeField[] } | { status: 'different' | 'unavailable' } | null {
+  if (value.schema !== 'marque.ordinary-cab-confirmation.v1') return null;
+  if (value.status === 'unavailable' && value.confirmation === null) return { status: 'unavailable' as const };
+  if (
+    value.status !== 'available' ||
+    value.confirmation_receipt !== expectedReceipt ||
+    value.reason !== null ||
+    !value.confirmation ||
+    typeof value.confirmation !== 'object'
+  )
+    return null;
+  const result = value.confirmation as { schema?: unknown; version?: unknown; status?: unknown; fields?: unknown };
+  if (result.schema !== 'knitli.native-cab-field-confirmation.v1' || result.version !== 1) return null;
+  if ((result.status === 'different' || result.status === 'unavailable') && result.fields === null)
+    return { status: result.status };
+  if (result.status !== 'confirmed' || !Array.isArray(result.fields) || result.fields.length !== selected.length)
+    return null;
+  const expected = new Set(selected);
+  for (const field of result.fields) if (!expected.delete(field as NativeField)) return null;
+  return expected.size === 0 ? { status: 'confirmed' as const, fields: selected } : null;
+}
+
+function checkedSnapshot(
+  snapshot: unknown,
+  grant: OfficeOrdinaryCabGrant,
+  session: OfficeNativeWordSession,
+  maxBytes: number,
+) {
+  try {
+    const native = parseNativeJson(JSON.stringify(snapshot), maxBytes);
+    const doc: Doc = { findings: [], document: { blocking: [], artifacts: [], native_evaluation: native } };
+    return readCabSnapshot(doc, { ...grant.current, expectedChain: session.chain, maxBasisBytes: maxBytes });
+  } catch {
+    return null;
+  }
+}
+
+function questionSnapshot(
+  responseText: unknown,
+  grant: OfficeOrdinaryCabGrant,
+  session: OfficeNativeWordSession,
+  maxBytes: number,
+) {
+  const limit = Math.min(maxBytes, 1_048_576);
+  if (typeof responseText !== 'string' || responseText.length > limit || encoder.encode(responseText).length > limit)
+    return null;
+  try {
+    const response = JSON.parse(responseText);
+    if (
+      response?.schema !== 'marque.ordinary-cab-questions.v1' ||
+      response.status !== 'available' ||
+      response.reason !== null ||
+      !response.snapshot
+    )
+      return null;
+    return checkedSnapshot(response.snapshot, grant, session, maxBytes);
+  } catch {
+    return null;
+  }
+}
+
 /** Read a trusted provider with an independently current basis and host grants. */
 export function mountOrdinaryCabWorkspace(
   root: HTMLElement,
@@ -384,10 +671,12 @@ export function mountOrdinaryCabWorkspace(
   };
   const provider = session.ordinaryCab;
   const viewerId = provider?.viewerId;
+  const isCurrent = (attempt: number) =>
+    !disposed && attempt === generation && session.ordinaryCab === provider && provider?.viewerId === viewerId;
   if (
     provider &&
     host.watchOrdinaryCabInvalidation &&
-    host.readOrdinaryCabGrant &&
+    (host.readOrdinaryCabGrant || host.readOrdinaryCabConfirmationGrant) &&
     Number.isSafeInteger(maxBytes) &&
     maxBytes! > 0
   ) {
@@ -397,57 +686,43 @@ export function mountOrdinaryCabWorkspace(
       /* unavailable */
     }
   }
+  function addConfirmationButton(section: HTMLElement) {
+    if (!provider?.confirm || !host.readOrdinaryCabConfirmationGrant) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Check accepted answers';
+    button.addEventListener('click', () => void confirm());
+    section.append(button);
+  }
   async function refresh() {
     revoke();
     const attempt = generation;
-    if (!provider || typeof unsubscribe !== 'function' || !host.readOrdinaryCabGrant || !maxBytes) return;
+    if (!provider || typeof unsubscribe !== 'function' || !maxBytes) return;
     try {
-      if (!(await isSameWordDocument(host, session)) || disposed || attempt !== generation) return;
+      if (!(await isSameWordDocument(host, session)) || !isCurrent(attempt)) return;
+      if (provider.confirm && host.readOrdinaryCabConfirmationGrant) {
+        const section = document.createElement('section');
+        const message = document.createElement('p');
+        message.textContent = 'The current authority block questions are unavailable.';
+        section.append(message);
+        addConfirmationButton(section);
+        root.replaceChildren(section);
+      }
+      if (!host.readOrdinaryCabGrant) return;
       const grant = await host.readOrdinaryCabGrant(session.documentId, session.chain, viewerId!);
       const fingerprint = checkedGrant(grant, session, maxBytes);
-      if (
-        !fingerprint ||
-        !grant ||
-        disposed ||
-        attempt !== generation ||
-        session.ordinaryCab !== provider ||
-        provider.viewerId !== viewerId
-      )
-        return;
+      if (!fingerprint || !grant || !isCurrent(attempt)) return;
       const authorized = JSON.parse(fingerprint) as OfficeOrdinaryCabGrant;
       const responseText = await provider.evaluate(authorized.requestJson);
-      if (
-        typeof responseText !== 'string' ||
-        responseText.length > Math.min(maxBytes, 1_048_576) ||
-        encoder.encode(responseText).length > Math.min(maxBytes, 1_048_576) ||
-        disposed ||
-        attempt !== generation
-      )
-        return;
-      const response = JSON.parse(responseText);
-      if (
-        response?.schema !== 'marque.ordinary-cab-questions.v1' ||
-        response.status !== 'available' ||
-        response.reason !== null ||
-        !response.snapshot
-      )
-        return;
-      const native = parseNativeJson(JSON.stringify(response.snapshot), maxBytes);
-      const doc: Doc = { findings: [], document: { blocking: [], artifacts: [], native_evaluation: native } };
-      const evaluated = readCabSnapshot(doc, {
-        ...authorized.current,
-        expectedChain: session.chain,
-        maxBasisBytes: maxBytes,
-      });
-      if (!evaluated || !('findings' in evaluated)) return;
+      if (!isCurrent(attempt)) return;
+      const snapshot = questionSnapshot(responseText, authorized, session, maxBytes);
+      if (!snapshot || !('findings' in snapshot)) return;
+      const evaluated = snapshot as NativeEvaluationV2;
       const latest = await host.readOrdinaryCabGrant(session.documentId, session.chain, viewerId!);
       if (
         checkedGrant(latest, session, maxBytes) !== fingerprint ||
         !(await isSameWordDocument(host, session)) ||
-        disposed ||
-        attempt !== generation ||
-        session.ordinaryCab !== provider ||
-        provider.viewerId !== viewerId
+        !isCurrent(attempt)
       )
         return;
       const section = document.createElement('section');
@@ -476,6 +751,7 @@ export function mountOrdinaryCabWorkspace(
         button.addEventListener('click', () => void preview());
         section.append(button);
       }
+      addConfirmationButton(section);
       displayedGrant = fingerprint;
       root.replaceChildren(section);
     } catch {
@@ -485,7 +761,7 @@ export function mountOrdinaryCabWorkspace(
   async function preview() {
     const originalGrant = displayedGrant;
     const original = root.firstElementChild?.cloneNode(true) as HTMLElement | undefined;
-    original?.querySelector('button')?.remove();
+    original?.querySelectorAll('button').forEach((button) => button.remove());
     displayedGrant = null;
     const attempt = ++generation;
     root.textContent = 'The authority block preview is unavailable.';
@@ -503,7 +779,7 @@ export function mountOrdinaryCabWorkspace(
       const baseKey = checkedGrant(base, session, maxBytes);
       const permission = await host.readOrdinaryCabPreviewGrant(session.documentId, session.chain, viewerId!);
       const permissionKey = checkedPreviewGrant(permission, session, maxBytes);
-      if (!baseKey || baseKey !== originalGrant || !original || !permissionKey || !base || !permission) return;
+      if (!baseKey || baseKey !== originalGrant || !original || !permissionKey) return;
       const authorized = JSON.parse(baseKey) as OfficeOrdinaryCabGrant;
       const previewGrant = JSON.parse(permissionKey) as OfficeOrdinaryCabPreviewGrant;
       const questionRequest: unknown = JSON.parse(authorized.requestJson);
@@ -523,10 +799,7 @@ export function mountOrdinaryCabWorkspace(
         ? JSON.parse((JSON.parse(sourceKey) as OfficeOrdinaryCabSourceLinkGrant).sourceLinkJson)
         : undefined;
       const current = async () =>
-        !disposed &&
-        attempt === generation &&
-        session.ordinaryCab === provider &&
-        provider.viewerId === viewerId &&
+        isCurrent(attempt) &&
         provider.preview === previewOperation &&
         checkedGrant(
           await host.readOrdinaryCabGrant!(session.documentId, session.chain, viewerId!),
@@ -548,25 +821,10 @@ export function mountOrdinaryCabWorkspace(
               maxBytes,
             ) === sourceKey)) &&
         (await isSameWordDocument(host, session)) &&
-        !disposed &&
-        attempt === generation &&
-        session.ordinaryCab === provider &&
-        provider.viewerId === viewerId &&
+        isCurrent(attempt) &&
         provider.preview === previewOperation;
       if (!(await current())) return;
-      const validSnapshot = (snapshot: unknown) => {
-        try {
-          const native = parseNativeJson(JSON.stringify(snapshot), maxBytes);
-          const doc: Doc = { findings: [], document: { blocking: [], artifacts: [], native_evaluation: native } };
-          return readCabSnapshot(doc, {
-            ...authorized.current,
-            expectedChain: session.chain,
-            maxBasisBytes: maxBytes,
-          });
-        } catch {
-          return null;
-        }
-      };
+      const validSnapshot = (snapshot: unknown) => checkedSnapshot(snapshot, authorized, session, maxBytes);
       const prepared = await executePreview(
         previewOperation,
         {
@@ -622,9 +880,83 @@ export function mountOrdinaryCabWorkspace(
         line.textContent = `${labels[row.field]}: ${outcome}.`;
         section.append(line);
       }
+      addConfirmationButton(section);
       root.replaceChildren(original, section);
     } catch {
       /* keep revoked */
+    }
+  }
+  async function confirm() {
+    displayedGrant = null;
+    const attempt = ++generation;
+    root.textContent = 'The accepted answers could not be checked.';
+    if (!provider?.confirm || !host.readOrdinaryCabConfirmationGrant || typeof unsubscribe !== 'function' || !maxBytes)
+      return;
+    const operation = provider.confirm;
+    try {
+      const grant = await host.readOrdinaryCabConfirmationGrant(session.documentId, session.chain, viewerId!);
+      const checked = checkedConfirmationGrant(grant, session, maxBytes);
+      if (!grant || !checked) return;
+      const authorized = JSON.parse(checked.key) as OfficeOrdinaryCabConfirmationGrant;
+      const sourceId = authorized.sourceLinkGrantId;
+      let sourceKey: string | null = null;
+      if (sourceId) {
+        if (!host.readOrdinaryCabSourceLinkGrant) return;
+        const source = await host.readOrdinaryCabSourceLinkGrant(session.documentId, session.chain, viewerId!);
+        sourceKey = checkedSourceLinkGrant(source, session, sourceId, checked.target, maxBytes);
+        if (
+          !sourceKey ||
+          canon(JSON.parse((JSON.parse(sourceKey) as OfficeOrdinaryCabSourceLinkGrant).sourceLinkJson)) !==
+            canon(checked.sourceLink)
+        )
+          return;
+      }
+      const current = async () =>
+        isCurrent(attempt) &&
+        provider.confirm === operation &&
+        checkedConfirmationGrant(
+          await host.readOrdinaryCabConfirmationGrant!(session.documentId, session.chain, viewerId!),
+          session,
+          maxBytes,
+        )?.key === checked.key &&
+        (!sourceId ||
+          (!!host.readOrdinaryCabSourceLinkGrant &&
+            checkedSourceLinkGrant(
+              await host.readOrdinaryCabSourceLinkGrant(session.documentId, session.chain, viewerId!),
+              session,
+              sourceId,
+              checked.target,
+              maxBytes,
+            ) === sourceKey)) &&
+        (await isSameWordDocument(host, session)) &&
+        isCurrent(attempt) &&
+        provider.confirm === operation;
+      if (!(await current())) return;
+      const response = await executePreview(operation, checked.request, maxBytes);
+      if (!(await current())) return;
+      const result = confirmationResult(response, checked.selected, authorized.expectedConfirmationReceipt);
+      if (!result || result.status === 'unavailable') return;
+      if (result.status === 'different') {
+        root.textContent = 'The accepted answers do not match the current authority block.';
+        return;
+      }
+      if (result.status !== 'confirmed') return;
+      const section = document.createElement('section');
+      const heading = document.createElement('h2');
+      heading.textContent = 'Accepted answers checked';
+      section.append(heading);
+      const note = document.createElement('p');
+      note.textContent = 'These fields match the authority block in the checked revision.';
+      section.append(note);
+      for (const field of result.fields) {
+        if (!authorized.disclosedFields.includes(field)) continue;
+        const line = document.createElement('p');
+        line.textContent = `${labels[field]}: matches.`;
+        section.append(line);
+      }
+      root.replaceChildren(section);
+    } catch {
+      /* keep unavailable */
     }
   }
   const ready = refresh();
