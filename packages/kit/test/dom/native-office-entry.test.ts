@@ -28,7 +28,12 @@ test('Office startup opens the provider native scope without falling back to sam
     kind: 'native_cab',
     nativeCab: { documentId: target.document_id, chain: 'chain', wire: JSON.stringify(wire), request },
   } as unknown as OfficeNativeWordSession;
-  const wordHost = { activeDocumentId: async () => target.document_id, applyCommitted: write } as OfficeWordHost;
+  const wordHost = {
+    activeDocumentId: async () => target.document_id,
+    applyCommitted: write,
+    watchNativeCabInvalidation: () => () => {},
+    readNativeCabScope: async () => request,
+  } as OfficeWordHost;
   document.body.innerHTML = '<div id="pane"></div><div id="note"></div><div id="sample"></div>';
   window.marqueOfficeWorkspace = { provider: { openWord: async () => session }, wordHost, nativeMaxBytes: 1_048_576 };
   let start!: (info: { host: string }) => Promise<void>;
@@ -40,7 +45,9 @@ test('Office startup opens the provider native scope without falling back to sam
   });
   await import('../../../../apps/office-addin/src/taskpane.ts');
   await start({ host: 'Word' });
-  expect(document.querySelector('#pane')?.textContent).toContain('Authority block evaluation is incomplete.');
+  await vi.waitFor(() =>
+    expect(document.querySelector('#pane')?.textContent).toContain('Authority block evaluation is incomplete.'),
+  );
   expect(document.querySelector('#pane')?.textContent).not.toContain('Needs you');
   expect(document.querySelector('#pane')?.querySelectorAll('button, input, form')).toHaveLength(0);
   expect(write).not.toHaveBeenCalled();

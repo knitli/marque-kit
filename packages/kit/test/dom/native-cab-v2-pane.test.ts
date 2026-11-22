@@ -85,8 +85,14 @@ describe('native v2 read-only pane', () => {
       },
       readNativeCab: read,
     } as unknown as OfficeNativeWordSession;
-    const host = { activeDocumentId: async () => session.documentId, applyCommitted: write } as OfficeWordHost;
+    const host = {
+      activeDocumentId: async () => session.documentId,
+      applyCommitted: write,
+      watchNativeCabInvalidation: () => () => {},
+      readNativeCabScope: async () => first.request,
+    } as OfficeWordHost;
     const pane = mountNativeWorkspace(root, session, host, 1_048_576);
+    await pane.ready;
     expect(root.textContent).toContain('Source coverage is complete.');
     read.mockResolvedValueOnce({
       documentId: session.documentId,
@@ -259,5 +265,172 @@ describe('native v2 read-only pane', () => {
       const { doc, request } = setup(JSON.stringify(x));
       expect(readCabSnapshot(doc, request)).toBeNull();
     }
+  });
+  test('trusted invalidation clears without refresh and stale reads cannot restore the pane', async () => {
+    const { request, e } = setup(raw('funded'));
+    const root = document.createElement('div');
+    const write = vi.fn();
+    let invalidate!: () => void;
+    let finish!: (value: typeof session.nativeCab) => void;
+    const delayed = new Promise<typeof session.nativeCab>((resolve) => {
+      finish = resolve;
+    });
+    const session = {
+      kind: 'native_cab',
+      documentId: request.target.document_id,
+      chain: e.evaluation.chain!,
+      nativeCab: { documentId: request.target.document_id, chain: e.evaluation.chain!, wire: raw('funded') },
+      readNativeCab: () => delayed,
+    };
+    let unsubscribed = false;
+    const host = {
+      activeDocumentId: async () => session.documentId,
+      applyCommitted: write,
+      watchNativeCabInvalidation: (_d: string, _c: string, cb: () => void) => {
+        invalidate = cb;
+        return () => {
+          unsubscribed = true;
+        };
+      },
+      readNativeCabScope: async () => request,
+    } as OfficeWordHost;
+    const pane = mountNativeWorkspace(root, session as unknown as OfficeNativeWordSession, host, 1_048_576);
+    await pane.ready;
+    expect(root.textContent).toContain('Additional information is needed.');
+    invalidate();
+    expect(root.textContent).not.toContain('Additional information is needed.');
+    const pending = pane.refresh();
+    await Promise.resolve();
+    await Promise.resolve();
+    invalidate();
+    finish(session.nativeCab);
+    await pending;
+    expect(root.textContent).toContain('evaluation is unavailable');
+    expect(root.textContent).not.toContain('Additional information is needed.');
+    pane.destroy();
+    expect(unsubscribed).toBe(true);
+    expect(write).not.toHaveBeenCalled();
+  });
+  test('without trusted invalidation and independent scope the native route stays unavailable', async () => {
+    const { request, e } = setup(raw('funded'));
+    const root = document.createElement('div');
+    const session = {
+      kind: 'native_cab',
+      documentId: request.target.document_id,
+      chain: e.evaluation.chain!,
+      nativeCab: { documentId: request.target.document_id, chain: e.evaluation.chain!, wire: raw('funded'), request },
+    } as unknown as OfficeNativeWordSession;
+    const host = { activeDocumentId: async () => session.documentId } as OfficeWordHost;
+    const pane = mountNativeWorkspace(root, session, host, 1_048_576);
+    await pane.ready;
+    expect(root.textContent).toContain('evaluation is unavailable');
+    expect(root.textContent).not.toContain('Additional information is needed.');
+    pane.destroy();
+  });
+  test('independently obtained host scope overrides a matching provider claim', async () => {
+    const { request, e } = setup(raw('funded'));
+    const stale = structuredClone(request);
+    const basis = JSON.parse(stale.currentBasisJson);
+    basis.basis.source_revisions[0].revision_id = 'changed-revision';
+    stale.currentBasisJson = JSON.stringify(basis);
+    const session = {
+      kind: 'native_cab',
+      documentId: request.target.document_id,
+      chain: e.evaluation.chain!,
+      nativeCab: { documentId: request.target.document_id, chain: e.evaluation.chain!, wire: raw('funded'), request },
+    } as unknown as OfficeNativeWordSession;
+    const root = document.createElement('div');
+    const host = {
+      activeDocumentId: async () => session.documentId,
+      watchNativeCabInvalidation: () => () => {},
+      readNativeCabScope: async () => stale,
+    } as unknown as OfficeWordHost;
+    const pane = mountNativeWorkspace(root, session, host, 1_048_576);
+    await pane.ready;
+    expect(root.textContent).toContain('evaluation is unavailable');
+    expect(root.textContent).not.toContain('Additional information is needed.');
+    pane.destroy();
+  });
+  test('actual fresh typed r2 shows satisfied requirement with its resolved finding absent', () => {
+    const { e, doc, request } = setup(raw('post-write'));
+    expect(readCabSnapshot(doc, request)).not.toBeNull();
+    expect(e.evaluation.requirements.find((r) => r.field === 'classified_by')?.state).toBe('satisfied');
+    expect(e.evaluation.findings.items.some((f) => f.question?.field === 'classified_by')).toBe(false);
+    const root = document.createElement('div');
+    const pane = mount(root, { doc, nativeCabRequest: request });
+    expect(root.textContent).toContain('satisfied');
+    expect(root.textContent?.match(/Additional information is needed/g)).toHaveLength(2);
+    pane.destroy();
+  });
+  test('pending or failed independent host scope cannot flash the initial provider data', async () => {
+    const { request, e } = setup(raw('funded'));
+    const root = document.createElement('div');
+    let finish!: (scope: typeof request | null) => void;
+    const pending = new Promise<typeof request | null>((resolve) => {
+      finish = resolve;
+    });
+    const session = {
+      kind: 'native_cab',
+      documentId: request.target.document_id,
+      chain: e.evaluation.chain!,
+      nativeCab: { documentId: request.target.document_id, chain: e.evaluation.chain!, wire: raw('funded'), request },
+    } as unknown as OfficeNativeWordSession;
+    const host = {
+      activeDocumentId: async () => session.documentId,
+      watchNativeCabInvalidation: () => () => {},
+      readNativeCabScope: () => pending,
+    } as unknown as OfficeWordHost;
+    const pane = mountNativeWorkspace(root, session, host, 1_048_576);
+    await Promise.resolve();
+    expect(root.textContent).toContain('evaluation is unavailable');
+    expect(root.textContent).not.toContain('Additional information is needed.');
+    finish(null);
+    await pane.ready;
+    expect(root.textContent).toContain('evaluation is unavailable');
+    pane.destroy();
+  });
+  test('subscription failure leaves route unavailable', async () => {
+    const { request, e } = setup(raw('funded'));
+    const root = document.createElement('div');
+    const session = {
+      kind: 'native_cab',
+      documentId: request.target.document_id,
+      chain: e.evaluation.chain!,
+      nativeCab: { documentId: request.target.document_id, chain: e.evaluation.chain!, wire: raw('funded') },
+    } as unknown as OfficeNativeWordSession;
+    const host = {
+      activeDocumentId: async () => session.documentId,
+      watchNativeCabInvalidation: () => {
+        throw Error('subscription failed');
+      },
+      readNativeCabScope: async () => request,
+    } as unknown as OfficeWordHost;
+    const pane = mountNativeWorkspace(root, session, host, 1_048_576);
+    await pane.ready;
+    expect(root.textContent).toContain('evaluation is unavailable');
+    expect(root.textContent).not.toContain('Additional information is needed.');
+    pane.destroy();
+  });
+  test('failed subscription cleanup still clears the mounted view', async () => {
+    const { request, e } = setup(raw('funded'));
+    const root = document.createElement('div');
+    const session = {
+      kind: 'native_cab',
+      documentId: request.target.document_id,
+      chain: e.evaluation.chain!,
+      nativeCab: { documentId: request.target.document_id, chain: e.evaluation.chain!, wire: raw('funded') },
+    } as unknown as OfficeNativeWordSession;
+    const host = {
+      activeDocumentId: async () => session.documentId,
+      watchNativeCabInvalidation: () => () => {
+        throw Error('cleanup failed');
+      },
+      readNativeCabScope: async () => request,
+    } as unknown as OfficeWordHost;
+    const pane = mountNativeWorkspace(root, session, host, 1_048_576);
+    await pane.ready;
+    expect(root.textContent).toContain('Additional information is needed.');
+    pane.destroy();
+    expect(root.textContent).toBe('');
   });
 });

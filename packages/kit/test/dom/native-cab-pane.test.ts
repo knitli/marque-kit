@@ -112,8 +112,13 @@ describe('native CAB pane', () => {
       nativeCab: { documentId: active, chain: 'chain', wire: JSON.stringify(a), request: req },
       readNativeCab,
     } as unknown as OfficeNativeWordSession;
-    const host = { activeDocumentId: async () => active } as OfficeWordHost;
+    const host = {
+      activeDocumentId: async () => active,
+      watchNativeCabInvalidation: () => () => {},
+      readNativeCabScope: async () => req,
+    } as unknown as OfficeWordHost;
     const pane = mountNativeWorkspace(n, session, host, 1_048_576);
+    await pane.ready;
     expect(n.textContent).toContain('Source coverage is complete.');
     const refresh = pane.refresh();
     expect(n.textContent).not.toContain('Classified by');
@@ -141,8 +146,14 @@ describe('native CAB pane', () => {
       readNativeCab: read,
       applyCommitted: write,
     } as unknown as OfficeNativeWordSession;
-    const host = { activeDocumentId: async () => session.documentId, applyCommitted: write } as OfficeWordHost;
+    const host = {
+      activeDocumentId: async () => session.documentId,
+      applyCommitted: write,
+      watchNativeCabInvalidation: () => () => {},
+      readNativeCabScope: async () => request,
+    } as unknown as OfficeWordHost;
     const pane = mountNativeWorkspace(n, session, host, 1_048_576);
+    await pane.ready;
     read.mockResolvedValueOnce({
       documentId: session.documentId,
       chain: session.chain,
@@ -152,7 +163,7 @@ describe('native CAB pane', () => {
     await pane.refresh();
     expect(n.textContent).toContain('Source coverage is partial.');
     expect(n.textContent).toContain('unsatisfied');
-    read.mockResolvedValueOnce({ documentId: session.documentId, chain: session.chain, wire: JSON.stringify(b) });
+    read.mockResolvedValueOnce({ documentId: session.documentId, chain: session.chain, wire: '{' });
     await pane.refresh();
     expect(n.textContent).toContain('unavailable');
     expect(n.textContent).not.toContain('unsatisfied');
@@ -177,7 +188,11 @@ describe('native CAB pane', () => {
       nativeCab: { documentId: request.target.document_id, chain: 'chain', wire: JSON.stringify(a), request },
       readNativeCab: read,
     } as unknown as OfficeNativeWordSession;
-    const host = { activeDocumentId: async () => session.documentId } as OfficeWordHost;
+    const host = {
+      activeDocumentId: async () => session.documentId,
+      watchNativeCabInvalidation: () => () => {},
+      readNativeCabScope: async () => request,
+    } as unknown as OfficeWordHost;
     read.mockReturnValueOnce(first).mockResolvedValueOnce({
       documentId: session.documentId,
       chain: session.chain,
@@ -185,6 +200,7 @@ describe('native CAB pane', () => {
       request: requestFor(b),
     });
     const pane = mountNativeWorkspace(n, session, host, 1_048_576);
+    await pane.ready;
     const older = pane.refresh();
     await Promise.resolve();
     await Promise.resolve();
