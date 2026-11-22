@@ -14,6 +14,33 @@ const fields: readonly NativeField[] = [
 type Question = { chain?: unknown; serial?: unknown; revision?: unknown; field?: unknown };
 const key = (q: Question) => JSON.stringify([q.chain, q.serial, q.revision, q.field]);
 
+/** A canonical unkeyed digest has a fixed prefix and 64 lowercase hex digits. */
+export function validDigest(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length !== 71 || !value.startsWith('blake3:')) return false;
+  for (const char of value.slice(7)) {
+    if (!'0123456789abcdef'.includes(char)) return false;
+  }
+  return true;
+}
+
+/** The host examination must refer to the independently granted source scope. */
+export function matchesSourceExamination(request: unknown, source: unknown): boolean {
+  if (!request || typeof request !== 'object' || !source || typeof source !== 'object' || Array.isArray(source))
+    return false;
+  const member = (
+    request as {
+      member?: { cab_inspection?: { target?: unknown }; owner?: { intrinsic_classification_locator?: unknown } };
+    }
+  ).member;
+  const examination = source as { target?: unknown; intrinsic_classification_locator?: unknown };
+  return (
+    !!member?.cab_inspection?.target &&
+    !!member.owner?.intrinsic_classification_locator &&
+    canon(examination.target) === canon(member.cab_inspection.target) &&
+    canon(examination.intrinsic_classification_locator) === canon(member.owner.intrinsic_classification_locator)
+  );
+}
+
 /** Only the current base may issue handles used by the separately granted group. */
 export function issuedAnswers(base: NativeEvaluationV2, answers: unknown): answers is { question: Question }[] {
   if (!Array.isArray(answers) || answers.length < 1 || answers.length > 16) return false;
@@ -142,6 +169,7 @@ export async function executePreview(
 /** Bind each response to independently qualified commitments and the same base. */
 export function preparedPreview(response: Record<string, unknown>, expectedReceipt: string): boolean {
   return (
+    validDigest(expectedReceipt) &&
     response.schema === 'marque.ordinary-cab-preview.v1' &&
     response.status === 'available' &&
     response.reason === null &&
@@ -155,6 +183,7 @@ export function appliedPreview(
   expectedFingerprint: string,
 ): boolean {
   return (
+    validDigest(expectedFingerprint) &&
     preparedPreview(response, String(prepared.preview_receipt)) &&
     response.preview_fingerprint === expectedFingerprint &&
     JSON.stringify(response.snapshot) === JSON.stringify(prepared.snapshot)

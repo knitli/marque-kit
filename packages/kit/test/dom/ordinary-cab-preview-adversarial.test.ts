@@ -305,8 +305,8 @@ test.skipIf(!process.env.MARQUE_163_WASM)(
     const wasm = realEngine();
     for (const denial of ['none', 'input', 'output', 'viewer'] as const) {
       const grant = independentlyQualifiedGrant(wasm);
-      if (denial === 'input') Object.assign(grant, { authorizeRawInput: false });
-      if (denial === 'output') Object.assign(grant, { authorizeRawOutput: false });
+      if (denial === 'input') (grant as unknown as { authorizeRawInput: boolean }).authorizeRawInput = false;
+      if (denial === 'output') (grant as unknown as { authorizeRawOutput: boolean }).authorizeRawOutput = false;
       if (denial === 'viewer') grant.viewerId = 'another-viewer';
       const f = setup(async (input) => wasm.evaluate_ordinary_cab_preview(input), denial === 'none' ? null : grant);
       await f.pane.ready;
@@ -404,8 +404,8 @@ test.each([
   'wrong examination classification locator',
 ] as const)('requires a separate current preview grant: %s', async (denial) => {
   const grant = previewGrant();
-  if (denial === 'input') Object.assign(grant, { authorizeRawInput: false });
-  if (denial === 'output') Object.assign(grant, { authorizeRawOutput: false });
+  if (denial === 'input') (grant as unknown as { authorizeRawInput: boolean }).authorizeRawInput = false;
+  if (denial === 'output') (grant as unknown as { authorizeRawOutput: boolean }).authorizeRawOutput = false;
   if (denial === 'viewer') grant.viewerId = 'another-viewer';
   if (denial === 'document') grant.documentId = 'another-document';
   if (denial === 'chain') grant.chain = 'another-chain';

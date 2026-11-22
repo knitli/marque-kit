@@ -59,3 +59,8 @@ preview suite passed 30/30. The Node package was copied to a clean temporary
 directory with a CommonJS manifest; its hashes were checked before and after.
 The full suite used the prior bounded runner with `MARQUE_163_WASM` set to that
 copy, and the focused command above used the same environment variable.
+
+After the hosted analysis cleanup, the frozen-product focused suite again passed
+30/30, the three-product full suite again passed 50 Node and 238 DOM tests with
+the same intentional mismatch skip, and all three package builds passed. The
+cleanup retains exact commitment validation and the same host currentness checks.

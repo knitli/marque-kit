@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { readCabSnapshot } from '@knitli/marque-kit-core/native-cab';
-import { canon } from '@knitli/marque-kit-core/state';
 import { parseNativeBasisJson, parseNativeJson } from '@knitli/marque-kit-core/native-wire';
 import type { NativeEvaluationV2, NativeField } from '@knitli/marque-kit-core/native-wire';
 import type { Doc } from '@knitli/marque-kit-core/types';
@@ -10,8 +9,10 @@ import {
   appliedPreview,
   executePreview,
   issuedAnswers,
+  matchesSourceExamination,
   preparedPreview,
   projectedRows,
+  validDigest,
 } from './ordinary-cab-preview.ts';
 import { isSameWordDocument } from './workspace.ts';
 import type {
@@ -178,10 +179,8 @@ function checkedPreviewGrant(
     !id(grant.viewerId) ||
     !id(grant.grantId) ||
     !id(grant.permissionRevision) ||
-    typeof grant.expectedReceipt !== 'string' ||
-    !/^blake3:[0-9a-f]{64}$/.test(grant.expectedReceipt) ||
-    typeof grant.expectedPreviewFingerprint !== 'string' ||
-    !/^blake3:[0-9a-f]{64}$/.test(grant.expectedPreviewFingerprint) ||
+    !validDigest(grant.expectedReceipt) ||
+    !validDigest(grant.expectedPreviewFingerprint) ||
     grant.authorizeRawInput !== true ||
     grant.authorizeRawOutput !== true ||
     typeof grant.sourceExaminationJson !== 'string' ||
@@ -373,23 +372,7 @@ export function mountOrdinaryCabWorkspace(
       const previewGrant = JSON.parse(permissionKey) as OfficeOrdinaryCabPreviewGrant;
       const questionRequest: unknown = JSON.parse(authorized.requestJson);
       const sourceExamination: unknown = JSON.parse(previewGrant.sourceExaminationJson);
-      const requestMember = (
-        questionRequest as {
-          member?: { cab_inspection?: { target?: unknown }; owner?: { intrinsic_classification_locator?: unknown } };
-        }
-      ).member;
-      const examination = sourceExamination as { target?: unknown; intrinsic_classification_locator?: unknown } | null;
-      if (
-        !sourceExamination ||
-        typeof sourceExamination !== 'object' ||
-        Array.isArray(sourceExamination) ||
-        !requestMember?.cab_inspection?.target ||
-        !requestMember.owner?.intrinsic_classification_locator ||
-        canon(examination?.target) !== canon(requestMember.cab_inspection.target) ||
-        canon(examination?.intrinsic_classification_locator) !==
-          canon(requestMember.owner.intrinsic_classification_locator)
-      )
-        return;
+      if (!matchesSourceExamination(questionRequest, sourceExamination)) return;
       const validSnapshot = (snapshot: unknown) => {
         try {
           const native = parseNativeJson(JSON.stringify(snapshot), maxBytes);
