@@ -35,7 +35,7 @@ export interface OfficeWordHost {
     documentId: string,
     chain: string,
   ): Promise<Omit<NativeCabRequest, 'maxBasisBytes' | 'expectedChain'> | null>;
-  /** Revoke before target or source, viewer, grant, permission, provider, layout, formatting or answer changes. */
+  /** Revoke before target, successor or source, viewer, grant, permission, provider, layout, formatting or answer changes. */
   watchOrdinaryCabInvalidation?(
     documentId: string,
     chain: string,
@@ -56,6 +56,12 @@ export interface OfficeWordHost {
     chain: string,
     viewerId: string,
   ): Promise<OfficeOrdinaryCabSourceLinkGrant | null>;
+  /** Independently grant this viewer an exact accepted group and current successor comparison. */
+  readOrdinaryCabConfirmationGrant?(
+    documentId: string,
+    chain: string,
+    viewerId: string,
+  ): Promise<OfficeOrdinaryCabConfirmationGrant | null>;
   /** Independent current owner, source text and layout revision. */
   readNativeCabPlacementScope?(documentId: string, chain: string): Promise<OfficeCabPlacementScope | null>;
   /** Revoke before any selected source, selection, viewer, grant or provider changes. */
@@ -157,6 +163,22 @@ export interface OfficeOrdinaryCabPreviewGrant {
   disclosedFields: NativeField[];
 }
 
+/** Independently observed member, owner and face. */
+export interface OfficeOrdinaryCabMemberScope {
+  documentId: string;
+  revisionId: string;
+  contributionId: string;
+  scopeLocator: [number, number];
+  text: string;
+  layoutRevision: string;
+  facePage: number;
+  owner: {
+    role: 'transmittal' | 'attachment';
+    parentDocumentId: string | null;
+    intrinsicClassificationLocator: [number, number];
+  };
+}
+
 /** Independent authority for a linked source; raw-output permission includes commitments to its inputs. */
 export interface OfficeOrdinaryCabSourceLinkGrant {
   documentId: string;
@@ -166,21 +188,39 @@ export interface OfficeOrdinaryCabSourceLinkGrant {
   permissionRevision: string;
   authorizeRawInput: true;
   authorizeRawOutput: true;
-  current: {
-    documentId: string;
-    revisionId: string;
-    contributionId: string;
-    scopeLocator: [number, number];
-    text: string;
-    layoutRevision: string;
-    facePage: number;
-    owner: {
-      role: 'transmittal' | 'attachment';
-      parentDocumentId: string | null;
-      intrinsicClassificationLocator: [number, number];
-    };
-  };
+  current: OfficeOrdinaryCabMemberScope;
   sourceLinkJson: string;
+}
+
+/** Read authority for an accepted group and separately observed successor, never write authority. */
+export interface OfficeOrdinaryCabConfirmationGrant {
+  documentId: string;
+  chain: string;
+  viewerId: string;
+  grantId: string;
+  permissionRevision: string;
+  authorizeRawInput: true;
+  authorizeRawOutput: true;
+  /** Separate permission to show the outcome for the entire accepted group. */
+  authorizeGroupOutcome: true;
+  base: OfficeOrdinaryCabMemberScope;
+  successor: OfficeOrdinaryCabMemberScope;
+  logicalTargetId: string;
+  expectedReceipt: string;
+  expectedPreviewFingerprint: string;
+  /** Independently qualified commitment to the entire confirmation request. */
+  expectedConfirmationReceipt: string;
+  /** The host's exact accepted apply input and independently bound value identities. */
+  acceptedPreviewJson: string;
+  acceptedValueIdentitiesJson: string;
+  /** Current host observations, not a provider's claim about the successor. */
+  successorMemberJson: string;
+  successorExaminationJson: string | null;
+  successorValueIdentitiesJson: string;
+  correspondenceJson: string;
+  successorDirectUseJson?: string;
+  sourceLinkGrantId?: string;
+  disclosedFields: NativeField[];
 }
 
 export interface OfficeOrdinaryCabProvider {
@@ -189,6 +229,8 @@ export interface OfficeOrdinaryCabProvider {
   evaluate(requestJson: string): Promise<string>;
   /** Optional separately granted read-only prepare/apply preview operation. */
   preview?(this: void, requestJson: string): Promise<string>;
+  /** Optional separately granted read-only comparison of accepted answers with a successor. */
+  confirm?(this: void, requestJson: string): Promise<string>;
 }
 
 /** Native wire text and independently issued scope, without a legacy document. */

@@ -1,0 +1,1089 @@
+{
+  "original": {
+    "request": {
+      "chain_id": "neutral-chain-159",
+      "profile": "original_us_nsi",
+      "member": {
+        "identity": {
+          "document_id": "synthetic-target",
+          "revision_id": "r1",
+          "contribution_id": "body"
+        },
+        "format": "document_content",
+        "source": "(S) Synthetic target.\n\nDeclassify On: 20500101\nAgency and Office of Origin: Example Office\n",
+        "owner": {
+          "document_id": "synthetic-target",
+          "revision_id": "r1",
+          "contribution_id": "body",
+          "role": "transmittal",
+          "parent_document_id": null,
+          "intrinsic_classification_locator": [1, 2]
+        },
+        "cab_inspection": {
+          "basis": {
+            "document_id": "synthetic-target",
+            "revision_id": "r1",
+            "contribution_id": "body",
+            "scope_locator": [0, 91]
+          },
+          "target": {
+            "document_id": "synthetic-target",
+            "revision_id": "r1",
+            "contribution_id": "body",
+            "scope_locator": [0, 91]
+          },
+          "candidate": [23, 90],
+          "face_page": 1,
+          "layout_revision": "layout-1",
+          "source_facts": [
+            {
+              "fact": "nsi",
+              "locator": "fact:nsi",
+              "group_locator": "fact:group"
+            },
+            {
+              "fact": "original_mode",
+              "locator": "fact:original_mode",
+              "group_locator": "fact:group"
+            },
+            {
+              "fact": "us_system",
+              "locator": "fact:us_system",
+              "group_locator": "fact:group"
+            }
+          ],
+          "fields": [
+            {
+              "field": "classified_by",
+              "coverage": "complete",
+              "state": "examined_absent",
+              "occurrence": null,
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r1",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 91]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-1",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "classification_reason",
+              "coverage": "complete",
+              "state": "examined_absent",
+              "occurrence": null,
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r1",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 91]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-1",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "declassify_on",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [23, 90],
+                "label": [23, 36],
+                "value": [38, 46]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r1",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 91]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-1",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "agency_and_office_of_origin",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [23, 90],
+                "label": [47, 74],
+                "value": [76, 90]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r1",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 91]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-1",
+                "pages": [1]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "examination": {
+      "target": {
+        "document_id": "synthetic-target",
+        "revision_id": "r1",
+        "contribution_id": "body",
+        "scope_locator": [0, 91]
+      },
+      "intrinsic_classification_locator": [1, 2],
+      "regime": {
+        "coverage": "complete",
+        "locator": "exam:regime",
+        "inventory": "enumerated"
+      },
+      "mode": {
+        "coverage": "complete",
+        "locator": "exam:mode",
+        "inventory": "enumerated"
+      },
+      "system": {
+        "coverage": "complete",
+        "locator": "exam:system",
+        "inventory": "enumerated"
+      },
+      "instruction": {
+        "coverage": "complete",
+        "locator": "exam:instruction",
+        "inventory": "examined_empty"
+      },
+      "protected_values": {
+        "coverage": "complete",
+        "locator": "exam:protected",
+        "inventory": "examined_empty"
+      }
+    }
+  },
+  "successor": {
+    "request": {
+      "chain_id": "neutral-chain-159",
+      "profile": "original_us_nsi",
+      "member": {
+        "identity": {
+          "document_id": "synthetic-target",
+          "revision_id": "r2",
+          "contribution_id": "body"
+        },
+        "format": "document_content",
+        "source": "(S) Synthetic target.\n\nDeclassify On: 20500101\nAgency and Office of Origin: Example Office\nClassified By: Example Analyst\nClassification Reason: 1.4(c)\n",
+        "owner": {
+          "document_id": "synthetic-target",
+          "revision_id": "r2",
+          "contribution_id": "body",
+          "role": "transmittal",
+          "parent_document_id": null,
+          "intrinsic_classification_locator": [1, 2]
+        },
+        "cab_inspection": {
+          "basis": {
+            "document_id": "synthetic-target",
+            "revision_id": "r2",
+            "contribution_id": "body",
+            "scope_locator": [0, 152]
+          },
+          "target": {
+            "document_id": "synthetic-target",
+            "revision_id": "r2",
+            "contribution_id": "body",
+            "scope_locator": [0, 152]
+          },
+          "candidate": [23, 151],
+          "face_page": 1,
+          "layout_revision": "layout-r2",
+          "source_facts": [
+            {
+              "fact": "nsi",
+              "locator": "fact:nsi",
+              "group_locator": "fact:group"
+            },
+            {
+              "fact": "original_mode",
+              "locator": "fact:original_mode",
+              "group_locator": "fact:group"
+            },
+            {
+              "fact": "us_system",
+              "locator": "fact:us_system",
+              "group_locator": "fact:group"
+            }
+          ],
+          "fields": [
+            {
+              "field": "classified_by",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [23, 151],
+                "label": [91, 104],
+                "value": [106, 121]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r2",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 152]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-r2",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "classification_reason",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [23, 151],
+                "label": [122, 143],
+                "value": [145, 151]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r2",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 152]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-r2",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "declassify_on",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [23, 151],
+                "label": [23, 36],
+                "value": [38, 46]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r2",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 152]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-r2",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "agency_and_office_of_origin",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [23, 151],
+                "label": [47, 74],
+                "value": [76, 90]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r2",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 152]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-r2",
+                "pages": [1]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "examination": {
+      "target": {
+        "document_id": "synthetic-target",
+        "revision_id": "r2",
+        "contribution_id": "body",
+        "scope_locator": [0, 152]
+      },
+      "intrinsic_classification_locator": [1, 2],
+      "regime": {
+        "coverage": "complete",
+        "locator": "exam:regime",
+        "inventory": "enumerated"
+      },
+      "mode": {
+        "coverage": "complete",
+        "locator": "exam:mode",
+        "inventory": "enumerated"
+      },
+      "system": {
+        "coverage": "complete",
+        "locator": "exam:system",
+        "inventory": "enumerated"
+      },
+      "instruction": {
+        "coverage": "complete",
+        "locator": "exam:instruction",
+        "inventory": "examined_empty"
+      },
+      "protected_values": {
+        "coverage": "complete",
+        "locator": "exam:protected",
+        "inventory": "examined_empty"
+      }
+    }
+  },
+  "different": {
+    "request": {
+      "chain_id": "neutral-chain-159",
+      "profile": "original_us_nsi",
+      "member": {
+        "identity": {
+          "document_id": "synthetic-target",
+          "revision_id": "r2",
+          "contribution_id": "body"
+        },
+        "format": "document_content",
+        "source": "(S) Synthetic target.\n\nDeclassify On: 20500101\nAgency and Office of Origin: Example Office\nClassified By: Another Analyst\nClassification Reason: 1.4(c)\n",
+        "owner": {
+          "document_id": "synthetic-target",
+          "revision_id": "r2",
+          "contribution_id": "body",
+          "role": "transmittal",
+          "parent_document_id": null,
+          "intrinsic_classification_locator": [1, 2]
+        },
+        "cab_inspection": {
+          "basis": {
+            "document_id": "synthetic-target",
+            "revision_id": "r2",
+            "contribution_id": "body",
+            "scope_locator": [0, 152]
+          },
+          "target": {
+            "document_id": "synthetic-target",
+            "revision_id": "r2",
+            "contribution_id": "body",
+            "scope_locator": [0, 152]
+          },
+          "candidate": [23, 151],
+          "face_page": 1,
+          "layout_revision": "layout-r2",
+          "source_facts": [
+            {
+              "fact": "nsi",
+              "locator": "fact:nsi",
+              "group_locator": "fact:group"
+            },
+            {
+              "fact": "original_mode",
+              "locator": "fact:original_mode",
+              "group_locator": "fact:group"
+            },
+            {
+              "fact": "us_system",
+              "locator": "fact:us_system",
+              "group_locator": "fact:group"
+            }
+          ],
+          "fields": [
+            {
+              "field": "classified_by",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [23, 151],
+                "label": [91, 104],
+                "value": [106, 121]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r2",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 152]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-r2",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "classification_reason",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [23, 151],
+                "label": [122, 143],
+                "value": [145, 151]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r2",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 152]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-r2",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "declassify_on",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [23, 151],
+                "label": [23, 36],
+                "value": [38, 46]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r2",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 152]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-r2",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "agency_and_office_of_origin",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [23, 151],
+                "label": [47, 74],
+                "value": [76, 90]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r2",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 152]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-r2",
+                "pages": [1]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "examination": {
+      "target": {
+        "document_id": "synthetic-target",
+        "revision_id": "r2",
+        "contribution_id": "body",
+        "scope_locator": [0, 152]
+      },
+      "intrinsic_classification_locator": [1, 2],
+      "regime": {
+        "coverage": "complete",
+        "locator": "exam:regime",
+        "inventory": "enumerated"
+      },
+      "mode": {
+        "coverage": "complete",
+        "locator": "exam:mode",
+        "inventory": "enumerated"
+      },
+      "system": {
+        "coverage": "complete",
+        "locator": "exam:system",
+        "inventory": "enumerated"
+      },
+      "instruction": {
+        "coverage": "complete",
+        "locator": "exam:instruction",
+        "inventory": "examined_empty"
+      },
+      "protected_values": {
+        "coverage": "complete",
+        "locator": "exam:protected",
+        "inventory": "examined_empty"
+      }
+    }
+  },
+  "linked": {
+    "request": {
+      "chain_id": "neutral-chain-159",
+      "profile": "original_us_nsi",
+      "member": {
+        "identity": {
+          "document_id": "synthetic-target",
+          "revision_id": "r1",
+          "contribution_id": "body"
+        },
+        "format": "document_content",
+        "source": "(S) Synthetic target. Direct source ALPHA-PRIVATE REV-1\n\nDeclassify On: 20500101\nAgency and Office of Origin: Example Office\n",
+        "owner": {
+          "document_id": "synthetic-target",
+          "revision_id": "r1",
+          "contribution_id": "body",
+          "role": "transmittal",
+          "parent_document_id": null,
+          "intrinsic_classification_locator": [1, 2]
+        },
+        "cab_inspection": {
+          "basis": {
+            "document_id": "synthetic-target",
+            "revision_id": "r1",
+            "contribution_id": "body",
+            "scope_locator": [0, 125]
+          },
+          "target": {
+            "document_id": "synthetic-target",
+            "revision_id": "r1",
+            "contribution_id": "body",
+            "scope_locator": [0, 125]
+          },
+          "candidate": [57, 124],
+          "face_page": 1,
+          "layout_revision": "layout-1",
+          "source_facts": [
+            {
+              "fact": "nsi",
+              "locator": "fact:nsi",
+              "group_locator": "fact:group"
+            },
+            {
+              "fact": "original_mode",
+              "locator": "fact:original_mode",
+              "group_locator": "fact:group"
+            },
+            {
+              "fact": "us_system",
+              "locator": "fact:us_system",
+              "group_locator": "fact:group"
+            }
+          ],
+          "fields": [
+            {
+              "field": "classified_by",
+              "coverage": "complete",
+              "state": "examined_absent",
+              "occurrence": null,
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r1",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 125]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-1",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "classification_reason",
+              "coverage": "complete",
+              "state": "examined_absent",
+              "occurrence": null,
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r1",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 125]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-1",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "declassify_on",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [57, 124],
+                "label": [57, 70],
+                "value": [72, 80]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r1",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 125]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-1",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "agency_and_office_of_origin",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [57, 124],
+                "label": [81, 108],
+                "value": [110, 124]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r1",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 125]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-1",
+                "pages": [1]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "examination": {
+      "target": {
+        "document_id": "synthetic-target",
+        "revision_id": "r1",
+        "contribution_id": "body",
+        "scope_locator": [0, 125]
+      },
+      "intrinsic_classification_locator": [1, 2],
+      "regime": {
+        "coverage": "complete",
+        "locator": "exam:regime",
+        "inventory": "enumerated"
+      },
+      "mode": {
+        "coverage": "complete",
+        "locator": "exam:mode",
+        "inventory": "enumerated"
+      },
+      "system": {
+        "coverage": "complete",
+        "locator": "exam:system",
+        "inventory": "enumerated"
+      },
+      "instruction": {
+        "coverage": "complete",
+        "locator": "exam:instruction",
+        "inventory": "examined_empty"
+      },
+      "protected_values": {
+        "coverage": "complete",
+        "locator": "exam:protected",
+        "inventory": "examined_empty"
+      }
+    },
+    "sourceLink": {
+      "member": {
+        "identity": {
+          "document_id": "source-document-a",
+          "revision_id": "REV-1",
+          "contribution_id": "body"
+        },
+        "format": "document_content",
+        "source": "(S) Synthetic source. Independent source observations: 20440229 EVENT-CHARLIE CLASSIFIER-ALPHA\n\nDeclassify On: 20400101\nAgency and Office of Origin: Example Office\n",
+        "owner": {
+          "document_id": "source-document-a",
+          "revision_id": "REV-1",
+          "contribution_id": "body",
+          "role": "transmittal",
+          "parent_document_id": null,
+          "intrinsic_classification_locator": [1, 2]
+        },
+        "cab_inspection": {
+          "basis": {
+            "document_id": "source-document-a",
+            "revision_id": "REV-1",
+            "contribution_id": "body",
+            "scope_locator": [0, 164]
+          },
+          "target": {
+            "document_id": "source-document-a",
+            "revision_id": "REV-1",
+            "contribution_id": "body",
+            "scope_locator": [0, 164]
+          },
+          "candidate": [96, 163],
+          "face_page": 1,
+          "layout_revision": "layout-1",
+          "source_facts": [
+            {
+              "fact": "nsi",
+              "locator": "fact:nsi",
+              "group_locator": "fact:group"
+            },
+            {
+              "fact": "original_mode",
+              "locator": "fact:original_mode",
+              "group_locator": "fact:group"
+            },
+            {
+              "fact": "us_system",
+              "locator": "fact:us_system",
+              "group_locator": "fact:group"
+            }
+          ],
+          "fields": [
+            {
+              "field": "classified_by",
+              "coverage": "complete",
+              "state": "examined_absent",
+              "occurrence": null,
+              "readback": {
+                "target": {
+                  "document_id": "source-document-a",
+                  "revision_id": "REV-1",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 164]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-1",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "classification_reason",
+              "coverage": "complete",
+              "state": "examined_absent",
+              "occurrence": null,
+              "readback": {
+                "target": {
+                  "document_id": "source-document-a",
+                  "revision_id": "REV-1",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 164]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-1",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "declassify_on",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [96, 163],
+                "label": [96, 109],
+                "value": [111, 119]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "source-document-a",
+                  "revision_id": "REV-1",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 164]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-1",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "agency_and_office_of_origin",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [96, 163],
+                "label": [120, 147],
+                "value": [149, 163]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "source-document-a",
+                  "revision_id": "REV-1",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 164]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-1",
+                "pages": [1]
+              }
+            }
+          ]
+        }
+      },
+      "source_examination": {
+        "target": {
+          "document_id": "source-document-a",
+          "revision_id": "REV-1",
+          "contribution_id": "body",
+          "scope_locator": [0, 164]
+        },
+        "intrinsic_classification_locator": [1, 2],
+        "regime": {
+          "coverage": "complete",
+          "locator": "exam:regime",
+          "inventory": "enumerated"
+        },
+        "mode": {
+          "coverage": "complete",
+          "locator": "exam:mode",
+          "inventory": "enumerated"
+        },
+        "system": {
+          "coverage": "complete",
+          "locator": "exam:system",
+          "inventory": "enumerated"
+        },
+        "instruction": {
+          "coverage": "complete",
+          "locator": "exam:instruction",
+          "inventory": "enumerated"
+        },
+        "protected_values": {
+          "coverage": "complete",
+          "locator": "exam:protected",
+          "inventory": "enumerated"
+        },
+        "instruction_observations": [
+          {
+            "kind": "cab_date",
+            "reference": "opaque-external-cab-date"
+          }
+        ],
+        "protected_value_observations": [
+          {
+            "kind": "value",
+            "field": "classifier_identity",
+            "reference": "opaque-source-classifier-a",
+            "locator": [78, 94],
+            "group_locator": [0, 94]
+          }
+        ]
+      },
+      "target_use": {
+        "target": {
+          "document_id": "synthetic-target",
+          "revision_id": "r1",
+          "contribution_id": "body",
+          "scope_locator": [0, 125]
+        },
+        "coverage": "complete",
+        "reference": "ALPHA-PRIVATE",
+        "revision": "REV-1",
+        "reference_span": [36, 49],
+        "revision_span": [50, 55],
+        "group_span": [0, 55]
+      },
+      "material": {
+        "reference": "ALPHA-PRIVATE",
+        "kind": "source_document",
+        "source": {
+          "document_id": "source-document-a",
+          "revision_id": "REV-1",
+          "contribution_id": "body",
+          "scope_locator": [0, 164]
+        }
+      }
+    }
+  },
+  "linkedSuccessor": {
+    "request": {
+      "chain_id": "neutral-chain-159",
+      "profile": "original_us_nsi",
+      "member": {
+        "identity": {
+          "document_id": "synthetic-target",
+          "revision_id": "r2",
+          "contribution_id": "body"
+        },
+        "format": "document_content",
+        "source": "(S) Synthetic target. Fresh review. Direct source ALPHA-PRIVATE REV-1\n\nDeclassify On: 20500101\nAgency and Office of Origin: Example Office\nClassified By: Example Analyst\nClassification Reason: 1.4(c)\n",
+        "owner": {
+          "document_id": "synthetic-target",
+          "revision_id": "r2",
+          "contribution_id": "body",
+          "role": "transmittal",
+          "parent_document_id": null,
+          "intrinsic_classification_locator": [1, 2]
+        },
+        "cab_inspection": {
+          "basis": {
+            "document_id": "synthetic-target",
+            "revision_id": "r2",
+            "contribution_id": "body",
+            "scope_locator": [0, 200]
+          },
+          "target": {
+            "document_id": "synthetic-target",
+            "revision_id": "r2",
+            "contribution_id": "body",
+            "scope_locator": [0, 200]
+          },
+          "candidate": [71, 199],
+          "face_page": 1,
+          "layout_revision": "layout-r2",
+          "source_facts": [
+            {
+              "fact": "nsi",
+              "locator": "fact:nsi",
+              "group_locator": "fact:group"
+            },
+            {
+              "fact": "original_mode",
+              "locator": "fact:original_mode",
+              "group_locator": "fact:group"
+            },
+            {
+              "fact": "us_system",
+              "locator": "fact:us_system",
+              "group_locator": "fact:group"
+            }
+          ],
+          "fields": [
+            {
+              "field": "classified_by",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [71, 199],
+                "label": [139, 152],
+                "value": [154, 169]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r2",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 200]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-r2",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "classification_reason",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [71, 199],
+                "label": [170, 191],
+                "value": [193, 199]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r2",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 200]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-r2",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "declassify_on",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [71, 199],
+                "label": [71, 84],
+                "value": [86, 94]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r2",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 200]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-r2",
+                "pages": [1]
+              }
+            },
+            {
+              "field": "agency_and_office_of_origin",
+              "coverage": "complete",
+              "state": "present",
+              "occurrence": {
+                "candidate": [71, 199],
+                "label": [95, 122],
+                "value": [124, 138]
+              },
+              "readback": {
+                "target": {
+                  "document_id": "synthetic-target",
+                  "revision_id": "r2",
+                  "contribution_id": "body",
+                  "scope_locator": [0, 200]
+                },
+                "face_page": 1,
+                "layout_revision": "layout-r2",
+                "pages": [1]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "examination": {
+      "target": {
+        "document_id": "synthetic-target",
+        "revision_id": "r2",
+        "contribution_id": "body",
+        "scope_locator": [0, 200]
+      },
+      "intrinsic_classification_locator": [1, 2],
+      "regime": {
+        "coverage": "complete",
+        "locator": "exam:regime",
+        "inventory": "enumerated"
+      },
+      "mode": {
+        "coverage": "complete",
+        "locator": "exam:mode",
+        "inventory": "enumerated"
+      },
+      "system": {
+        "coverage": "complete",
+        "locator": "exam:system",
+        "inventory": "enumerated"
+      },
+      "instruction": {
+        "coverage": "complete",
+        "locator": "exam:instruction",
+        "inventory": "examined_empty"
+      },
+      "protected_values": {
+        "coverage": "complete",
+        "locator": "exam:protected",
+        "inventory": "examined_empty"
+      }
+    },
+    "directUse": {
+      "target": {
+        "document_id": "synthetic-target",
+        "revision_id": "r2",
+        "contribution_id": "body",
+        "scope_locator": [0, 200]
+      },
+      "coverage": "complete",
+      "reference": "ALPHA-PRIVATE",
+      "revision": "REV-1",
+      "reference_span": [50, 63],
+      "revision_span": [64, 69],
+      "group_span": [0, 69]
+    }
+  }
+}

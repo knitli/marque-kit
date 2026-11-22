@@ -204,12 +204,13 @@ void Office.onReady(async (info) => {
     // capability beside the restricted semantic-results-only route.
     if (session && bound && 'kind' in session && session.kind === 'native_cab') {
       if (session.ordinaryCab) {
-        mountOrdinaryCabWorkspace(
+        const ordinaryCab = mountOrdinaryCabWorkspace(
           document.querySelector<HTMLElement>('#pane')!,
           session,
           installation.wordHost,
           installation.nativeMaxBytes,
         );
+        addEventListener('pagehide', () => ordinaryCab.destroy(), { once: true });
       } else {
         mountPrivilegedSourceMarking();
         mountNativeWorkspace(
