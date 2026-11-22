@@ -45,6 +45,27 @@ Word's page API requires `WordApiDesktop 1.2`; unsupported hosts and unresolved,
 
 On macOS, after building the Node-targeted engine WASM package, run the saved-file Word probe with `node --conditions=source apps/office-addin/test/cab-word-readback/run.mjs /absolute/path/to/marque_wasm.js`; see [the probe](test/cab-word-readback/run.mjs). It uses an isolated fictional document and Apple Events. It does not qualify Office.js event delivery or an installed trusted host provider.
 
+### Selected audience
+
+A trusted installation may open a `native_selected_audience` session for an active Word document and viewer. Its `evaluateSelectedAudience(requestJson)` must call the paired engine's `evaluate_selected_audience` operation, built with `absence-detection`. The separate host callback `readNativeSelectedAudienceScope(documentId, viewerId)` supplies a current grant, permission and selection revisions, individually authorized source snapshots, exact UTF-8 byte selections, and explicit disclosure flags for each result axis and coverage. Each snapshot has its own source, revision and contribution identity; a second document requires its own independently current authorization. The host must authorize this pane to read every supplied source and the entire engine response. Because the engine operation returns every axis, all disclosure flags must be true before it is called. The pane does not infer selections or permissions from text.
+
+The host's `watchNativeSelectedAudienceInvalidation` must revoke the view before any source, revision, selection, viewer, permission, grant or provider change can be displayed. The pane reads the independent scope and checks the active document before and after evaluation, clears results on invalidation, and discards late replies. Missing capabilities, any denied result field, stale grants, malformed or oversized requests and invalid responses leave the view unavailable. A restricted viewer needs a separately sanitized provider response, rather than hiding fields after the full response enters the pane. The selected-query, source-evidence and document-scan coverage are separate; a selected query can be complete when whole-source evidence is partial. These results do not grant release authority or establish readiness.
+
+The reader accepts only recipient identifiers in the paired engine's generated register, bounds the response and lists, and withholds the view for unknown identifiers. This checks the wire vocabulary; it does not decide audience policy or authenticate a response. The trusted provider remains responsible for returning the actual engine response.
+
+The session and independently read scope must each provide `engineArtifactSha256` and `recipientVocabularySha256`. Both must match the generated kit constants before and after evaluation. The installation must derive the artifact hash from the actual deployed engine bytes and the vocabulary hash from that same build's target-side `values.rs`, including any configured `country_extensions.toml`. The vocabulary hash is SHA-256 over the sorted register identifiers, each followed by LF. Hashes are lowercase hex. A host must invalidate an open view before the engine or its pairing changes. These attestations rely on the trusted installation; they are not proof against a provider that lies about its own binary.
+
+Build the engine first, then generate the paired reader using the target-side `marque-ism-*/out/values.rs` actually listed in that build's dependency file, the exact engine artifact to deploy (for a Node WASM package, `marque_wasm_bg.wasm`), and the full engine commit:
+
+```sh
+python3 fixtures/extract-selected-audience-vocabulary.py /path/to/values.rs /path/to/marque_wasm_bg.wasm ENGINE_COMMIT
+python3 fixtures/extract-selected-audience-vocabulary.py /path/to/values.rs /path/to/marque_wasm_bg.wasm ENGINE_COMMIT --check
+```
+
+The generated module records the engine commit, generated-file hash, register hash and artifact hash. Packaging must run the check on the actual artifact and preserve the pairing metadata with it. A differently configured or rebuilt engine requires a newly generated and reviewed kit pair; missing or mismatched hashes leave this view unavailable. The checked-in pair is the integrated engine build recorded in the generated module. No host provider or live Word installation is included here.
+
+This is a provider-neutral interface, not a live Word or workspace integration. The repository does not install a provider, authenticate a viewer, obtain cross-document access, or establish that an Office host delivers invalidation events. An installation that cannot guarantee the stated binding and invalidation must not expose this session.
+
 ## Run it in Word
 
 1. Trust a localhost certificate, once. This adds a certificate to your keychain, so it's yours to run:
