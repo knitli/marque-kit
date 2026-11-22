@@ -6,12 +6,10 @@
 /// <reference types="vite/client" />
 
 /**
- * The Word task pane: the kit's pane on the sample memo's findings, until the engine lints the document.
+ * The Word task pane: real actions require the installation's trusted provider;
+ * without one, the sample findings remain read-only.
  * Jump selects a finding's marking in the document; the cursor landing in a
- * paragraph with a finding opens its card (DECISIONS #8). What the person does is
- * written into the document, the banner into the header and footer, and the pane
- * re-lints; taking an act back takes its text out again. Word's own undo of an
- * answer is noticed and recorded as the answer taken back.
+ * paragraph with a finding opens its card (DECISIONS #8).
  *
  * Not yet: the engine (findings come from fixtures/, re-lints are a stand-in), the
  * authority block, help popovers and the lookup (their controls stay inert), the
@@ -22,21 +20,37 @@ import '@knitli/marque-kit/theme.css';
 import '@knitli/marque-kit/kit.css';
 import { mount } from '@knitli/marque-kit';
 import { button, el } from '@knitli/marque-kit/marking';
-import { record, snapshot } from '@knitli/marque-kit-core/state';
-import type { Doc, State, Subject, Vocab } from '@knitli/marque-kit-core/types';
+import { canWriteAct, canWriteMarking, isDisclosedState, sameBasis } from '@knitli/marque-kit-core/state';
+import type { Doc, LogEntry, State, Subject, Vocab } from '@knitli/marque-kit-core/types';
 import findingsUrl from '../../../fixtures/memo.findings.json?url';
 import vocabUrl from '../../../fixtures/memo.vocab.json?url';
 import memo from '../../../fixtures/memo.txt?raw';
 import { locate, paragraphAt, written } from './locate.ts';
-import { banner, edits, held, made, relint } from './write.ts';
+import { banner, edits, made, relint, undoneSubject } from './write.ts';
+import { isSameWordDocument } from './workspace.ts';
+import { mountNativeWorkspace } from './native-workspace.ts';
+import { mountOrdinaryCabWorkspace } from './ordinary-cab-workspace.ts';
+import { mountCabPlacementWorkspace } from './cab-placement-workspace.ts';
+import { mountNativeSemanticResultsWorkspace } from './native-semantic-results-workspace.ts';
+import { mountSelectedAudienceWorkspace } from './selected-audience-workspace.ts';
+import { mountOfficeSourceMarking } from './source-marking.ts';
+import type {
+  OfficeCurrentEvaluation,
+  OfficeNativeCabPlacementSession,
+  OfficeNativeSemanticResultsSession,
+  OfficeNativeSelectedAudienceSession,
+  OfficeNativeWordSession,
+  OfficeWordSession,
+} from './workspace.ts';
 
 /** In dev, what the pane would say to a console it doesn't have goes to the dev server's .dev.log. */
-const log = (...what: unknown[]): void => {
-  if (import.meta.env.DEV) void fetch('/__log', { method: 'POST', body: JSON.stringify(what) }).catch(() => {});
+const log = (event: 'error' | 'unhandled' | 'not the memo' | 'undone in Word', ...counts: number[]): void => {
+  if (import.meta.env.DEV)
+    void fetch('/__log', { method: 'POST', body: JSON.stringify([event, ...counts]) }).catch(() => {});
 };
 if (import.meta.env.DEV) {
-  addEventListener('error', (e) => log('error', String(e.error ?? e.message)));
-  addEventListener('unhandledrejection', (e) => log('unhandled', String(e.reason)));
+  addEventListener('error', () => log('error'));
+  addEventListener('unhandledrejection', () => log('unhandled'));
 }
 
 /** The memo as the document should have it: its lines with every edit in, and each finding's span moved to match. */
@@ -72,88 +86,17 @@ const says = (ps: string[], lines: string[]): boolean => {
     want = full(lines).map((i) => lines[i]);
   return got.length === want.length && got.every((p, k) => p === want[k]);
 };
-/** The fixture's spans mean something only in a document that is the memo, as edited here. */
+/** The fixture's spans mean something only in the unchanged fictional sample memo. */
 const isMemo = (ps: string[]): boolean => {
   const same = says(ps, now.lines);
   if (!same) {
     const got = full(ps).map((i) => ps[i]),
       want = full(now.lines).map((i) => now.lines[i]);
     const k = got.findIndex((p, n) => p !== want[n]);
-    log('not the memo', { paragraphs: got.length, want: want.length, first: k, got: got[k], expected: want[k] });
+    log('not the memo', got.length, want.length, k);
   }
   return same;
 };
-
-/** The banner, top and bottom of every page: each section's headers and footers, first-page and even-page
- *  ones too, centered. Cleared when there's none. */
-const setBanner = async (ctx: Word.RequestContext, text: string | null): Promise<void> => {
-  const ss = ctx.document.sections.load('items');
-  await ctx.sync();
-  for (const s of ss.items)
-    for (const type of ['Primary', 'FirstPage', 'EvenPages'] as const)
-      for (const part of [s.getHeader(type), s.getFooter(type)]) {
-        if (!text) part.clear();
-        else part.insertText(text, 'Replace').paragraphs.getFirst().alignment = 'Centered';
-      }
-};
-
-/** The banner as the document has it: the first section's header. */
-const header = (ctx: Word.RequestContext): Word.Body =>
-  ctx.document.sections.getFirst().getHeader('Primary').load('text');
-
-/** Replace the document with the memo as it stands, a paragraph per line, and its banner. */
-const insertMemo = (): Promise<void> =>
-  Word.run(async (ctx) => {
-    const body = ctx.document.body;
-    body.clear();
-    const [first = '', ...rest] = now.lines;
-    body.paragraphs.getFirst().insertText(first, 'Replace');
-    for (const l of rest) body.insertParagraph(l, 'End');
-    await setBanner(ctx, now.banner);
-    await ctx.sync();
-  });
-
-/** The part of `b` that differs from `a`: a's middle, b's middle, and where a's starts. */
-const differs = (a: string, b: string): { was: string; is: string; at: number } => {
-  let i = 0;
-  while (i < a.length && i < b.length && a[i] === b[i]) i++;
-  let j = 0;
-  while (j < a.length - i && j < b.length - i && a[a.length - 1 - j] === b[b.length - 1 - j]) j++;
-  return { was: a.slice(i, a.length - j), is: b.slice(i, b.length - j), at: i };
-};
-
-/** Write what changed from one layout to the next: in each paragraph, only the part that differs. A
- *  paragraph that already says the new line (Word's own undo put it there) is left alone. A document
- *  that says neither isn't the memo as the pane knows it: nothing is written, and the act stays pending. */
-const write = (from: Layout, to: Layout): Promise<void> =>
-  Word.run(async (ctx) => {
-    const ps = ctx.document.body.paragraphs.load('items/text');
-    await ctx.sync();
-    const texts = ps.items.map((p) => p.text);
-    if (!says(texts, from.lines) && !says(texts, to.lines)) throw new Error('the document is not the memo');
-    for (const [line, next] of to.lines.entries()) {
-      const p = ps.items[toWord(texts, line)];
-      const prev = from.lines[line] ?? '';
-      if (!p || next === prev || p.text === next) continue;
-      const d = differs(prev, next);
-      // shortcut: an insertion, or a change longer than Word's 255-character search, rewrites the paragraph's
-      // text whole. The Word adapter's content controls (packages/word) will hold each marking's range.
-      if (!d.was || d.was.length > 255) {
-        p.insertText(next, 'Replace');
-        continue;
-      }
-      let nth = 0;
-      for (let k = prev.indexOf(d.was); k !== -1 && k < d.at; k = prev.indexOf(d.was, k + 1)) nth++;
-      const hits = p.search(d.was, { matchCase: true }).load('items');
-      await ctx.sync();
-      const r = hits.items[nth];
-      if (!r) p.insertText(next, 'Replace');
-      else if (d.is) r.insertText(d.is, 'Replace');
-      else r.delete();
-    }
-    if (from.banner !== to.banner) await setBanner(ctx, to.banner);
-    await ctx.sync();
-  });
 
 /** Select a finding's marking, or the start of its paragraph when nothing is written there. */
 const jump = (f: Subject): Promise<void> =>
@@ -183,6 +126,10 @@ const jump = (f: Subject): Promise<void> =>
     await ctx.sync();
   });
 
+/** The first-page header used only to confirm that the open Word document is the sample memo. */
+const header = (ctx: Word.RequestContext): Word.Body =>
+  ctx.document.sections.getFirst().getHeader('Primary').load('text');
+
 /** The index of the paragraph the selection starts in, or -1. */
 const selected = (): Promise<{ index: number; texts: string[]; head: string }> =>
   Word.run(async (ctx) => {
@@ -200,57 +147,161 @@ const selected = (): Promise<{ index: number; texts: string[]; head: string }> =
 
 void Office.onReady(async (info) => {
   if (info.host !== Office.HostType.Word) return;
+  const installation = window.marqueOfficeWorkspace;
+  let sourceMarkingMounted = false;
+  const mountPrivilegedSourceMarking = (): void => {
+    if (sourceMarkingMounted || !window.marqueOfficeSourceMarking) return;
+    sourceMarkingMounted = true;
+    const sourceRoot = document.createElement('section');
+    document.querySelector<HTMLElement>('#pane')!.before(sourceRoot);
+    const sourceView = mountOfficeSourceMarking(sourceRoot, window.marqueOfficeSourceMarking);
+    addEventListener('pagehide', () => sourceView.destroy(), { once: true });
+  };
+  if (installation) {
+    let session:
+      | OfficeWordSession
+      | OfficeNativeWordSession
+      | OfficeNativeCabPlacementSession
+      | OfficeNativeSemanticResultsSession
+      | OfficeNativeSelectedAudienceSession
+      | null;
+    let bound = false;
+    try {
+      session = await installation.provider.openWord(installation.wordHost);
+      bound = !!session && (await isSameWordDocument(installation.wordHost, session));
+    } catch {
+      session = null;
+    }
+    if (session && bound && 'kind' in session && session.kind === 'native_semantic_results') {
+      mountNativeSemanticResultsWorkspace(
+        document.querySelector<HTMLElement>('#pane')!,
+        session,
+        installation.wordHost,
+        installation.nativeMaxBytes,
+      );
+      return;
+    }
+    if (session && bound && 'kind' in session && session.kind === 'native_selected_audience') {
+      const audience = mountSelectedAudienceWorkspace(
+        document.querySelector<HTMLElement>('#pane')!,
+        session,
+        installation.wordHost,
+        installation.nativeMaxBytes,
+      );
+      addEventListener('pagehide', () => audience.destroy(), { once: true });
+      return;
+    }
+    if (session && bound && 'kind' in session && session.kind === 'native_cab_placement') {
+      mountCabPlacementWorkspace(
+        document.querySelector<HTMLElement>('#pane')!,
+        session,
+        installation.wordHost,
+        installation.nativeMaxBytes,
+      );
+      return;
+    }
+    // Source markings are privileged provider data. Never mount their binding or
+    // capability beside the restricted semantic-results-only route.
+    if (session && bound && 'kind' in session && session.kind === 'native_cab') {
+      if (session.ordinaryCab) {
+        const ordinaryCab = mountOrdinaryCabWorkspace(
+          document.querySelector<HTMLElement>('#pane')!,
+          session,
+          installation.wordHost,
+          installation.nativeMaxBytes,
+        );
+        addEventListener('pagehide', () => ordinaryCab.destroy(), { once: true });
+      } else {
+        mountPrivilegedSourceMarking();
+        mountNativeWorkspace(
+          document.querySelector<HTMLElement>('#pane')!,
+          session,
+          installation.wordHost,
+          installation.nativeMaxBytes,
+        );
+      }
+      return;
+    }
+    if (
+      session &&
+      bound &&
+      !('kind' in session) &&
+      isDisclosedState(session.state) &&
+      sameBasis(session.doc.document.evaluation?.basis, session.basis)
+    ) {
+      mountPrivilegedSourceMarking();
+      mountWorkspace(session, installation.wordHost);
+      return;
+    }
+    // A failed, stale, or cross-document provider session cannot establish
+    // which privileged views belong here. Keep the pane unavailable and do
+    // not fall through to source marking or Word document reads.
+    document
+      .querySelector<HTMLElement>('#pane')
+      ?.replaceChildren(el('p', 'mq-p', 'This Word workspace is unavailable for the current document.'));
+    return;
+  }
+  mountPrivilegedSourceMarking();
   const doc = (await (await fetch(findingsUrl)).json()) as Doc;
   const vocab = (await (await fetch(vocabUrl)).json()) as Vocab;
-  // One write at a time, in the order the person acted. What each writes, and the re-lint after it,
-  // come from Marque's findings and the log as of that act, never from an earlier re-lint.
-  let queue = Promise.resolve();
-
   const pane = mount(document.querySelector<HTMLElement>('#pane')!, {
     doc,
     vocab,
+    readOnly: true,
     onJump: (f) => void jump(f),
-    onChange(state: State, act) {
-      if (!act) return; // only the seen list moved
-      // The host applies: write the act into the document, then re-lint, so the card says done
-      // only once the text is there. A failed write leaves the act pending, as the kit shows it.
-      const to = layout(doc, state);
-      queue = queue
-        .then(() => write(now, to))
-        .then(() => {
-          now = to;
-          note.hidden = !held(doc, state).size;
-          pane.update({ doc: relint(doc, state), linted: state.log.length });
-        })
-        .catch((e: unknown) => log('write failed', String(e)));
-    },
   });
   now = layout(doc, pane.state);
 
-  // What this pane can't write yet goes back to its question; this says why, rather than leave it unexplained.
+  // Keep the disconnected state visible even while the sample memo's own note is hidden.
   const note = document.querySelector<HTMLElement>('#note')!;
+  note.hidden = false;
   note.append(
     el(
       'p',
       'mq-p',
-      'This sample pane can’t write every answer yet: one that isn’t a marking, a typed portion mark with more than its level or above the banner’s, or the authority block. Those questions stay open.',
+      'Sample mode only: no trusted workspace is connected. You can inspect and navigate the fictional findings; opening the sample creates a separate document and leaves this one unchanged.',
     ),
   );
 
-  // Spans mean something only in the memo itself: while the document isn't the memo, say so and offer it.
-  // Kept in step on every selection change (typing is one) from the text cursor-follow reads anyway.
+  // Spans mean something only in the sample memo itself; the note stays read-only on any other document.
   const sample = document.querySelector<HTMLElement>('#sample')!;
   const show = (memo: boolean): boolean => {
     sample.hidden = memo;
     return memo;
   };
+  const canCreateSample =
+    Office.context.requirements.isSetSupported('WordApi', '1.3') &&
+    Office.context.requirements.isSetSupported('WordApiHiddenDocument', '1.3');
+  const sampleStatus = el('p', 'mq-p');
+  sampleStatus.setAttribute('role', 'status');
   sample.append(
-    el('p', 'mq-p', 'These are the sample memo’s findings. Put the memo in this document to follow them here.'),
-    button('act', 'Insert the sample memo', () => {
-      void insertMemo()
-        .then(paragraphs)
-        .then((ps) => show(isMemo(ps)));
+    el(
+      'p',
+      'mq-p',
+      'These findings describe the fictional sample memo. Navigation works when that memo is open in Word.',
+    ),
+    button('act', 'Open sample in a new document', () => {
+      if (!canCreateSample) {
+        sampleStatus.textContent = 'This Word host cannot open the sample in a separate document.';
+        return;
+      }
+      void Word.run(async (ctx) => {
+        const created = ctx.application.createDocument();
+        await ctx.sync();
+        const [first = '', ...rest] = now.lines;
+        created.body.insertText(first, 'Replace');
+        for (const line of rest) created.body.insertParagraph(line, 'End');
+        await ctx.sync();
+        created.open();
+        await ctx.sync();
+      }).catch(() => {
+        sampleStatus.textContent = 'Word could not open the sample in a separate document.';
+      });
     }),
+    ...(!canCreateSample
+      ? [el('p', 'mq-p', 'Opening the sample separately requires WordApi 1.3 and WordApiHiddenDocument 1.3.')]
+      : []),
+    sampleStatus,
   );
 
   /** Word's undo took an act out of the document behind the pane's back: the act whose take-back
@@ -258,12 +309,10 @@ void Office.onReady(async (info) => {
    *  Written or not: an answer the last re-lint applied no longer shows as the person's on the view. */
   const undone = (texts: string[], head: string): Subject | null => {
     const v = pane.view()!;
-    for (const id of new Set([...pane.state.log].reverse().map((e) => e.id))) {
-      const f = [...v.findings, ...v.document.artifacts].find((x) => x.id === id);
-      const was = f && layout(doc, record(pane.state, id, 'changed', null, undefined, snapshot(f)));
-      if (was && says(texts, was.lines) && head === (was.banner ?? '')) return f;
-    }
-    return null;
+    return undoneSubject(pane.state, [...v.findings, ...v.document.artifacts], (hypothesis) => {
+      const was = layout(doc, hypothesis);
+      return says(texts, was.lines) && head === (was.banner ?? '');
+    });
   };
 
   // Cursor-follow: the card for the paragraph the cursor is in comes up. Leaving it keeps the card open.
@@ -272,7 +321,7 @@ void Office.onReady(async (info) => {
     if (!says(texts, now.lines) || head !== (now.banner ?? '')) {
       const f = undone(texts, head);
       if (f) {
-        log('undone in Word', f.id);
+        log('undone in Word');
         pane.host.onAct?.(f, 'changed', null);
         return;
       }
@@ -291,3 +340,204 @@ void Office.onReady(async (info) => {
     void follow();
   });
 });
+
+/** A real-document route: only the injected trusted provider owns history, writes and evaluation. */
+function mountWorkspace(
+  session: OfficeWordSession,
+  wordHost: NonNullable<Window['marqueOfficeWorkspace']>['wordHost'],
+): void {
+  const note = document.querySelector<HTMLElement>('#note')!;
+  note.hidden = false;
+  note.append(
+    el(
+      'p',
+      'mq-p',
+      'This document is connected to its trusted workspace. Its answers and evaluation come from that workspace.',
+    ),
+  );
+  const recovery = el('div', 'mq-pane-foot');
+  recovery.setAttribute('role', 'status');
+  const recoveryText = el('p', 'mq-p');
+  let failedRequestIds = new Set<string>();
+  let recoveryScanFailed = false;
+  const retry = button('ghost', 'Retry document update', () => {
+    if (recoveryScanFailed) {
+      recoveryScanFailed = false;
+      void session
+        .pendingWrites()
+        .then((entries) => {
+          for (const entry of [...entries].sort((a, b) => a.sequence - b.sequence)) {
+            if (entry.requestId) scheduleRecovery(entry.requestId);
+          }
+        })
+        .catch(() => {
+          recoveryScanFailed = true;
+          recoveryText.textContent =
+            'The workspace could not recover saved document work. Nothing was marked complete.';
+        });
+    }
+    for (const requestId of failedRequestIds) scheduleRecovery(requestId);
+  });
+  retry.disabled = true;
+  recovery.append(recoveryText, retry);
+  note.append(recovery);
+  let basis = session.basis;
+  let queue = Promise.resolve();
+  const pendingRecovery = new Set<string>();
+  const recoveryEntries = new Map<string, Pick<LogEntry, 'binding'>>();
+  let pane!: ReturnType<typeof mount>;
+  const stillBound = () => isSameWordDocument(wordHost, session);
+  const canDispatch = (): boolean => {
+    const current = pane?.view();
+    return (
+      !!current &&
+      !pane.host.readOnly &&
+      !('native_evaluation' in current.document) &&
+      !('native_semantic_results' in current.document)
+    );
+  };
+  const applyPending = async (requestId: string): Promise<void> => {
+    if (!canDispatch()) throw new Error('The current view cannot issue document writes.');
+    if (!(await stillBound())) throw new Error('Switch back to the document this action belongs to, then retry.');
+    let entry = recoveryEntries.get(requestId);
+    if (!entry) {
+      const pending = (await session.pendingWrites()).find((item) => item.requestId === requestId);
+      if (!pending) return; // Some actions require no physical write.
+      if (
+        !canWriteAct(pending.value) ||
+        !canWriteMarking(pending.about?.marking) ||
+        !canWriteMarking(pending.about?.result_marking)
+      )
+        throw new Error('The workspace must supply an authorized write for this masked marking.');
+      // A lost evaluation reply can leave the provider's pending list empty on retry.
+      entry = { binding: structuredClone(pending.binding) };
+      recoveryEntries.set(requestId, entry);
+    }
+    if (
+      entry.binding?.documentId !== session.documentId ||
+      entry.binding.chain !== session.chain ||
+      !entry.binding.basis ||
+      !(await stillBound())
+    )
+      throw new Error('This pending action no longer matches the document and evaluation it was taken on.');
+    if (!canDispatch()) throw new Error('The current view cannot issue document writes.');
+    const ack = await session.applyCommitted(requestId, wordHost);
+    if (
+      typeof ack.acknowledgement !== 'string' ||
+      !ack.acknowledgement.trim() ||
+      ack.requestId !== requestId ||
+      ack.documentId !== session.documentId ||
+      !sameBasis(ack.basis, entry.binding.basis) ||
+      !(await stillBound())
+    )
+      throw new Error('The host acknowledgement does not match the saved action.');
+    // The provider persists the acknowledgement before returning; do not start
+    // a new evaluation after the pane has lost write authority.
+    if (!canDispatch()) throw new Error('The write receipt is saved for reconciliation.');
+    const current: OfficeCurrentEvaluation = await session.evaluateCurrent(wordHost);
+    if (
+      current.documentId !== session.documentId ||
+      current.chain !== session.chain ||
+      !sameBasis(current.doc.document.evaluation?.basis, current.basis) ||
+      !(await stillBound())
+    )
+      throw new Error('The workspace did not return a current evaluation for this document.');
+    if (current.confirmedWriteAcks[requestId] !== ack.acknowledgement)
+      throw new Error('The current evaluation has not confirmed the host write.');
+    basis = current.basis;
+    pane.host.currentBasis = current.basis;
+    pane.host.requiredWrites = [...current.requiredWrites];
+    pane.host.requiredAcceptanceChecks = [...current.requiredAcceptanceChecks];
+    pane.host.confirmedWrites = [...current.confirmedWrites];
+    pane.host.acceptanceChecks = { ...current.acceptanceChecks };
+    pane.update({
+      doc: current.doc,
+      currentDisclosureRevision: current.currentDisclosureRevision ?? null,
+      historyDisclosure: current.historyDisclosure ?? null,
+      actBinding: { documentId: session.documentId, chain: session.chain, basis: current.basis },
+    });
+    if (!canDispatch()) {
+      retry.disabled = true;
+      recovery.hidden = true;
+    }
+  };
+  function scheduleRecovery(requestId: string): void {
+    if (!canDispatch() || pendingRecovery.has(requestId)) return;
+    pendingRecovery.add(requestId);
+    queue = queue
+      .then(() => applyPending(requestId))
+      .then(
+        () => {
+          recoveryEntries.delete(requestId);
+          failedRequestIds.delete(requestId);
+          pendingRecovery.delete(requestId);
+          if (!failedRequestIds.size && !recoveryScanFailed) {
+            recoveryText.textContent = '';
+            retry.disabled = true;
+          }
+        },
+        () => {
+          failedRequestIds.add(requestId);
+          pendingRecovery.delete(requestId);
+          if (!canDispatch()) {
+            retry.disabled = true;
+            recovery.hidden = true;
+            return;
+          }
+          recoveryText.textContent =
+            'A saved action still needs a document update or fresh evaluation. It has not been marked complete.';
+          retry.disabled = false;
+        },
+      );
+  }
+  pane = mount(document.querySelector<HTMLElement>('#pane')!, {
+    doc: session.doc,
+    currentDisclosureRevision: session.currentDisclosureRevision,
+    historyDisclosure: session.historyDisclosure,
+    state: session.state,
+    vocab: session.vocab,
+    engine: 'ok',
+    currentBasis: basis,
+    actBinding: { documentId: session.documentId, chain: session.chain, basis },
+    requiredWrites: [...session.requiredWrites],
+    requiredAcceptanceChecks: [...session.requiredAcceptanceChecks],
+    confirmedWrites: [...session.confirmedWrites],
+    acceptanceChecks: { ...session.acceptanceChecks },
+    onJump: (subject) => {
+      if (wordHost.jump)
+        void stillBound().then(async (ok) => {
+          if (ok) await wordHost.jump!(subject.id, session.documentId);
+        });
+    },
+    onAppend: async (request) => {
+      if (!canDispatch()) throw new Error('The current view cannot record actions.');
+      if (!(await stillBound()) || !canDispatch()) throw new Error('The active view changed.');
+      if (request.binding?.documentId !== session.documentId || request.binding.chain !== session.chain) {
+        return { status: 'refused', reason: 'request-id-conflict', state: pane.state };
+      }
+      await session.stageAppend(structuredClone(request));
+      if (!(await stillBound()) || !canDispatch())
+        throw new Error('The active view changed after the intent was saved.');
+      const result = await session.append(request);
+      if (!(await stillBound())) throw new Error('The active Word document changed.');
+      return result;
+    },
+    onChange(_state, act) {
+      if (!act) return;
+      scheduleRecovery(act.requestId);
+    },
+  });
+  // Recover independently persisted committed work after a pane restart.
+  void session
+    .pendingWrites()
+    .then((entries) => {
+      for (const entry of [...entries].sort((a, b) => a.sequence - b.sequence)) {
+        if (entry.requestId) scheduleRecovery(entry.requestId);
+      }
+    })
+    .catch(() => {
+      recoveryScanFailed = true;
+      recoveryText.textContent = 'The workspace could not recover saved document work. Nothing was marked complete.';
+      retry.disabled = false;
+    });
+}

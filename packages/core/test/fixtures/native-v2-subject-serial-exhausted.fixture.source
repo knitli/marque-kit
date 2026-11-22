@@ -1,0 +1,3 @@
+Producer fixture: replacement/fixtures/subject-exhausted-identity.json
+Producer test: replacement/native-wire/tests/findings_v2.rs, actual_subject_exhaustion_retains_requirement_and_action_without_addressable_work
+SHA-256: d64e4d16da374539f7220e29b90fae68d32a76bcbfa06c4dd78dd863ef00ab88

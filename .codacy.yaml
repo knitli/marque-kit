@@ -1,0 +1,46 @@
+---
+# Codacy configuration file — https://docs.codacy.com/repositories-configure/codacy-configuration-file/
+# File exclusions are applied by Codacy Cloud from this file on the default branch.
+# (The .codacy/codacy.config.json exclusions apply to LOCAL analysis only.)
+exclude_paths:
+  - '.agents/**'
+  - 'claudedocs/**'
+  - 'tools/**'
+  - 'evidence/**'
+  - 'scripts/**'
+  - 'specs/**'
+  - '.specify/**'
+  - '.claude/**'
+  - 'patent/**'
+  - '**/tests/**'
+  - '**/benches/**'
+  - '**/cache/**'
+  - '**/target/**'
+  - '**/dist/**'
+  # Frozen provisional-filing snapshots. Once a snapshot is cut it is
+  # priority-anchored and byte-immutable -- an auto-applied style fix here
+  # would alter a filed document. Excluded for every engine, not just
+  # markdownlint.
+  - 'patent/filed/**'
+engines:
+  markdownlint:
+    exclude_paths:
+      # Most of docs/ is entirely private -- the exception is security/
+      - 'docs/**'
+      - '.gemini/**'
+      - '.github/**'
+      - '.jules/**'
+      - 'demo/**'
+      - 'deploy/**'
+      - 'data/**'
+      - 'supply-chain/**'
+      - 'LICENSES/**'
+      - 'crates/*/docs/**'
+      - 'site/src/assets/**'
+      - '**/CHANGELOG.md'
+      - '**/LICENSE.md'
+    include_paths:
+      - 'docs/security/**'
+  lizard:
+    exclude_paths:
+      - '**/build.rs'

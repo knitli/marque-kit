@@ -32,10 +32,24 @@
  * engine's document as-is.
  */
 
-import { render as mark, settle, resettle, relabel, masked, el, button } from './marking.ts';
+import { readCabSnapshot } from '@knitli/marque-kit-core/native-cab';
+import type { NativeCabRequest } from '@knitli/marque-kit-core/native-cab';
+import { readNativeSemanticResults } from '@knitli/marque-kit-core/native-results';
+import type { NativeSemanticResultsRequest } from '@knitli/marque-kit-core/native-results';
+import type { NativeField, NativeSemanticResultSupportKind } from '@knitli/marque-kit-core/native-wire';
+import { render as mark, settle, resettle, relabel, el, button } from './marking.ts';
 import {
+  appendAcknowledgementIssue,
+  disclosedReading,
+  canWriteMarking,
+  hasDefinitiveSourceBasis,
+  disclosedAsks,
+  disclosedBasis,
+  disclosedAppendRequest,
+  isDisclosedState,
+  isDisclosedRequest,
   empty,
-  record,
+  newActRequestId,
   see,
   linted,
   snapshot,
@@ -43,7 +57,10 @@ import {
   decision,
   answered,
   canon,
-  face,
+  sameBasis,
+  effectiveReady,
+  writeConfirmationToken,
+  acceptedReplacements,
   isArtifact,
 } from '@knitli/marque-kit-core/state';
 import { GATE, rung, waits, artRung, artWaits, sections, type Sections } from '@knitli/marque-kit-core/attention';
@@ -51,18 +68,25 @@ import { cite, hasTip, tips, closeWithin } from './help.ts';
 import { check, watch, release } from './theme.ts';
 import type {
   Act,
+  ActAppendBinding,
+  ActAppendRefusal,
+  ActAppendRequest,
+  AppendActResult,
   ActValue,
   Anchor,
   ArtifactField,
   ArtifactView,
   Doc,
+  DocumentIntake,
   EngineState,
+  HistoryDisclosure,
   Finding,
   FindingView,
   Host,
   LogEntry,
   MarkingLike,
   Moment,
+  PendingAppend,
   Rule,
   Rung,
   Snapshot,
@@ -103,8 +127,13 @@ interface Draft {
   radio: boolean;
   focused: boolean;
 }
+export type { HistoryDisclosure } from '@knitli/marque-kit-core/types';
+type HistoryDisclosureHost = Pick<
+  Host,
+  'actBinding' | 'currentBasis' | 'currentDisclosureRevision' | 'historyDisclosure'
+>;
 /** What the receipt is about: the session as the engine will seal it. */
-export interface Session {
+export interface Session extends HistoryDisclosureHost {
   schema?: string;
   classifier_id?: string;
   session_root?: string;
@@ -126,6 +155,14 @@ export interface Update {
   engine?: EngineState;
   moment?: Moment;
   readOnly?: boolean;
+  /** The host's latest known document/chain/basis binding; null clears it to unknown. */
+  actBinding?: ActAppendBinding | null;
+  currentDisclosureRevision?: string | null;
+  historyDisclosure?: HistoryDisclosure | null;
+  /** Replace or revoke the independently supplied native CAB scope. */
+  nativeCabRequest?: NativeCabRequest | null;
+  /** Replace or revoke the independently supplied selected-result disclosure. */
+  nativeSemanticResultsRequest?: NativeSemanticResultsRequest | null;
   /** The log length when this lint began. */
   linted?: number | undefined;
   /** The host's request counter. */
@@ -148,6 +185,8 @@ export interface Mounted {
 /* ── helpers ─────────────────────────────────────────────────────────── */
 /** DOM ids per rendered copy: the gate and the pane can show the same finding at once. */
 let uid = 0;
+// Draft comparison keys are private to the form and never belong in a DOM attribute.
+const draftContext = new WeakMap<HTMLElement, { asked: string; reading?: string }>();
 const placed = <T extends HTMLElement>(m: T): T => {
   queueMicrotask(() => settle(m));
   return m;
@@ -225,9 +264,25 @@ function stampOf(f: Subject, r: Rung, moment?: Moment): Stamp {
 }
 
 /* ── C4 · the asks renderer ──────────────────────────────────────────── */
-function asks(f: FindingView, host: Host, r: Rung, help: string[]): HTMLFormElement | null {
+const canRecordAct = (host: Host): boolean => typeof host.onAct === 'function';
+const canWriteDocument = (host: Host): boolean => canRecordAct(host) && !host.readOnly;
+
+function asks(f: FindingView, host: Host, r: Rung, help: string[]): HTMLElement | null {
   const a = f.asks;
   if (!a) return null;
+  if (!canRecordAct(host)) return el('p', 'mq-p', 'This host cannot record actions.');
+  if (host.readOnly) {
+    const routes = el('div', 'mq-ask');
+    routes.append(
+      el('p', 'mq-p', 'This document is read-only. You can route the question, but cannot answer it here.'),
+    );
+    const actions = el('div', 'mq-acts');
+    if (r !== 'blocking' && f.deferred !== 'deferred')
+      actions.append(button('ghost', 'Ask me at finalize', () => host.onAct?.(f, 'deferred')));
+    if (f.deferred !== 'declined') actions.append(button('ghost', 'Not my call', () => host.onAct?.(f, 'declined')));
+    if (actions.childElementCount) routes.append(actions);
+    return routes;
+  }
   const form = el('form', 'mq-ask');
   const name = `ask-${f.id}-${++uid}`;
   let chosen: ActValue | null = null;
@@ -268,6 +323,10 @@ function asks(f: FindingView, host: Host, r: Rung, help: string[]): HTMLFormElem
   });
   const options = a.options === 'outcome.readings' ? (f.outcome.readings ?? []) : a.options || [];
 
+  const askedKey = canon({ asked: disclosedAsks(a), basis: f.evaluationBasis && disclosedBasis(f.evaluationBasis) });
+  const maskedQuestion =
+    !canWriteMarking(f.marking?.as_written) || options.some((option) => !canWriteMarking(option.result));
+  const restoreDraft = !maskedQuestion || hasDefinitiveSourceBasis(f.evaluationBasis, f.evaluationBasis);
   const fs = el('fieldset', 'mq-opts');
   fs.append(el('legend', null, a.text));
   options.forEach((o, i) => {
@@ -277,8 +336,7 @@ function asks(f: FindingView, host: Host, r: Rung, help: string[]): HTMLFormElem
     inp.name = name;
     inp.value = String(i);
     inp.dataset.draft = `${f.id}:reading`;
-    inp.dataset.asked = canon(a); // a draft is for this question only
-    inp.dataset.reading = canon(o); // a draft is the reading itself, not its place in the list
+    if (restoreDraft) draftContext.set(inp, { asked: askedKey, reading: canon(disclosedReading(o)) });
     inp.addEventListener('change', () => {
       chosen = { reading: o, index: i };
       free.value = '';
@@ -300,7 +358,7 @@ function asks(f: FindingView, host: Host, r: Rung, help: string[]): HTMLFormElem
   free.id = `${name}-free`;
   free.type = 'text';
   free.dataset.draft = `${f.id}:free`;
-  free.dataset.asked = canon(a);
+  if (restoreDraft) draftContext.set(free, { asked: askedKey });
   free.placeholder = a.field?.hint || 'Type an answer';
   free.addEventListener('input', () => {
     const t = free.value.trim();
@@ -410,7 +468,13 @@ export function card(f: FindingView, host: Host = {}): HTMLElement {
   }
 
   // The alternative the author also wrote (advisory): one action away.
-  if (f.outcome?.kind === 'chosen_over' && f.outcome.readings?.length && !f.overridden && !answered(f)) {
+  if (
+    canWriteDocument(host) &&
+    f.outcome?.kind === 'chosen_over' &&
+    f.outcome.readings?.length &&
+    !f.overridden &&
+    !answered(f)
+  ) {
     const alt = f.outcome.readings[0]!;
     const dep = el('div', 'mq-dep');
     dep.append(el('span', null, 'Or, as you also wrote:'));
@@ -423,7 +487,7 @@ export function card(f: FindingView, host: Host = {}): HTMLElement {
   if (ask) c.append(ask);
 
   // Conservative fallback, named, for the unattended boundary.
-  if (f.outcome?.fallback && r === 'blocking') {
+  if (canWriteDocument(host) && f.outcome?.fallback && r === 'blocking') {
     const fb = el('div', 'mq-dep');
     fb.append(el('span', null, "If no one can answer, Marque's most restrictive form keeps every stated equity:"));
     fb.append(placed(mark(f.outcome.fallback.result, { size: 'sm' })));
@@ -443,18 +507,20 @@ export function card(f: FindingView, host: Host = {}): HTMLElement {
   if (ct) foot.append(ct);
   // Back to what Marque said: "Change my answer", "Undo" on a choice the
   // person made, "Fix it after all" on an override. Each is a new line in the log.
-  if (answered(f))
+  if (canWriteDocument(host) && answered(f))
     foot.append(button('ghost', wasAsked(f) ? 'Change my answer' : 'Undo', () => host.onAct?.(f, 'changed', null)));
-  else if (f.overridden) foot.append(button('ghost', 'Fix it after all', () => host.onAct?.(f, 'changed', null)));
+  else if (canRecordAct(host) && f.overridden)
+    foot.append(button('ghost', 'Fix it after all', () => host.onAct?.(f, 'changed', null)));
   // No Undo on a fix the person must own; an override is recorded, not hidden.
   // Only a fix Marque made or chose can be kept against: an available one isn't applied, a withheld one is none.
   else if (
+    canRecordAct(host) &&
     (r === 'noticeable' || r === 'advisory') &&
     (f.outcome?.kind === 'applied' || f.outcome?.kind === 'chosen_over')
   )
     foot.append(button('ghost', 'Keep as written', () => host.onAct?.(f, 'kept_as_written')));
   // Available: Marque has the fix and the person applies it (CONTRACT: available → apply); the host writes it.
-  if (f.outcome?.kind === 'available' && f.outcome.result && !answered(f) && !f.overridden && !host.readOnly) {
+  if (canWriteDocument(host) && f.outcome?.kind === 'available' && f.outcome.result && !answered(f) && !f.overridden) {
     const acts = el('div', 'mq-acts');
     acts.append(button('act', 'Apply', () => host.onAct?.(f, 'answered', { apply: true })));
     c.append(acts);
@@ -564,16 +630,40 @@ export function row(f: Subject, host: Host = {}, doc?: Doc | null): HTMLDivEleme
 /** A required artifact Marque derived and nobody has written: it goes in as the document goes out. */
 const due = (a: ArtifactView): boolean =>
   a.state === 'absent_but_required' && !!a.derived_value && a.fixability === 'fixable';
-/** Read-only, nothing can be written, so a due artifact holds the document up. */
+/** No automatic artifact placement can be confirmed by a read-only host. */
 const unwritable = (doc: Doc, host: Host): number => (host.readOnly ? doc.document.artifacts.filter(due).length : 0);
-const ready = (doc: Doc, host: Host): boolean => doc.document.ready && !unwritable(doc, host);
+/** Read-only, nothing can be written, so a due artifact holds the document up. */
+const unconfirmedWrites = (doc: Doc, host: Host): string[] =>
+  [
+    ...new Set([
+      ...(doc.document.awaitingWrites ?? []),
+      ...(host.requiredWrites ?? []),
+      ...doc.document.artifacts.filter(due).map((a) => a.id),
+    ]),
+  ].filter((token) => {
+    const basis = doc.document.evaluation?.basis;
+    const confirmation = basis && writeConfirmationToken(token, basis);
+    return !confirmation || !(host.confirmedWrites ?? []).includes(confirmation);
+  });
+const ready = (doc: Doc, host: Host): boolean =>
+  effectiveReady(doc, {
+    ...host,
+    requiredWrites: [...(host.requiredWrites ?? []), ...doc.document.artifacts.filter(due).map((a) => a.id)],
+  });
 /** What the gate lists: blockers and the writes still waiting, once each. A required
  *  finding that never blocks needs the person but holds nothing up. */
 const holding = (doc: Doc, host: Host = {}): string[] => [
   ...new Set([
     ...doc.document.blocking,
     ...(doc.document.pending || []),
-    ...(host.readOnly ? doc.document.artifacts.filter(due).map((a) => a.id) : []),
+    ...unconfirmedWrites(doc, host),
+    ...(host.requiredAcceptanceChecks ?? [])
+      .filter((id) => {
+        const basis = doc.document.evaluation?.basis;
+        const confirmation = basis && writeConfirmationToken(id, basis);
+        return !confirmation || host.acceptanceChecks?.[id] !== confirmation;
+      })
+      .map((id) => `check:${id}`),
   ]),
 ];
 const held = (doc: Doc, host: Host): number => holding(doc, host).length;
@@ -630,6 +720,259 @@ export function status(doc: Doc | null, host: Host = {}): HTMLDivElement {
     if (g.later.length) s.append(words(`${g.must.length ? 'and ' : ''}${g.later.length} before you finalize`));
   }
   return s;
+}
+
+/** Read-only engine receipts: source text and candidate evidence never enter the view. */
+const TRANSFORMATION_NAMES: Readonly<Record<string, string>> = {
+  normalized_ascii_case: 'Normalized ASCII case',
+  missing_opening_delimiter_at_boundary: 'Missing opening delimiter at the boundary',
+};
+const RESOURCE_NAMES: Readonly<Record<string, string>> = {
+  input_bytes: 'input bytes',
+  input_records: 'input records',
+  input_members: 'input members',
+  items: 'items',
+  support_edges: 'support edges',
+  work: 'work',
+  retained_bytes: 'retained bytes',
+  output_bytes: 'output bytes',
+};
+const MAX_SOURCE_BYTES = 262_144;
+// The producer's projection index cap covers receipts and candidate rows together.
+const MAX_INTAKE_INDEX_ITEMS = 8_192;
+const MAX_INTAKE_DISPLAY_CANDIDATES = 64;
+const safeIndex = (value: unknown, max = Number.MAX_SAFE_INTEGER): value is number =>
+  Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= max;
+const ownName = (names: Readonly<Record<string, string>>, key: string): string | undefined =>
+  Object.prototype.hasOwnProperty.call(names, key) ? names[key] : undefined;
+
+type SafeSpan = { start: number; end: number };
+function safeSpan(value: unknown): SafeSpan | null {
+  if (!Array.isArray(value) || value.length !== 2) return null;
+  const [start, end] = value;
+  if (!safeIndex(start, MAX_SOURCE_BYTES) || !safeIndex(end, MAX_SOURCE_BYTES) || start > end) return null;
+  return { start, end };
+}
+
+type SafeTransformation = { name: string; start: number; end: number; observation: number };
+function safeTransformation(row: unknown): SafeTransformation | null {
+  if (!row || typeof row !== 'object') return null;
+  const value = row as Record<string, unknown>;
+  const name = typeof value.kind === 'string' ? ownName(TRANSFORMATION_NAMES, value.kind) : undefined;
+  const span = safeSpan(value.span);
+  if (!name || !span || !safeIndex(value.observation)) return null;
+  return { name, ...span, observation: value.observation };
+}
+
+type SafeIntakeCandidate = {
+  observation: number;
+  span: SafeSpan;
+  classification?: string;
+  system?: 'FGI' | 'JOINT';
+  ownerUnresolved: boolean;
+};
+const CLASSIFICATION_NAMES: Readonly<Record<string, string>> = {
+  u: 'Unclassified',
+  c: 'Confidential',
+  s: 'Secret',
+  ts: 'Top Secret',
+  r: 'Restricted',
+};
+const FOREIGN_LEVEL_CODES: Readonly<Record<string, string>> = {
+  unclassified: 'u',
+  confidential: 'c',
+  secret: 's',
+  top_secret: 'ts',
+  restricted: 'r',
+};
+
+function safeIntakeCandidate(row: unknown): SafeIntakeCandidate | null {
+  if (!row || typeof row !== 'object') return null;
+  const value = row as Record<string, unknown>;
+  const span = safeSpan(value.span);
+  if (!safeIndex(value.observation) || !span) return null;
+  const hypothesis = value.hypothesis;
+  const classificationCode =
+    hypothesis && typeof hypothesis === 'object' && (hypothesis as Record<string, unknown>).kind === 'classification'
+      ? String((hypothesis as Record<string, unknown>).classification)
+      : undefined;
+  const classification =
+    classificationCode === undefined ? undefined : ownName(CLASSIFICATION_NAMES, classificationCode);
+  const evidence = Array.isArray(value.evidence) ? value.evidence : [];
+  let system: SafeIntakeCandidate['system'];
+  let ownerUnresolved = false;
+  for (const raw of evidence) {
+    if (!raw || typeof raw !== 'object') continue;
+    const item = raw as Record<string, unknown>;
+    if (item.kind === 'known_lexical_token' && item.category === 'classification') {
+      const levelCode = typeof item.level === 'string' ? ownName(FOREIGN_LEVEL_CODES, item.level) : undefined;
+      if (levelCode === classificationCode && item.system === 'fgi') system = 'FGI';
+      else if (levelCode === classificationCode && item.system === 'joint') system = 'JOINT';
+    }
+    if (item.kind === 'unresolved_owner') ownerUnresolved = true;
+  }
+  return {
+    observation: value.observation,
+    span,
+    ...(classification && { classification }),
+    ...(system && { system }),
+    ownerUnresolved,
+  };
+}
+
+function candidateProjection(intake: DocumentIntake): HTMLElement | null {
+  if (intake.status === 'refused' || intake.status === 'unavailable') return null;
+  const supplied = Array.isArray(intake.candidates) ? intake.candidates : null;
+  const emitted = safeIndex(intake.candidate_count_emitted) ? intake.candidate_count_emitted : undefined;
+  const total = safeIndex(intake.candidate_count) ? intake.candidate_count : undefined;
+  if (supplied === null && emitted === undefined && total === undefined) return null;
+
+  const bounded = supplied !== null && supplied.length <= MAX_INTAKE_INDEX_ITEMS && emitted === supplied.length;
+  const candidates = bounded && supplied ? supplied.map(safeIntakeCandidate) : [];
+  const retained = candidates.filter((candidate): candidate is SafeIntakeCandidate => candidate !== null);
+  const full =
+    intake.candidate_inventory_status === 'complete' &&
+    bounded &&
+    total !== undefined &&
+    emitted === total &&
+    retained.length === supplied?.length;
+  const summary = el(
+    'p',
+    'mq-p',
+    full
+      ? `Source candidate details · ${plural(retained.length, 'candidate', 'candidates')} retained`
+      : `Partial source evidence · ${retained.length} of ${total ?? emitted ?? '?'} candidates retained`,
+  );
+  const body = el('div', 'mq-source-evidence');
+  body.append(summary);
+  if (!full) {
+    const resource = intake.projection_cutoff?.resource;
+    const cutoff = typeof resource === 'string' ? ownName(RESOURCE_NAMES, resource) : undefined;
+    body.append(
+      el('p', 'mq-p', `Candidate evidence is incomplete${cutoff ? `; projection stopped at ${cutoff}` : ''}.`),
+    );
+  }
+  if (retained.length) {
+    const list = el('ul', 'mq-transforms');
+    for (const candidate of retained.slice(0, MAX_INTAKE_DISPLAY_CANDIDATES)) {
+      const parts: string[] = [];
+      if (candidate.classification) {
+        parts.push(`${candidate.system ? `${candidate.system} ` : ''}classification: ${candidate.classification}`);
+      }
+      if (candidate.ownerUnresolved) parts.push('Foreign ownership unresolved.');
+      if (!parts.length) continue;
+      list.append(el('li', 'mq-transform', parts.join(' · ')));
+    }
+    if (list.childElementCount) body.append(list);
+    if (retained.length > MAX_INTAKE_DISPLAY_CANDIDATES) {
+      body.append(el('p', 'mq-p', `Showing the first ${MAX_INTAKE_DISPLAY_CANDIDATES} candidate summaries.`));
+    }
+  }
+  return body;
+}
+
+function candidateOwners(candidates: readonly unknown[]): Map<number, SafeSpan | null> {
+  const owners = new Map<number, SafeSpan | null>();
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'object') continue;
+    const value = candidate as Record<string, unknown>;
+    const observation = value.observation;
+    if (!safeIndex(observation)) continue;
+    const span = safeSpan(value.span);
+    if (owners.has(observation)) {
+      owners.set(observation, null);
+    } else {
+      owners.set(observation, span);
+    }
+  }
+  return owners;
+}
+
+function transformationReceipts(intake: DocumentIntake): HTMLDetailsElement {
+  const status = ['complete', 'partial', 'refused', 'unavailable'].includes(intake.status)
+    ? intake.status
+    : 'unavailable';
+  const refused = status === 'refused' || status === 'unavailable';
+  let suppliedRows: unknown[] | null = null;
+  let rows: SafeTransformation[] = [];
+  let counted = false;
+  let total: number | undefined;
+  let ownerReferencesComplete = false;
+  if (!refused) {
+    const inputRows = intake.transformations;
+    const inputCandidates = intake.candidates;
+    const emittedCandidateCount = intake.candidate_count_emitted;
+    suppliedRows = Array.isArray(inputRows) ? inputRows : null;
+    const candidates = Array.isArray(inputCandidates) ? inputCandidates : null;
+    counted = safeIndex(intake.transformation_count);
+    total = counted ? intake.transformation_count : undefined;
+    const bounded =
+      suppliedRows !== null &&
+      candidates !== null &&
+      safeIndex(emittedCandidateCount) &&
+      emittedCandidateCount === candidates.length &&
+      suppliedRows.length + candidates.length <= MAX_INTAKE_INDEX_ITEMS;
+    if (bounded && suppliedRows !== null && candidates !== null) {
+      const owners = candidateOwners(candidates);
+      for (const raw of suppliedRows) {
+        const row = safeTransformation(raw);
+        if (!row) continue;
+        const owner = owners.get(row.observation);
+        if (owner && owner.start <= row.start && row.end <= owner.end) rows.push(row);
+      }
+      ownerReferencesComplete = true;
+    }
+  }
+  const complete =
+    status === 'complete' &&
+    counted &&
+    suppliedRows !== null &&
+    ownerReferencesComplete &&
+    rows.length === suppliedRows.length &&
+    rows.length === total;
+  const partial = !complete && !refused;
+  const summary = refused
+    ? `Source transformations · ${status}`
+    : complete && total === 0
+      ? 'Source transformations · none recorded'
+      : complete
+        ? `Source transformations · ${total} recorded`
+        : `Source transformations · ${status === 'partial' ? 'partial' : 'incomplete'} · ${rows.length} of ${counted ? total : '?'} retained`;
+  const details = el('details', 'mq-engine mq-transform-receipt') as HTMLDetailsElement;
+  details.append(el('summary', 'mq-h', summary));
+
+  const body = el('div', 'mq-txt');
+  body.append(el('p', 'mq-p', 'Read-only records from this lint. They do not change the source or affect readiness.'));
+  if (partial) {
+    const resource = intake.projection_cutoff?.resource;
+    const cutoff = typeof resource === 'string' ? ownName(RESOURCE_NAMES, resource) : undefined;
+    body.append(
+      el(
+        'p',
+        'mq-p',
+        `Partial receipt: ${rows.length} of ${counted ? total : 'an unknown number of'} transformations are retained${cutoff ? `; the projection stopped at ${cutoff}` : ''}.`,
+      ),
+    );
+  } else if (refused) {
+    body.append(el('p', 'mq-p', 'A complete transformation receipt was not available.'));
+  }
+  if (rows.length) {
+    const list = el('ul', 'mq-transforms');
+    for (const row of rows) {
+      const item = el('li', 'mq-transform');
+      item.append(
+        el('span', 'mq-h', row.name),
+        el('span', 'mq-p', `Original byte span ${row.start}–${row.end}`),
+        el('span', 'mq-p', `Owning observation ${row.observation}`),
+      );
+      list.append(item);
+    }
+    body.append(list);
+  }
+  const candidateDetails = candidateProjection(intake);
+  if (candidateDetails) body.append(candidateDetails);
+  details.append(body);
+  return details;
 }
 
 /* ── C6 · the pane ───────────────────────────────────────────────────── */
@@ -737,10 +1080,53 @@ const did = (e: LogEntry): string =>
           ? 'Filled in'
           : DONE[e.act];
 
-/** Every act, newest first. The answer or override still in force can be taken back, which asks the
- *  question again; an artifact's only until it is written, and a typed field's not yet (core can't).
- *  Only that act shows its marking, from the latest view: a code concealed since is masked there too. */
+type DisclosedHistoryEntry = Extract<HistoryDisclosure['entries'][number], { status: 'available' }>;
+
+/** Index the provider's current display once; conflicting request or sequence identities withhold that act. */
+function historyDisplay(doc: Doc, context: HistoryDisclosureHost): (entry: LogEntry) => DisclosedHistoryEntry | null {
+  const p = context.historyDisclosure;
+  const binding = context.actBinding;
+  if (
+    !p ||
+    !binding?.documentId ||
+    !binding.chain ||
+    !context.currentDisclosureRevision?.trim() ||
+    p.disclosureRevision !== context.currentDisclosureRevision ||
+    p.documentId !== binding.documentId ||
+    p.chain !== binding.chain ||
+    !Array.isArray(p.entries) ||
+    !sameBasis(p.basis, context.currentBasis) ||
+    !sameBasis(binding.basis, context.currentBasis) ||
+    !sameBasis(doc.document.evaluation?.basis, context.currentBasis)
+  )
+    return () => null;
+  const requests = new Set<string>();
+  const repeated = new Set<string>();
+  const rows = new Map<number, HistoryDisclosure['entries'][number] | null>();
+  for (const row of p.entries) {
+    if (requests.has(row.requestId)) repeated.add(row.requestId);
+    requests.add(row.requestId);
+    rows.set(row.sequence, rows.has(row.sequence) ? null : row);
+  }
+  return (entry) => {
+    const row = rows.get(entry.sequence);
+    if (
+      !entry.requestId ||
+      !Number.isSafeInteger(entry.sequence) ||
+      entry.sequence < 1 ||
+      entry.binding?.documentId !== p.documentId ||
+      entry.binding.chain !== p.chain ||
+      row?.status !== 'available' ||
+      row.requestId !== entry.requestId ||
+      row.subjectId !== entry.id ||
+      repeated.has(entry.requestId)
+    )
+      return null;
+    return row;
+  };
+}
 function history(doc: Doc, log: readonly LogEntry[], host: Host): HTMLElement {
+  const display = historyDisplay(doc, host);
   const rows = el('div', 'mq-rows mq-history');
   const all: Subject[] = [...doc.findings, ...doc.document.artifacts];
   [...log].reverse().forEach((e, i, newest) => {
@@ -752,16 +1138,11 @@ function history(doc: Doc, log: readonly LogEntry[], host: Host): HTMLElement {
     // In force: the last act on its id, and still the one the finding stands on.
     const last = newest.findIndex((y) => y.id === e.id) === i;
     const force = last && !!x && [x.person, isArtifact(x) ? null : decision(x)].some((d) => d && canon(d) === canon(e));
-    if (force && !isArtifact(x)) {
-      const m =
-        e.act === 'kept_as_written'
-          ? x.marking?.as_written
-          : e.act === 'answered' || e.act === 'changed'
-            ? x.outcome?.result
-            : null;
-      if (m && isMarking(m)) what.append(placed(mark(m, { form: 'folded' })));
-      else if (e.value?.free) what.append(el('span', 'mq-p', `“${e.value.free}”`));
-    }
+    if (force && !isArtifact(x) && e.act === 'kept_as_written' && x.marking?.as_written)
+      what.append(placed(mark(x.marking.as_written, { form: 'folded' })));
+    const disclosed = display(e);
+    if (disclosed?.text) what.append(el('span', 'mq-p', disclosed.text));
+    if (disclosed?.marking) what.append(placed(mark(disclosed.marking, { form: 'folded' })));
     li.append(what);
     // Routing acts (later, not my call) leave the question open: there is nothing to take back.
     const back =
@@ -770,12 +1151,132 @@ function history(doc: Doc, log: readonly LogEntry[], host: Host): HTMLElement {
       (e.act === 'kept_as_written' || ((e.act === 'answered' || e.act === 'changed') && e.value != null));
     if (back) {
       const end = el('div', 'end');
-      end.append(button('ghost', 'Take back', () => host.onAct?.(x, 'changed', null)));
+      if (canWriteDocument(host)) end.append(button('ghost', 'Take back', () => host.onAct?.(x, 'changed', null)));
       li.append(end);
     }
     rows.append(li);
   });
   return rows;
+}
+
+const CAB_FIELD_LABEL: Record<NativeField, string> = {
+  classified_by: 'Classified by',
+  agency_and_office_of_origin: 'Agency and office of origin',
+  classification_reason: 'Classification reason',
+  derived_from: 'Derived from',
+  declassify_on: 'Declassify on',
+};
+const RESULT_SUPPORT_LABEL: Record<NativeSemanticResultSupportKind, string> = {
+  authored: 'Author-written material',
+  unresolved_occurrence: 'Unresolved source occurrence',
+  implied_usa: 'Implied by U.S. origin',
+  examined_absence: 'Examined absence',
+  rel_receive_implies_show: 'Foreign release relationship',
+  eyes_receive_implies_show: 'EYES receive implies show',
+  preview_answer: 'Preview response',
+  cab_proof: 'Classification authority evidence',
+  sci_proof: 'Sensitive compartmented information evidence',
+  default_policy_proof: 'Default policy evidence',
+};
+const words = (value: string): string => value.replaceAll('_', ' ');
+/** A scoped read, not a finding, document readiness verdict, or writable card. */
+function nativeCab(doc: Doc, host: Host): HTMLElement {
+  const section = el('section', 'mq-section');
+  const heading = el('h2', 'mq-label', 'Classification Authority Block');
+  section.append(heading);
+  const result = host.nativeCabRequest && readCabSnapshot(doc, host.nativeCabRequest);
+  if (!result) {
+    section.append(el('p', 'mq-p', 'The current authority block evaluation is unavailable.'));
+    return section;
+  }
+  const ready = result.readiness.kind === 'supported' ? words(result.readiness.status) : words(result.readiness.kind);
+  section.append(el('p', 'mq-p', `Authority block evaluation is ${ready}.`));
+  section.append(el('p', 'mq-p', `Source coverage is ${words(result.coverage.status)}.`));
+  const list = el('dl', 'mq-rows');
+  for (const req of result.requirements) {
+    if (!req.field) continue;
+    const row = el('div', 'mq-row-item');
+    row.append(el('dt', 'mq-label', CAB_FIELD_LABEL[req.field]), el('dd', 'mq-p', words(req.state)));
+    list.append(row);
+  }
+  if (list.childElementCount) section.append(list);
+  if ('findings' in result) {
+    section.append(el('p', 'mq-p', 'Finding details are partial.'));
+    const findings = el('ul', 'mq-rows');
+    for (const finding of result.findings.items) {
+      const row = el('li', 'mq-row-item');
+      const req =
+        finding.requirement.status === 'resolved' ? result.requirements[Number(finding.requirement.index)] : null;
+      row.append(el('span', 'mq-label', req?.field ? CAB_FIELD_LABEL[req.field] : 'Requirement unavailable'));
+      row.append(
+        el(
+          'span',
+          'mq-p',
+          finding.outcome === 'needs_fact'
+            ? 'Finding reports: Additional information is needed.'
+            : 'Finding outcome is unavailable.',
+        ),
+      );
+      const prompt = finding.question?.prompt ?? finding.requested_action?.requested_fact;
+      if (prompt) row.append(el('span', 'mq-p', prompt));
+      if (finding.identity.status === 'unavailable') row.append(el('span', 'mq-p', 'Finding identity is unavailable.'));
+      if (!finding.question) row.append(el('span', 'mq-p', 'Question identity is unavailable.'));
+      if (!finding.result || !finding.result_revision)
+        row.append(el('span', 'mq-p', 'Result identity is unavailable.'));
+      findings.append(row);
+    }
+    if (findings.childElementCount) section.append(findings);
+  }
+  return section;
+}
+
+/** A bounded read-only projection of only the rows and details the host granted. */
+function nativeSemanticResults(doc: Doc, host: Host): HTMLElement {
+  const section = el('section', 'mq-section');
+  section.append(el('h2', 'mq-label', 'Evaluation results'));
+  const result = readNativeSemanticResults(doc, host.nativeSemanticResultsRequest, host.currentDisclosureRevision);
+  if (!result) {
+    section.append(el('p', 'mq-p', 'The current result disclosure is unavailable.'));
+    return section;
+  }
+  section.append(
+    el(
+      'p',
+      'mq-p',
+      `${plural(result.disclosure.items.length, 'selected result row', 'selected result rows')} are available for this read-only view. Source values and identifiers are not shown.`,
+    ),
+  );
+  if (result.disclosure.coverage)
+    section.append(el('p', 'mq-p', `Result coverage is ${words(result.disclosure.coverage)}.`));
+  const rows = el('ol', 'mq-rows');
+  for (const item of result.disclosure.items) {
+    const row = el('li', 'mq-row-item');
+    const title = item.meaning?.status === 'available' ? CAB_FIELD_LABEL[item.meaning.field] : `Result ${item.ordinal}`;
+    row.append(el('h3', 'mq-label', title));
+    if (!item.meaning || item.meaning.status === 'unavailable')
+      row.append(el('p', 'mq-p', 'Typed meaning is unavailable.'));
+    if (item.support_kinds) {
+      const supportText = item.support_kinds.map((kind) => RESULT_SUPPORT_LABEL[kind]).join('; ');
+      row.append(el('p', 'mq-p', supportText ? `Evidence types: ${supportText}.` : 'No support types were reported.'));
+    }
+    if (item.dependencies) {
+      if (item.dependencies.status === 'unavailable') {
+        row.append(el('p', 'mq-p', 'Dependency information is unavailable.'));
+      } else if (item.dependencies.items.length === 0) {
+        row.append(el('p', 'mq-p', 'No result dependencies were reported.'));
+      } else {
+        const dependencyRows = item.dependencies.items
+          .map((dependency) =>
+            dependency.status === 'resolved' ? `Result ${dependency.row}` : 'An unavailable dependency',
+          )
+          .join('; ');
+        row.append(el('p', 'mq-p', `Depends on: ${dependencyRows}.`));
+      }
+    }
+    rows.append(row);
+  }
+  if (rows.childElementCount) section.append(rows);
+  return section;
 }
 
 export function pane(doc: Doc | null, host: Host = {}): HTMLDivElement {
@@ -801,6 +1302,12 @@ export function pane(doc: Doc | null, host: Host = {}): HTMLDivElement {
     return p;
   }
 
+  if ('native_evaluation' in doc.document || 'native_semantic_results' in doc.document) {
+    if ('native_evaluation' in doc.document) p.append(nativeCab(doc, host));
+    if ('native_semantic_results' in doc.document) p.append(nativeSemanticResults(doc, host));
+    return p;
+  }
+
   const g = sections(doc, host.moment);
   const atGate = GATE.has(host.moment);
   head.append(
@@ -812,6 +1319,7 @@ export function pane(doc: Doc | null, host: Host = {}): HTMLDivElement {
   );
   p.append(status(doc, host));
   if (partial) p.append(engineState(host));
+  if (doc.document.intake) p.append(transformationReceipts(doc.document.intake));
 
   if (host.readOnly) {
     // The host's state, not Marque's. Findings still show; a reader needs them too.
@@ -910,14 +1418,14 @@ export function artifact(a: ArtifactView, host: Host = {}, doc?: Doc | null): HT
     // Generated, not applied: the person can apply it; the host writes it (docs/COMPONENTS.md, C9).
     const fixes = a.state === 'absent_but_required' || a.state === 'present_not_canonical';
     if (a.applying && fixes) c.append(el('p', 'mq-p', 'Waiting to be written into the document.'));
-    else if (a.fixability === 'fixable' && fixes && !host.readOnly) {
+    else if (a.fixability === 'fixable' && fixes && canWriteDocument(host)) {
       const acts = el('div', 'mq-acts');
       acts.append(button('act', 'Apply', () => host.onAct?.(a, 'answered', { apply: true })));
       c.append(acts);
     }
   }
   // Present but not required: an Advisory in its own right, one optional action. Leaving it is the other choice.
-  if (a.state === 'present_not_required' && !a.applying && !host.readOnly) {
+  if (a.state === 'present_not_required' && !a.applying && canWriteDocument(host)) {
     const acts = el('div', 'mq-acts');
     acts.append(button('act', 'Remove it', () => host.onAct?.(a, 'answered', { remove: true })));
     c.append(acts);
@@ -927,12 +1435,19 @@ export function artifact(a: ArtifactView, host: Host = {}, doc?: Doc | null): HT
     const dl = el('div', 'mq-cab');
     // A field a person fills: labeled by its key, committed on Enter or Fill in.
     const entry = (k: string, fld: ArtifactField, key: HTMLElement): HTMLSpanElement => {
+      if (!canWriteDocument(host)) {
+        const value = el('span', `v ${fld.state === 'blank' ? 'blank' : ''}`.trim(), fld.value || 'Not provided');
+        value.setAttribute('aria-label', `${k.replace(/_/g, ' ')}: ${fld.value || 'not provided'}`);
+        return value;
+      }
       const v = el('span', 'v blank mq-field');
       const inp = el('input', 'mono');
       inp.type = 'text';
       inp.id = `${a.id}-${k}-${++uid}`;
       inp.dataset.draft = `${a.id}:${k}`;
-      inp.dataset.asked = canon(fld); // and this field as given
+      draftContext.set(inp, {
+        asked: canon({ ...fld, evaluationBasis: fld.evaluationBasis && disclosedBasis(fld.evaluationBasis) }),
+      });
       key.id = `${inp.id}-k`;
       inp.setAttribute('aria-labelledby', key.id);
       inp.placeholder = fld.format || '';
@@ -1000,7 +1515,9 @@ export function artifact(a: ArtifactView, host: Host = {}, doc?: Doc | null): HT
           i.focus();
         });
         change.dataset.change = `${a.id}:${k}`;
-        change.dataset.asked = canon(fld);
+        draftContext.set(change, {
+          asked: canon({ ...fld, evaluationBasis: fld.evaluationBasis && disclosedBasis(fld.evaluationBasis) }),
+        });
         v.append(' ', change);
       }
       dl.append(v);
@@ -1009,15 +1526,25 @@ export function artifact(a: ArtifactView, host: Host = {}, doc?: Doc | null): HT
     if (a.applying && !a.derived_value && a.state !== 'present_not_required')
       c.append(el('p', 'mq-p', 'Waiting to be written into the document.'));
   }
-  if (a.if_taken) {
+  const joint = a.jointPreview;
+  const evaluation = doc?.document.evaluation;
+  const baseOnly = (basis: Host['currentBasis']) => basis && { ...basis, replacements: {} };
+  const jointIsCurrent =
+    joint &&
+    joint.status === 'complete' &&
+    evaluation?.completion === 'complete' &&
+    evaluation.jointPreview?.status === 'complete' &&
+    sameBasis(evaluation.basis, host.currentBasis) &&
+    sameBasis(baseOnly(joint.basis), baseOnly(evaluation.basis)) &&
+    sameBasis(joint.basis, evaluation.jointPreview.basis) &&
+    canon(joint.basis.replacements) === canon(doc ? acceptedReplacements(doc) : {});
+  if (joint?.status === 'unavailable') {
+    c.append(el('p', 'mq-p', 'Combined preview unavailable. Marque will check the accepted answers together.'));
+  } else if (jointIsCurrent && joint?.result) {
     const dep = el('div', 'mq-dep');
-    for (const [fid, alt] of Object.entries(a.if_taken)) {
-      dep.append(
-        // Named by where the finding is, never by its id: an id is the engine's, not the person's.
-        el('span', null, `If ${alternative(doc?.findings.find((x) => x.id === fid))} is taken:`),
-        placed(mark(alt, { size: 'sm' })),
-      );
-    }
+    dep.append(el('span', null, 'If the accepted answers are taken together:'));
+    if (isMarking(joint.result)) dep.append(placed(mark(joint.result, { size: 'sm' })));
+    else dep.append(el('span', null, 'A combined artifact value is available.'));
     c.append(dep);
   }
   const foot = el('div', 'mq-foot');
@@ -1033,12 +1560,6 @@ export function artifact(a: ArtifactView, host: Host = {}, doc?: Doc | null): HT
   c.append(foot);
   return c;
 }
-
-/** "¶5's alternative", or "the alternative" when the finding isn't in hand. */
-const alternative = (f: Placed | undefined): string => {
-  const at = f ? where(f) : '—';
-  return at === '—' ? 'the alternative' : `${at}'s alternative`;
-};
 
 /* ── C10 · finalize gate ─────────────────────────────────────────────── */
 /** The Needs-you section with defer removed, in the pane's own words, with
@@ -1062,6 +1583,8 @@ export function gate(doc: Doc, host: Host = {}): HTMLDivElement {
     // Overrides too: the last look says which markings will be reported as kept.
     const decided = doc.findings.filter((f) => pend.has(f.id) || answered(f) || f.overridden);
     const stuck = unwritable(doc, host);
+    const isReady = ready(doc, h);
+    const outstanding = holding(doc, host).length;
     g.append(
       el(
         'h3',
@@ -1070,9 +1593,11 @@ export function gate(doc: Doc, host: Host = {}): HTMLDivElement {
           ? `Waiting for ${plural(n, 'answer', 'answers')} to be written into the document.`
           : stuck
             ? `Not ready. The document is read-only, so ${plural(stuck, 'thing', 'things')} can't be written into it.`
-            : will.length
-              ? `Ready. ${plural(will.length, 'thing', 'things')} will be applied as it goes out.`
-              : 'Ready to finalize.',
+            : isReady
+              ? 'Ready to finalize.'
+              : outstanding
+                ? `Not ready. ${plural(outstanding, 'write or check is', 'writes or checks are')} waiting for confirmation.`
+                : 'Not ready. Marque needs to check the current document and confirm that changes were saved.',
       ),
     );
     will.forEach((a) => g.append(artifact(a, h, doc)));
@@ -1129,84 +1654,29 @@ export function receipt(doc: Doc, session: Session = {}): HTMLDivElement {
     el('span', 'who', session.classifier_id || 'classifier id not set'),
   );
   r.append(hd);
-  // Each act with what was said and when, so a changed answer keeps the one it replaced.
-  // A reading by its words and its marking: two readings can write the same marking.
-  const said = (v: ActValue | null): string =>
-    (v?.reading ? `${v.reading.result ? masked(v.reading.result) : ''} (${v.reading.reading})`.trim() : null) ??
-    v?.free ??
-    (v?.fields
-      ? Object.entries(v.fields)
-          .map(([k, t]) => `${k.replace(/_/g, ' ')} ${t}`)
-          .join(', ')
-      : '');
-  // Typed notice content by its identity, so the receipt says which version was approved.
-  const content = (c: string): string => {
-    try {
-      return Object.entries(JSON.parse(c) as Record<string, unknown>)
-        .map(([k, v]) => `${k.replace(/_/g, ' ')} ${String(v)}`)
-        .join(', ');
-    } catch {
-      return c;
-    }
+  // Private log payload is not a disclosure grant. Only host-projected text/markings are displayable.
+  const display = historyDisplay(doc, session);
+  const acts = (x: Receiptable): HTMLElement => {
+    const out = el('span');
+    (x.history || []).forEach((e, i) => {
+      if (i) out.append(document.createTextNode(' → '));
+      out.append(document.createTextNode([e.act.replace(/_/g, ' '), e.at].filter(Boolean).join(' ')));
+      const safe = display(e);
+      if (safe?.text) out.append(document.createTextNode(` ${safe.text}`));
+      if (safe?.marking) out.append(document.createTextNode(' '), placed(mark(safe.marking, { size: 'xs' })));
+    });
+    return out;
   };
-  // A snapshot's markings as drawn, masks and all: a concealed code never prints as text.
-  const result = (a: Partial<Snapshot> | undefined): string => {
-    const m = a?.result_marking ?? a?.result;
-    return m ? masked(m) : '';
-  };
-  const written = (a: Partial<Snapshot>): string => {
-    const m = a.marking ?? a.as_written;
-    return m ? masked(m) : '';
-  };
-  const op = (e: LogEntry): string =>
-    e.act === 'changed' && e.value == null
-      ? 'back to Marque\u2019s result'
-      : e.act === 'kept_as_written'
-        ? result(e.about)
-          ? `instead of ${result(e.about)}`
-          : ''
-        : e.value?.apply
-          ? `apply${result(e.about) ? ` ${result(e.about)}` : e.about?.content ? ` ${content(e.about.content)}` : ''}`
-          : e.value?.remove
-            ? 'remove'
-            : said(e.value);
-  // An act taken on another rule or marking under this id says which, from its own snapshot.
-  const about = (e: LogEntry, x: Receiptable): string => {
-    const rule = x.rule ? `${x.rule.scheme}:${x.rule.predicate}` : x.kind;
-    if (!e.about) return '';
-    // Taken at another paragraph or page under this id: the receipt says where it was.
-    const was = 'anchor' in e.about ? where({ ...x, anchor: e.about.anchor }) : null;
-    const at = was && was !== where(x) ? `at ${was}` : '';
-    const asked = written(e.about);
-    if (e.about.rule && e.about.rule !== rule)
-      return [`on ${e.about.rule}${asked ? ` ${asked}` : ''}`, at].filter(Boolean).join(' ');
-    return [
-      asked && face(e.about.marking ?? e.about.as_written) !== face(x.marking?.as_written ?? null)
-        ? `asked of ${asked}`
-        : '',
-      at,
-    ]
-      .filter(Boolean)
-      .join(' ');
-  };
-  const acts = (x: Receiptable): string =>
-    (x.history || [])
-      .map((e) => [e.act.replace(/_/g, ' '), op(e), about(e, x), e.at].filter(Boolean).join(' '))
-      .join(' → ');
   for (const f of doc.findings) {
     const ln = el('div', 'ln');
     ln.append(el('span', 't', where(f)));
     const b = el('div', 'b');
     const did = acts(f);
-    b.append(
-      el(
-        'span',
-        null,
-        `${f.rule.scheme}:${f.rule.predicate} · ${f.outcome.kind.replace(/_/g, ' ')}${did ? ` · ${did}` : ''}`,
-      ),
-    );
+    b.append(el('span', null, `${f.rule.scheme}:${f.rule.predicate} · ${f.outcome.kind.replace(/_/g, ' ')}`));
+    if (did.hasChildNodes()) b.append(document.createTextNode(' · '), did);
     if (f.marking?.as_written) b.append(placed(mark(f.marking.as_written, { size: 'xs' })));
-    if (f.outcome?.result) b.append(placed(mark(f.outcome.result, { size: 'xs', state: 'changed' })));
+    // A pending answer's overlaid result is historical until the engine evaluates it.
+    if (!f.person && f.outcome?.result) b.append(placed(mark(f.outcome.result, { size: 'xs', state: 'changed' })));
     ln.append(b);
     r.append(ln);
   }
@@ -1215,7 +1685,8 @@ export function receipt(doc: Doc, session: Session = {}): HTMLDivElement {
     const ln = el('div', 'ln');
     const did = acts(a);
     const b = el('div', 'b');
-    b.append(el('span', null, `${a.kind} · ${a.state.replace(/_/g, ' ')}${did ? ` · ${did}` : ''}`));
+    b.append(el('span', null, `${a.kind} · ${a.state.replace(/_/g, ' ')}`));
+    if (did.hasChildNodes()) b.append(document.createTextNode(' · '), did);
     if (isMarking(a.derived_value)) b.append(placed(mark(a.derived_value, { size: 'xs', state: 'changed' })));
     ln.append(el('span', 't', where(a)), b);
     r.append(ln);
@@ -1226,9 +1697,9 @@ export function receipt(doc: Doc, session: Session = {}): HTMLDivElement {
     const a: Partial<Snapshot> = x.about || {};
     ln.append(el('span', 't', a.anchor || a.kind ? where(a) : '—'));
     const b = el('div', 'b');
-    b.append(el('span', null, `${a.rule ? `${a.rule} · ` : ''}no longer reported · ${acts(x)}`));
-    // From the act's own marking where it has one: its masks stay masks.
-    if (a.marking || a.as_written) b.append(placed(mark(a.marking || { text: a.as_written ?? '' }, { size: 'xs' })));
+    b.append(el('span', null, `${a.rule ? `${a.rule} · ` : ''}no longer reported`));
+    const did = acts(x);
+    if (did.hasChildNodes()) b.append(document.createTextNode(' · '), did);
     ln.append(b);
     r.append(ln);
   }
@@ -1259,26 +1730,49 @@ export function receipt(doc: Doc, session: Session = {}): HTMLDivElement {
  * Help on tokens is bound inside the pane; a host that renders gate() or a
  * card elsewhere binds tips(surface, vocab, p.host) on that surface too.
  *
- * The kit records each act in `state` (src/state.js) and hands it to
- * `onChange(state, act)` for the host to persist and apply; `act` is null
- * when only bookkeeping changed (the seen list, the lint checkpoint). An answer stays pending, and the document
- * not ready, until the host re-lints and passes the new `doc`. A new Action
- * required is announced in a polite live region; Quiet changes are not.
+ * A user action reaches `onAppend` first. The kit adopts only its acknowledged
+ * state; a new committed act is then handed to `onChange(state, act)` for host
+ * work. A refusal remains pending outside ordered history and never dispatches
+ * a write. `onChange` with a null act is still used for bookkeeping only.
+ * An answer stays pending, and the document not ready, until the host re-lints
+ * and passes the new `doc`. A new Action required is announced in a polite live
+ * region; Quiet changes are not.
  */
 export function mount(
   root: HTMLElement,
   { doc = null, state = empty(), moment = 'editing', engine = 'ok', readOnly = false, ...host }: MountOptions = {},
 ): Mounted {
+  if (!isDisclosedState(state))
+    throw new TypeError('The workspace must supply disclosed action history to open the pane.');
   const cur: {
     doc: Doc | null;
     state: State;
     moment: Moment;
     engine: EngineState;
     readOnly: boolean;
+    actBinding: ActAppendBinding | null;
+    currentDisclosureRevision: string | null;
+    historyDisclosure: HistoryDisclosure | null;
+    nativeCabRequest: NativeCabRequest | null;
+    nativeSemanticResultsRequest: NativeSemanticResultsRequest | null;
     open: string | null;
     tab: Tab;
     seq: number | null;
-  } = { doc, state, moment, engine, readOnly, open: null, tab: 'findings', seq: null };
+  } = {
+    doc,
+    state,
+    moment,
+    engine,
+    readOnly,
+    actBinding: host.actBinding ?? null,
+    currentDisclosureRevision: host.currentDisclosureRevision ?? null,
+    historyDisclosure: host.historyDisclosure ?? null,
+    nativeCabRequest: host.nativeCabRequest ?? null,
+    nativeSemanticResultsRequest: host.nativeSemanticResultsRequest ?? null,
+    open: null,
+    tab: 'findings',
+    seq: null,
+  };
   // Findings already there at mount aren't news; the first ones to arrive later are.
   let said: Set<string> | null = doc ? null : new Set(),
     unseen = false;
@@ -1348,6 +1842,21 @@ export function mount(
     get readOnly() {
       return cur.readOnly;
     },
+    get actBinding() {
+      return cur.actBinding ?? undefined;
+    },
+    get currentDisclosureRevision() {
+      return cur.currentDisclosureRevision ?? undefined;
+    },
+    get historyDisclosure() {
+      return cur.historyDisclosure ?? undefined;
+    },
+    get nativeCabRequest() {
+      return cur.nativeCabRequest ?? undefined;
+    },
+    get nativeSemanticResultsRequest() {
+      return cur.nativeSemanticResultsRequest ?? undefined;
+    },
     get open() {
       return cur.open;
     },
@@ -1386,34 +1895,9 @@ export function mount(
       }
       host.onOpen?.(f);
     },
-    onAct(f: Subject, act: Act, value: ActValue | null = null) {
-      cur.state = record(cur.state, f.id, act, value, undefined, snapshot(f));
-      const inPane = body.contains(document.activeElement);
-      // Putting it back to what Marque said reopens the card where the finding now lives, focus kept.
-      // Any other act leaves what was done and an Undo in the card's place (DECISIONS #23).
-      // A typed field has no Undo yet: core can't take one back (field answers accumulate).
-      const back = (act === 'changed' && value == null) || !cur.doc || !!value?.fields;
-      // Taken back from History: the question is the point, so the findings come back with its card open.
-      if (back) {
-        cur.open = f.id;
-        cur.tab = 'findings';
-      } else {
-        cur.open = null;
-        undoable(f, act, value);
-      }
-      // A host that re-lints at once redraws inside onChange; this finding's draft went with the act.
-      acting = f.id;
-      try {
-        host.onChange?.(cur.state, { id: f.id, act, value });
-      } finally {
-        acting = null;
-      }
-      draw(back && inPane ? f.id : null, { fresh: true });
-      if (!back && recent) {
-        if (inPane) recent.strip.querySelector('button')?.focus();
-        live.textContent = `${live.textContent} ${recent.say}`.trim();
-      }
-    },
+    onAct: host.onAppend
+      ? (f: Subject, act: Act, value: ActValue | null = null) => void submitAct(f, act, value)
+      : undefined,
   };
 
   /** The undo window: for UNDO_MS after an act, the card's place says what was done and offers Undo.
@@ -1434,7 +1918,7 @@ export function mount(
     /** Focus isn't on it: start the clock again if focus was what stopped it. */
     left: () => void;
   } | null = null;
-  function undoable(f: Subject, act: Act, value: ActValue | null): void {
+  function undoable(f: Subject, act: Act, value: ActValue | null, appended?: LogEntry): void {
     recent?.end();
     const li = body.querySelector<HTMLElement>(`.mq-row-item[data-finding="${CSS.escape(f.id)}"]`);
     const sec = li?.closest('.mq-section');
@@ -1449,19 +1933,16 @@ export function mount(
     const end = el('div', 'end');
     end.append(
       button('ghost', 'Undo', () => {
-        const id = f.id,
-          had = strip.contains(document.activeElement);
         const ok = holds();
-        stop();
         // A re-lint may have withdrawn it since: the act is taken back on what it was taken on.
-        if (ok) h.onAct?.(target() ?? f, 'changed', null);
-        if (had) refocus(id);
+        if (ok) void submitAct(target() ?? f, 'changed', null);
+        else stop();
       }),
     );
     strip.append(end);
     // The act this strip undoes, and whether it is still the one in force: a re-lint may have put another
     // question or marking under the same id, and Undo must not bring the old one back over it.
-    const entry = canon(cur.state.log[cur.state.log.length - 1]);
+    const entry = canon(appended ?? cur.state.log[cur.state.log.length - 1]);
     const target = (): Subject | undefined => {
       const v = cur.doc && docView(cur.doc, cur.state);
       return [...(v?.findings ?? []), ...(v?.document.artifacts ?? [])].find((y) => y.id === f.id);
@@ -1583,34 +2064,54 @@ export function mount(
   /** What the person has picked or typed and not yet sent, by a key that survives a redraw. */
   let acting: string | null = null,
     gen = 0; // the finding being acted on (its draft is spent); which draw is current
+  const canRetryPending = (item: PendingAppend): boolean =>
+    item.state === 'staged' || item.reason !== 'sequence-exhausted';
+  const nextPendingRequest = (state: State): PendingAppend | undefined => state.pendingAppends?.find(canRetryPending);
+  const terminalPendingRequest = (state: State): PendingAppend | undefined =>
+    state.pendingAppends?.find((item) => item.state === 'pending_sequence' && item.reason === 'sequence-exhausted');
+  const initialTerminalPending = terminalPendingRequest(cur.state);
+  let pendingRequest: ActAppendRequest | null = nextPendingRequest(cur.state) ?? null;
+  let appendStatus = pendingRequest
+    ? initialTerminalPending
+      ? 'A prior action remains outside history because the chain sequence limit was reached. Another saved action is ready to retry.'
+      : host.onAppend
+        ? 'A saved action is waiting to be recorded. It has not been applied.'
+        : 'A saved action remains outside the ordered history. This host cannot retry it; it has not been applied.'
+    : initialTerminalPending
+      ? 'A saved action remains outside history because the chain sequence limit was reached. It has not been applied.'
+      : '';
+  let appendRetryable = !!pendingRequest;
+  let appendInFlight: string | null = null;
   const drafts = (): Draft[] =>
     [...body.querySelectorAll<HTMLInputElement>('[data-draft]')]
-      .filter((x) => !acting || !x.dataset.draft?.startsWith(`${acting}:`))
+      .filter((x) => draftContext.has(x) && (!acting || !x.dataset.draft?.startsWith(`${acting}:`)))
       // An opened correction counts as soon as it's open, typed in or not.
       .filter((x) =>
         x.type === 'radio' ? x.checked : x.dataset.opened || (x.value.trim() && x.value !== x.defaultValue),
       )
       .map((x) => ({
         key: x.dataset.draft ?? '',
-        asked: x.dataset.asked,
-        value: x.type === 'radio' ? x.dataset.reading : x.value,
+        asked: draftContext.get(x)?.asked,
+        value: x.type === 'radio' ? draftContext.get(x)?.reading : x.value,
         radio: x.type === 'radio',
         focused: x === document.activeElement,
       }));
   function restore(list: Draft[]): void {
-    const find = (d: Draft) =>
-      [...body.querySelectorAll<HTMLInputElement>('[data-draft]')].find(
+    const find = (d: Draft): HTMLInputElement | undefined => {
+      const matches = [...body.querySelectorAll<HTMLInputElement>('[data-draft]')].filter(
         (x) =>
           x.dataset.draft === d.key &&
-          x.dataset.asked === d.asked &&
-          (d.radio ? x.type === 'radio' && x.dataset.reading === d.value : x.type !== 'radio'),
+          draftContext.get(x)?.asked === d.asked &&
+          (d.radio ? x.type === 'radio' && draftContext.get(x)?.reading === d.value : x.type !== 'radio'),
       );
+      return matches.length === 1 ? matches[0] : undefined;
+    };
     for (const d of list) {
       let n = find(d);
       // A correction under way to a filled field: open it again for the person.
       if (!n && !d.radio) {
         [...body.querySelectorAll<HTMLElement>('[data-change]')]
-          .find((x) => x.dataset.change === d.key && x.dataset.asked === d.asked)
+          .find((x) => x.dataset.change === d.key && draftContext.get(x)?.asked === d.asked)
           ?.click();
         n = find(d);
       }
@@ -1628,6 +2129,7 @@ export function mount(
 
   // `fresh`: the person just acted, so what they had in the form went with it.
   let parked: Draft[] = [];
+  let writeAuthorityRevoked = false;
   let dead = false; // destroyed: a draw queued before it (onOpen, a resize) draws nothing
   function draw(focusId?: string | null, { fresh = false }: { fresh?: boolean } = {}): void {
     if (dead) return;
@@ -1638,10 +2140,12 @@ export function mount(
     const v = cur.doc && docView(cur.doc, cur.state);
     let say = '';
     const ok = cur.engine === 'ok';
-    if (v && (ok || cur.engine === 'checking')) {
+    const nativeRoute = !!v && ('native_evaluation' in v.document || 'native_semantic_results' in v.document);
+    if (nativeRoute) recent?.end();
+    if (v && !nativeRoute && (ok || cur.engine === 'checking')) {
       const now = sections(v, cur.moment).must;
       // Keyed by the question too: one asked again under the same id is news.
-      const key = (f: Subject): string => `${f.id} ${canon(f.asks ?? null)}`;
+      const key = (f: Subject): string => `${f.id} ${canon(f.asks ? disclosedAsks(f.asks) : null)}`;
       const before = said;
       if (before && ok)
         say = now
@@ -1659,7 +2163,17 @@ export function mount(
     if (focusId === undefined) focusId = focusedId();
     if (recent) recent.focused = recent.strip.contains(document.activeElement);
     const onTab = body.contains(document.activeElement) && document.activeElement?.closest<HTMLElement>('.mq-tab');
-    body.replaceChildren(pane(v, h));
+    const view = pane(v, h);
+    if (appendStatus && !nativeRoute && !writeAuthorityRevoked) {
+      const notice = el('div', 'mq-pane-foot');
+      notice.setAttribute('role', 'status');
+      notice.append(el('p', 'mq-p', appendStatus));
+      if (pendingRequest && appendRetryable && !appendInFlight && host.onAppend) {
+        notice.append(button('ghost', 'Retry pending action', () => void submitPending()));
+      }
+      view.insertBefore(notice, view.children[1] ?? null);
+    }
+    body.replaceChildren(view);
     replace();
     if (onTab) body.querySelector<HTMLElement>(`.mq-tab[data-tab="${onTab.dataset.tab}"]`)?.focus();
     if (host.vocab) relabel(body, host.vocab); // this pane's own vocabulary
@@ -1674,6 +2188,256 @@ export function mount(
         }),
       );
   }
+  const actOwnerKey = (binding: ActAppendBinding | null): string =>
+    canon({ documentId: binding?.documentId ?? null, chain: binding?.chain ?? null });
+  const adoptHostState = (next: State, resolvedRequestId?: string): void => {
+    // A concurrent acknowledgement can arrive with an older same-owner snapshot.
+    // Keep the newer history unless the incoming log contains it exactly.
+    const incomingContainsCurrent = cur.state.log.every((entry) =>
+      next.log.some((candidate) => candidate.sequence === entry.sequence && canon(candidate) === canon(entry)),
+    );
+    const incomingFrontier = next.actSequence;
+    const currentFrontier = cur.state.actSequence;
+    const incomingIsAtLeastAsNew =
+      currentFrontier === undefined ||
+      (incomingFrontier !== undefined && Number.isSafeInteger(incomingFrontier) && incomingFrontier >= currentFrontier);
+    const base = incomingContainsCurrent && incomingIsAtLeastAsNew ? next : cur.state;
+    // `seen` and `linted` are independent local bookkeeping. Preserve pending
+    // host intents too, while letting a fresh refusal update a staged row.
+    const seen = [...base.seen];
+    for (const item of cur.state.seen) {
+      if (!seen.some((known) => canon(known) === canon(item))) seen.push(item);
+    }
+    const pending = new Map<string, PendingAppend>();
+    for (const item of [...(cur.state.pendingAppends ?? []), ...(next.pendingAppends ?? [])])
+      pending.set(item.requestId, item);
+    if (resolvedRequestId) pending.delete(resolvedRequestId);
+    const linted = Math.min(Math.max(cur.state.linted ?? 0, next.linted ?? 0), base.log.length);
+    cur.state = {
+      ...base,
+      seen,
+      pendingAppends: [...pending.values()],
+      ...(linted > 0 && { linted }),
+    };
+  };
+  const currentAppendBinding = (): ActAppendBinding | null => {
+    let binding = cur.actBinding ? structuredClone(cur.actBinding) : null;
+    if (host.currentBasis && !binding?.basis) {
+      binding = { ...binding, basis: structuredClone(host.currentBasis) };
+    }
+    return binding;
+  };
+  const appendRefusalMessage = (reason: ActAppendRefusal): string => {
+    switch (reason) {
+      case 'sequence-exhausted':
+        return 'The history reached its sequence limit. This action remains pending outside history and has not been applied.';
+      case 'missing-frontier':
+        return 'The host has no trusted history position. This action remains pending outside history and has not been applied.';
+      case 'missing-coverage':
+        return 'The host has no history coverage to check this request. It remains pending; restore coverage before retrying.';
+      case 'history-incomplete':
+        return 'The host history is incomplete or inconsistent. This action remains pending; repair history before retrying.';
+      case 'invalid-frontier':
+        return 'The host history position or ordered rows are invalid. This action remains pending outside history.';
+      case 'missing-target':
+        return 'The host could not bind this action to a finding. It remains pending and has not been applied.';
+      case 'undisclosed-marking':
+        return 'This action or its history contains undisclosed marking content. It was not recorded or applied.';
+      case 'request-id-conflict':
+        return 'This request key conflicts with a stored request. Resolve the conflict before retrying; no write was dispatched.';
+    }
+  };
+
+  async function submitPending(): Promise<void> {
+    if (!pendingRequest || appendInFlight) return;
+    if (!host.onAppend) {
+      appendRetryable = false;
+      appendStatus = 'The host cannot retry this pending action. It remains unapplied outside history.';
+      draw();
+      return;
+    }
+    const current = cur.doc && docView(cur.doc, cur.state);
+    const target = pendingRequest.id
+      ? [...(current?.findings ?? []), ...(current?.document.artifacts ?? [])].find(
+          (item) => item.id === pendingRequest!.id,
+        )
+      : undefined;
+    await submitAppend(pendingRequest, target);
+  }
+
+  async function submitAct(f: Subject, act: Act, value: ActValue | null): Promise<void> {
+    if (
+      writeAuthorityRevoked ||
+      (cur.doc && ('native_evaluation' in cur.doc.document || 'native_semantic_results' in cur.doc.document))
+    )
+      return;
+    if (appendInFlight) return;
+    if (!host.onAppend) {
+      appendStatus = 'The host cannot record this action. It has not been applied or added to history.';
+      draw();
+      return;
+    }
+    if (pendingRequest) {
+      appendStatus = 'An earlier action is still pending. Retry it before starting another action.';
+      draw();
+      return;
+    }
+    const binding = currentAppendBinding() ?? undefined;
+    const request = disclosedAppendRequest({
+      requestId: newActRequestId(),
+      id: f.id,
+      act,
+      value: value == null ? value : structuredClone(value),
+      at: new Date().toISOString(),
+      about: snapshot(f),
+      ...(binding && { binding }),
+    });
+    await submitAppend(request, f);
+  }
+
+  async function submitAppend(request: ActAppendRequest, original?: Subject): Promise<void> {
+    if (
+      writeAuthorityRevoked ||
+      (cur.doc && ('native_evaluation' in cur.doc.document || 'native_semantic_results' in cur.doc.document))
+    )
+      return;
+    const append = host.onAppend;
+    if (!append || appendInFlight) return;
+    const ownerBinding = currentAppendBinding();
+    const ownerKey = actOwnerKey(ownerBinding);
+    const ownerKnown = !!(ownerBinding?.documentId || ownerBinding?.chain);
+    const documentAtRequest = cur.doc;
+    const documentBasisKey = canon(documentAtRequest?.document.evaluation?.basis ?? null);
+    const bindingKey = canon(ownerBinding);
+    if (canon(request.binding ?? null) !== bindingKey) {
+      pendingRequest = request;
+      appendRetryable = false;
+      appendStatus =
+        'This pending action belongs to a different document or chain. Restore its original context before retrying.';
+      draw();
+      return;
+    }
+    const contextIsCurrent = (): boolean =>
+      !writeAuthorityRevoked &&
+      cur.doc === documentAtRequest &&
+      !(cur.doc && ('native_evaluation' in cur.doc.document || 'native_semantic_results' in cur.doc.document)) &&
+      canon(currentAppendBinding()) === bindingKey &&
+      canon(cur.doc?.document.evaluation?.basis ?? null) === documentBasisKey;
+    const sameOwner = (): boolean =>
+      actOwnerKey(cur.actBinding ?? null) === ownerKey && (ownerKnown || cur.doc === documentAtRequest);
+    const focusId = focusedId();
+    appendInFlight = request.requestId;
+    pendingRequest = request;
+    appendRetryable = false;
+    appendStatus = 'Sending this action to the host for recording.';
+    draw(focusId);
+
+    let result: AppendActResult;
+    try {
+      result = await append(structuredClone(request));
+    } catch {
+      if (dead) return;
+      appendInFlight = null;
+      appendRetryable = true;
+      appendStatus = 'The host did not acknowledge this action. It remains pending; retry will use the same request.';
+      draw(focusId);
+      return;
+    }
+    if (dead) return;
+    appendInFlight = null;
+    if (result.status === 'refused') {
+      if (!isDisclosedState(result.state) || (result.pending && !isDisclosedRequest(result.pending))) {
+        appendRetryable = true;
+        appendStatus = 'The workspace must return disclosed action history before this request can continue.';
+        draw(focusId);
+        return;
+      }
+      if (sameOwner() && contextIsCurrent()) adoptHostState(result.state);
+      const storedRequest = nextPendingRequest(cur.state);
+      pendingRequest = storedRequest ?? (result.reason === 'sequence-exhausted' ? null : (result.pending ?? request));
+      // A refusal belongs to the exact document/basis it was issued against.
+      // If that context moved while the host was working, leave it untouched
+      // and let the person retry the same request against the current context.
+      appendRetryable = !sameOwner() || !contextIsCurrent();
+      appendStatus =
+        !sameOwner() || !contextIsCurrent()
+          ? 'The document or chain changed before the host response. No state was adopted; this action remains pending with the same request for retry.'
+          : appendRefusalMessage(result.reason);
+      if (pendingRequest && pendingRequest.requestId !== request.requestId)
+        appendStatus += ' Another saved action is ready to retry.';
+      appendRetryable = appendRetryable || !!pendingRequest;
+      draw(focusId);
+      return;
+    }
+
+    const acknowledgementIssue = appendAcknowledgementIssue(request, result, cur.state);
+    if (acknowledgementIssue) {
+      appendRetryable = true;
+      appendStatus = `${appendRefusalMessage(acknowledgementIssue)} No host state was adopted.`;
+      draw(focusId);
+      return;
+    }
+
+    const { entry, replayed } = result;
+    if (!sameOwner() || !contextIsCurrent()) {
+      // A committed acknowledgement remains history for the same owner, but
+      // it must not trigger a write after the view loses write authority.
+      if (sameOwner()) adoptHostState(result.state, request.requestId);
+      appendStatus =
+        'The action was recorded, but the document or chain changed before it could be applied. The same request remains pending; retry it after restoring its document.';
+      appendRetryable = true;
+      draw(focusId);
+      return;
+    }
+
+    // Adopt only after the host's exact acknowledgement is bound to the still
+    // current document, chain, and evaluation basis.
+    adoptHostState(result.state, request.requestId);
+    pendingRequest = nextPendingRequest(cur.state) ?? null;
+    appendRetryable = !!pendingRequest;
+
+    appendStatus = pendingRequest
+      ? terminalPendingRequest(cur.state)
+        ? 'This action was recorded. A prior action remains outside history at the chain sequence limit; another saved action is ready to retry.'
+        : 'This action was recorded. Another saved action is ready to retry.'
+      : terminalPendingRequest(cur.state)
+        ? appendRefusalMessage('sequence-exhausted')
+        : '';
+    const current = cur.doc && docView(cur.doc, cur.state);
+    const target = request.id
+      ? [...(current?.findings ?? []), ...(current?.document.artifacts ?? [])].find((item) => item.id === request.id)
+      : undefined;
+    const subject = target ?? original;
+    const back = (entry.act === 'changed' && entry.value == null) || !cur.doc || !!entry.value?.fields;
+    const inPane = body.contains(document.activeElement);
+    recent?.end();
+    if (back) {
+      cur.open = entry.id;
+      cur.tab = 'findings';
+    } else {
+      cur.open = null;
+      if (subject) undoable(subject, entry.act, entry.value, entry);
+    }
+    acting = entry.id;
+    try {
+      host.onChange?.(cur.state, {
+        id: entry.id,
+        act: entry.act,
+        value: entry.value,
+        requestId: request.requestId,
+        entry,
+        replayed,
+      });
+    } finally {
+      acting = null;
+    }
+    draw(back && inPane ? entry.id : null, { fresh: true });
+    if (!back && recent) {
+      if (inPane) recent.strip.querySelector('button')?.focus();
+      live.textContent = `${live.textContent} ${recent.say}`.trim();
+    }
+  }
+
   draw();
 
   return {
@@ -1694,7 +2458,7 @@ export function mount(
       if (added) root.classList.remove('mq');
       if (mirrors && mine) root.removeAttribute('data-mq-theme');
     },
-    update({ linted: upTo, seq, open, ...next }: Update) {
+    update({ linted: upTo, seq, open, actBinding, ...next }: Update) {
       // A lint that began before the one already shown is stale: keep the newer document.
       // `seq` orders lints that began at the same point in the log. A stale lint's
       // failure is as stale as its document: neither replaces the newer one.
@@ -1706,8 +2470,29 @@ export function mount(
       ) {
         delete next.doc;
         delete next.engine;
-      } else if (lint && seq != null) cur.seq = seq;
+        delete next.currentDisclosureRevision;
+        delete next.historyDisclosure;
+        delete next.nativeCabRequest;
+        delete next.nativeSemanticResultsRequest;
+        actBinding = undefined;
+      } else {
+        if (lint && seq != null) cur.seq = seq;
+        // A new evaluation must explicitly carry a newly obtained native scope.
+        if (('doc' in next || ('engine' in next && next.engine !== 'ok')) && !('nativeCabRequest' in next))
+          cur.nativeCabRequest = null;
+        if (('doc' in next || ('engine' in next && next.engine !== 'ok')) && !('nativeSemanticResultsRequest' in next))
+          cur.nativeSemanticResultsRequest = null;
+        if (
+          'currentDisclosureRevision' in next &&
+          next.currentDisclosureRevision !== cur.currentDisclosureRevision &&
+          !('nativeSemanticResultsRequest' in next)
+        )
+          cur.nativeSemanticResultsRequest = null;
+      }
+      if (next.readOnly === true && !cur.readOnly) writeAuthorityRevoked = true;
+      if (next.readOnly === false) writeAuthorityRevoked = false;
       Object.assign(cur, next);
+      if (actBinding !== undefined) cur.actBinding = actBinding;
       if (open !== undefined) {
         const v = cur.doc && docView(cur.doc, cur.state);
         h.onOpen?.((open && v && [...v.findings, ...v.document.artifacts].find((x) => x.id === open)) || null);

@@ -34,6 +34,21 @@
       "source": "./src/types.ts",
       "types": "./dist/types.d.ts",
       "default": "./dist/types.js"
+    },
+    "./native-wire": {
+      "source": "./src/native-wire.ts",
+      "types": "./dist/native-wire.d.ts",
+      "default": "./dist/native-wire.js"
+    },
+    "./native-cab": {
+      "source": "./src/native-cab.ts",
+      "types": "./dist/native-cab.d.ts",
+      "default": "./dist/native-cab.js"
+    },
+    "./native-results": {
+      "source": "./src/native-results.ts",
+      "types": "./dist/native-results.d.ts",
+      "default": "./dist/native-results.js"
     }
   },
   "publishConfig": {

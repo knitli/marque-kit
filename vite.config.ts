@@ -11,6 +11,8 @@ import { defineConfig } from 'vite-plus';
 const config: UserConfig = defineConfig({
   // Workspace packages resolve to their TypeScript source (the "source" export condition), not dist/.
   resolve: { conditions: ['source', ...defaultClientConditions] },
+  // `vp test` here runs the projects that test under Vitest; node:test files run per package (`pnpm test`).
+  test: { projects: ['packages/kit'] },
   fmt: {
     // memo.vocab.json and memo.manual.json are written by fixtures/extract.py, as it writes them.
     ignorePatterns: [

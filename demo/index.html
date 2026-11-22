@@ -57,6 +57,13 @@
         border-bottom: 1px solid var(--mq-rule);
         font-size: 12px;
       }
+      .demo-scope {
+        margin: 0;
+        padding: 7px 14px;
+        border-bottom: 1px solid var(--mq-rule);
+        color: var(--mq-text-muted);
+        font-size: 12px;
+      }
       .bar select,
       .bar button {
         font: inherit;
@@ -111,6 +118,9 @@
           <label><input type="checkbox" id="ro" /> read-only</label>
           <button id="finalize" class="mq-btn attn" type="button">Finalize</button>
         </div>
+        <p class="demo-scope">
+          Demo only: actions are in memory and reset on reload; this is not trusted host storage.
+        </p>
         <div id="pane"></div>
         <div id="gate" style="padding: 14px"></div>
         <div id="receipt" style="padding: 14px"></div>
@@ -123,7 +133,7 @@
       import { render as mark, settle } from '../packages/kit/src/marking.ts';
       import { mount, gate, receipt, derivation, markClass } from '../packages/kit/src/render.ts';
       import { why, explain, passage, lookup, float, tips } from '../packages/kit/src/help.ts';
-      import { docView } from '../packages/core/src/state.ts';
+      import { appendAct, docView, empty } from '../packages/core/src/state.ts';
 
       const $ = (s) => document.querySelector(s);
       const doc = await (await fetch('../fixtures/memo.findings.json')).json();
@@ -133,10 +143,12 @@
       const bytes = new TextEncoder().encode(memo);
       const dec = new TextDecoder();
 
-      /* The host: what the kit never decides. The kit keeps the person's acts
-   (packages/core/src/state.ts) and hands each one here; a real host persists the state,
-   applies the edit, re-lints and calls p.update({ doc }). There is no engine
-   here, so the stand-in re-lint is the kit's own overlay on the fixture. */
+      /* Ephemeral demo host: its in-memory state is discarded on page reload.
+   This exercises the checked append path but is not a trusted durable workspace.
+   A real host persists each append plus its write outbox, applies the edit,
+   re-lints and calls p.update({ doc }). There is no engine here, so the stand-in
+   re-lint is the kit's own overlay on the fixture. */
+      let demoState = empty();
       const strip = ({ person, history, applying, ...x }) =>
         applying ? { ...x, state: x.state === 'present_not_required' ? 'absent_not_required' : 'present' } : x;
       // A written answer is applied, as the engine would report it.
@@ -152,17 +164,31 @@
         applied = {
           ...v,
           findings: v.findings.map(written),
-          document: { ...v.document, artifacts: v.document.artifacts.map(strip), blocking, pending: [], withdrawn: [] },
+          document: {
+            ...v.document,
+            artifacts: v.document.artifacts.map(strip),
+            blocking,
+            pending: [],
+            awaitingWrites: [],
+            withdrawn: [],
+          },
         };
         return applied;
       };
       const p = mount($('#pane'), {
         doc,
+        state: demoState,
         vocab,
+        async onAppend(request) {
+          const result = appendAct(demoState, request);
+          demoState = result.state;
+          return result;
+        },
         onLookup(anchor) {
           openLookup(anchor);
         },
         onChange(s, act) {
+          demoState = s;
           // Only the seen list moved: nothing to relint, but the page's marks follow the pane.
           if (act && !$('#ro').checked) p.update({ doc: relint(s) }); // read-only: answers wait
           draw();

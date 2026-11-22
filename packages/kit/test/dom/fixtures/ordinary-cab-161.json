@@ -1,0 +1,133 @@
+{
+  "chain_id": "neutral-chain-159",
+  "profile": "original_us_nsi",
+  "member": {
+    "identity": {
+      "document_id": "synthetic-target",
+      "revision_id": "r1",
+      "contribution_id": "body"
+    },
+    "format": "document_content",
+    "source": "(S) Synthetic target.\n\nDeclassify On: 20500101\nAgency and Office of Origin: Example Office\n",
+    "owner": {
+      "document_id": "synthetic-target",
+      "revision_id": "r1",
+      "contribution_id": "body",
+      "role": "transmittal",
+      "parent_document_id": null,
+      "intrinsic_classification_locator": [1, 2]
+    },
+    "cab_inspection": {
+      "basis": {
+        "document_id": "synthetic-target",
+        "revision_id": "r1",
+        "contribution_id": "body",
+        "scope_locator": [0, 91]
+      },
+      "target": {
+        "document_id": "synthetic-target",
+        "revision_id": "r1",
+        "contribution_id": "body",
+        "scope_locator": [0, 91]
+      },
+      "candidate": [23, 90],
+      "face_page": 1,
+      "layout_revision": "layout-1",
+      "source_facts": [
+        {
+          "fact": "nsi",
+          "locator": "fact:nsi",
+          "group_locator": "fact:group"
+        },
+        {
+          "fact": "original_mode",
+          "locator": "fact:original_mode",
+          "group_locator": "fact:group"
+        },
+        {
+          "fact": "us_system",
+          "locator": "fact:us_system",
+          "group_locator": "fact:group"
+        }
+      ],
+      "fields": [
+        {
+          "field": "classified_by",
+          "coverage": "complete",
+          "state": "examined_absent",
+          "occurrence": null,
+          "readback": {
+            "target": {
+              "document_id": "synthetic-target",
+              "revision_id": "r1",
+              "contribution_id": "body",
+              "scope_locator": [0, 91]
+            },
+            "face_page": 1,
+            "layout_revision": "layout-1",
+            "pages": [1]
+          }
+        },
+        {
+          "field": "classification_reason",
+          "coverage": "complete",
+          "state": "examined_absent",
+          "occurrence": null,
+          "readback": {
+            "target": {
+              "document_id": "synthetic-target",
+              "revision_id": "r1",
+              "contribution_id": "body",
+              "scope_locator": [0, 91]
+            },
+            "face_page": 1,
+            "layout_revision": "layout-1",
+            "pages": [1]
+          }
+        },
+        {
+          "field": "declassify_on",
+          "coverage": "complete",
+          "state": "present",
+          "occurrence": {
+            "candidate": [23, 90],
+            "label": [23, 36],
+            "value": [38, 46]
+          },
+          "readback": {
+            "target": {
+              "document_id": "synthetic-target",
+              "revision_id": "r1",
+              "contribution_id": "body",
+              "scope_locator": [0, 91]
+            },
+            "face_page": 1,
+            "layout_revision": "layout-1",
+            "pages": [1]
+          }
+        },
+        {
+          "field": "agency_and_office_of_origin",
+          "coverage": "complete",
+          "state": "present",
+          "occurrence": {
+            "candidate": [23, 90],
+            "label": [47, 74],
+            "value": [76, 90]
+          },
+          "readback": {
+            "target": {
+              "document_id": "synthetic-target",
+              "revision_id": "r1",
+              "contribution_id": "body",
+              "scope_locator": [0, 91]
+            },
+            "face_page": 1,
+            "layout_revision": "layout-1",
+            "pages": [1]
+          }
+        }
+      ]
+    }
+  }
+}

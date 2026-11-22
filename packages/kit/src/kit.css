@@ -443,7 +443,25 @@
 .mq-engine .mq-h {
   font-size: var(--mq-size-base);
 }
-
+.mq-transform-receipt {
+  display: block;
+}
+.mq-transform-receipt > summary {
+  cursor: pointer;
+}
+.mq-transform-receipt > .mq-txt {
+  padding-top: calc(var(--mq-unit) * 2);
+}
+.mq-transforms {
+  display: grid;
+  gap: calc(var(--mq-unit) * 2);
+  margin: calc(var(--mq-unit) * 2) 0 0;
+  padding-left: 1.5em;
+}
+.mq-transform {
+  display: grid;
+  gap: calc(var(--mq-unit) * 0.5);
+}
 .mq-quiet > summary {
   list-style: none;
 }

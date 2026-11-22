@@ -9,8 +9,8 @@
  * back takes its edit out, so the text goes back with the question.
  */
 
-import { docView, last } from '@knitli/marque-kit-core/state';
-import type { ArtifactView, Doc, FindingView, State, Subject } from '@knitli/marque-kit-core/types';
+import { canWriteAct, canWriteMarking, docView, last } from '@knitli/marque-kit-core/state';
+import type { ArtifactView, Doc, MarkingLike, FindingView, State, Subject } from '@knitli/marque-kit-core/types';
 
 export interface Edit {
   span: [number, number];
@@ -36,6 +36,7 @@ const shown = (f: FindingView): string => textOf(f.outcome?.result) ?? textOf(f.
 export function edits(view: Doc, memo: string): Edit[] {
   const bytes = enc.encode(memo);
   return view.findings.flatMap((f): Edit[] => {
+    if (!canWriteMarking(f.outcome?.result) || !canWriteMarking(f.marking?.as_written)) return [];
     const span = f.anchor?.span;
     if (!span) return [];
     if (f.anchor?.kind === 'portion') {
@@ -53,7 +54,9 @@ export function edits(view: Doc, memo: string): Edit[] {
 /** The banner a re-linted document carries: Marque's derived value once it's applied, or none. */
 export function banner(linted: Doc): string | null {
   const a = linted.document.artifacts.find((x: ArtifactView) => x.kind === 'front_marking');
-  return a?.state === 'present' ? textOf(a.derived_value) : null;
+  return a?.state === 'present' && (textOf(a.derived_value) == null || canWriteMarking(a.derived_value as MarkingLike))
+    ? textOf(a.derived_value)
+    : null;
 }
 
 /** A marking's classification, lowest 0; -1 when this can't read one. The first layer, after any owner
@@ -82,13 +85,27 @@ export function held(doc: Doc, state: State): Set<string> {
   const out = new Set<string>();
   for (const f of v.findings) {
     const e = last(state, f.id);
+    if ((e?.act === 'answered' || e?.act === 'changed') && e.value != null && !canWriteAct(e.value)) {
+      out.add(f.id);
+      continue;
+    }
     if (f.stale || (e?.act !== 'answered' && e?.act !== 'changed') || e.value == null) continue;
     const t = textOf(f.outcome?.result);
     // One it can't read the level of is held too: it might be above the banner. A typed one is written
     // only as a bare level (`(U)`): controls in it (NOFORN, FGI, REL TO) would move the banner, which
     // only Marque's own readings carry a derivation for.
     const bare = !e.value.free || /^\(\s*(TOP SECRET|TS|SECRET|S|CONFIDENTIAL|C|UNCLASSIFIED|U)\s*\)$/.test(t ?? '');
-    if (!t || !bare || level(t) < 0 || level(t) > top) out.add(f.id);
+    // The sample has no joint engine result for a finding and its dependent artifacts.
+    if (
+      !canWriteMarking(f.outcome?.result) ||
+      !canWriteMarking(f.marking?.as_written) ||
+      f.moves?.length ||
+      !t ||
+      !bare ||
+      level(t) < 0 ||
+      level(t) > top
+    )
+      out.add(f.id);
   }
   for (const a of v.document.artifacts)
     if (a.kind !== 'front_marking' && last(state, a.id)?.act === 'answered') out.add(a.id);
@@ -97,27 +114,43 @@ export function held(doc: Doc, state: State): Set<string> {
 
 /** The log without the acts on each id this host can't write: all of them, so an earlier answer it
  *  couldn't write either never comes back in when a later one is held. Marque's finding stands. */
-const writable = (doc: Doc, state: State): State => {
-  const h = held(doc, state);
+const writable = (state: State, h: Set<string>): State => {
   return h.size ? { ...state, log: state.log.filter((e) => !h.has(e.id)) } : state;
 };
 
 /** The document as the person's acts make it, from Marque's own findings and the whole log: every act
  *  this host can write overlays, written or not. A pure function of the two, so it never builds on an earlier view. */
-export const made = (doc: Doc, state: State): Doc => docView(doc, { ...writable(doc, state), linted: 0 });
+export const made = (doc: Doc, state: State): Doc => docView(doc, { ...writable(state, held(doc, state)), linted: 0 });
+
+/** Identify a Word undo only when exactly one subject's restored layout matches. */
+export function undoneSubject(
+  state: State,
+  subjects: readonly Subject[],
+  matches: (hypothesis: State) => boolean,
+): Subject | null {
+  let match: Subject | null = null;
+  for (const id of new Set(state.log.map((entry) => entry.id))) {
+    const subject = subjects.find((item) => item.id === id);
+    if (!subject || !matches({ ...state, log: state.log.filter((entry) => entry.id !== id) })) continue;
+    if (match) return null;
+    match = subject;
+  }
+  return match;
+}
 
 /**
  * The lint after the host wrote what the person did. There's no engine yet, so this stands in for
  * one: an answer in force reads as applied and is the document's from now on; anything else (an
  * override, a deferral, a take-back, nothing) leaves Marque's finding as it was, since the pane
- * overlays those itself. Artifacts follow the findings, so a banner moves with the alternatives taken.
+ * overlays those itself. A finding that needs a new artifact projection remains pending.
  * Always from Marque's first lint, never from the last re-lint: taking an alternative back restores
- * what it replaced. What blocks is what still needs a person.
+ * what it replaced. The original lint owns its blockers.
  * shortcut: a stand-in for the engine's re-lint; it goes when the engine lints the document.
  */
 export function relint(doc: Doc, all: State): Doc {
-  const state = writable(doc, all);
-  const v = made(doc, all);
+  const pending = held(doc, all);
+  const state = writable(all, pending);
+  const v = docView(doc, { ...state, linted: 0 });
   const strip = <T extends Subject>({ person: _p, history: _h, applying: _a, stale: _s, ...x }: T): T => x as T;
   // An artifact is in once applied and out once removed, whatever its derived value has moved to since:
   // the overlay checks an apply against the value it was taken on, and an alternative taken moves it.
@@ -135,9 +168,31 @@ export function relint(doc: Doc, all: State): Doc {
     const x = v.findings[i]!;
     return answer(x) ? { ...strip(x), outcome: { ...x.outcome, ...(x.asked && { kind: 'applied' as const }) } } : f;
   });
+  // The banner follows the portions as they now read: NOFORN until no portion carries it, then the REL TO
+  // of an alternative taken on a portion it depends on.
+  // shortcut: the memo's one NOFORN-or-REL TO choice, not a banner derivation; it goes with the stand-in.
+  const nf = findings.some((f) => /\/\/(NF|NOFORN)\b/.test(shown(f as FindingView)));
+  const rebanner = (a: ArtifactView): ArtifactView => {
+    const was = textOf(a.derived_value);
+    if (a.kind !== 'front_marking' || nf || !was?.includes('//NOFORN')) return a;
+    const rel = findings
+      .filter((f) => a.depends_on?.includes(f.id) && answer(v.findings.find((x) => x.id === f.id)!))
+      .map((f) => /\/\/REL TO [^/)]+/.exec(shown(f as FindingView))?.[0])
+      .findLast(Boolean);
+    return rel ? { ...a, derived_value: { text: was.replace('//NOFORN', rel), masks: [] } } : a;
+  };
+
   const artifacts = v.document.artifacts.map(put);
-  const blocking = [...findings, ...artifacts]
-    .filter((x) => x.needs_person === 'required' && x.blocks !== 'never')
-    .map((x) => x.id);
-  return { ...doc, findings, document: { ...v.document, artifacts, blocking, pending: [], withdrawn: [] } };
+  // A sample layout cannot confirm semantic readiness or discharge an engine blocker.
+  return {
+    ...doc,
+    findings,
+    document: {
+      ...v.document,
+      artifacts,
+      blocking: doc.document.blocking,
+      evaluation: undefined,
+      pending: [...new Set([...(doc.document.pending ?? []), ...pending])],
+    },
+  };
 }

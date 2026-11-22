@@ -7,7 +7,15 @@ import { defineConfig } from 'vite-plus';
 
 const config: UserConfig = defineConfig({
   pack: {
-    entry: ['src/attention.ts', 'src/marking.ts', 'src/state.ts', 'src/types.ts'],
+    entry: [
+      'src/attention.ts',
+      'src/marking.ts',
+      'src/state.ts',
+      'src/types.ts',
+      'src/native-wire.ts',
+      'src/native-cab.ts',
+      'src/native-results.ts',
+    ],
     format: ['esm'],
     // No DOM: core runs in a page, in node, and in Outlook's send handler.
     platform: 'neutral',

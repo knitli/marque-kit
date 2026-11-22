@@ -1,0 +1,4 @@
+Producer: uncommitted /private/tmp/marque-corpus-audit-131 based on f7d0459ff487e1947af0d15db007cdcc594759fe
+Generated from support::run_with_watermarks, with the first basis field target changed to Text(2..9) before encode_findings_v3.
+The resulting mixed-target binding is intentionally inconsistent and is a parser and rejection fixture, not a valid CAB snapshot.
+SHA-256: ee07131333321dc40538897fe9782ce198c420ccd97ca8ec567dd42efe1dbb11

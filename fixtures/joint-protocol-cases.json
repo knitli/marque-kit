@@ -1,0 +1,8 @@
+{
+  "id": "act-sequence-exhausted",
+  "input_ref": "act-sequence-exhausted",
+  "expected": {
+    "act_sequence": "exhausted",
+    "wrap_rounding_or_duplicate": false
+  }
+}

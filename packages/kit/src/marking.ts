@@ -33,6 +33,8 @@ import {
   type SpokenVocab,
 } from '@knitli/marque-kit-core/marking';
 import type { Layer, Marking, MarkingLike, Mask } from '@knitli/marque-kit-core/types';
+import type { NativeSourceMarkingView } from '@knitli/marque-kit-core/native-wire';
+import { isParsedNativeSourceMarkingView, parseNativeSourceMarkingJson } from '@knitli/marque-kit-core/native-wire';
 
 // The pure half, from core, as this module has always exported it.
 export {
@@ -119,6 +121,97 @@ export function settle(root: HTMLElement): HTMLElement {
   const one = root.getBoundingClientRect().height;
   const line = parseFloat(getComputedStyle(root).lineHeight) || 20;
   if (one > line * 1.5) root.classList.add('stacked');
+  return root;
+}
+
+export type SourceMarkingSessionBinding = NativeSourceMarkingView['binding'];
+export type SourceMarkingSessionProvider = {
+  isCurrent(binding: Readonly<SourceMarkingSessionBinding>): boolean | Promise<boolean>;
+  load(binding: Readonly<SourceMarkingSessionBinding>, maxBytes: number): Promise<string | null>;
+};
+export type SourceMarkingSessionCapability = {
+  isCurrent(): Promise<boolean>;
+  revoke(): void;
+};
+type SourceMarkingSessionRecord = {
+  binding: Readonly<SourceMarkingSessionBinding>;
+  maxBytes: number;
+  provider: SourceMarkingSessionProvider;
+  active: boolean;
+};
+const sourceMarkingSessions = new WeakMap<object, SourceMarkingSessionRecord>();
+const sourceMarkingBindingKeys = [
+  'chain_id',
+  'source_id',
+  'revision_id',
+  'contribution_id',
+  'scope_id',
+  'viewer_id',
+] as const;
+
+/** Install-time host hook. Its loader must return the engine's current, trusted response for this binding. */
+export function installSourceMarkingSession(
+  binding: SourceMarkingSessionBinding,
+  maxBytes: number,
+  provider: SourceMarkingSessionProvider,
+): SourceMarkingSessionCapability {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 32_768) {
+    throw new RangeError('source marking byte cap');
+  }
+  if (
+    sourceMarkingBindingKeys.some((key) => typeof binding[key] !== 'string' || !binding[key].trim()) ||
+    Object.keys(binding).length !== sourceMarkingBindingKeys.length
+  ) {
+    throw new TypeError('source marking session binding');
+  }
+  const record: SourceMarkingSessionRecord = {
+    binding: Object.freeze({ ...binding }),
+    maxBytes,
+    provider,
+    active: true,
+  };
+  const capability: SourceMarkingSessionCapability = Object.freeze({
+    isCurrent: async () => {
+      if (!record.active) return false;
+      try {
+        const valid = await provider.isCurrent(record.binding);
+        return record.active && valid;
+      } catch {
+        return false;
+      }
+    },
+    revoke: () => {
+      record.active = false;
+    },
+  });
+  sourceMarkingSessions.set(capability, record);
+  return capability;
+}
+
+/** Load through the installed host provider and render only its exact live response. */
+export async function renderSourceMarkingView(session: SourceMarkingSessionCapability): Promise<HTMLSpanElement> {
+  const record = sourceMarkingSessions.get(session);
+  if (!record || !(await session.isCurrent()) || !record.active) {
+    throw new TypeError('source marking view session mismatch or expired');
+  }
+  let json: string | null;
+  try {
+    json = await record.provider.load(record.binding, record.maxBytes);
+  } catch {
+    throw new TypeError('source marking view unavailable');
+  }
+  if (!(await session.isCurrent()) || !record.active || typeof json !== 'string') {
+    throw new TypeError('source marking view session mismatch or expired');
+  }
+  const view = parseNativeSourceMarkingJson(json, record.maxBytes);
+  if (
+    !isParsedNativeSourceMarkingView(view) ||
+    sourceMarkingBindingKeys.some((key) => view.binding[key] !== record.binding[key])
+  ) {
+    throw new TypeError('source marking view session mismatch or expired');
+  }
+  const root = render(view.marking);
+  root.setAttribute('aria-label', `Read-only source marking: ${spoken(view.marking)}`);
   return root;
 }
 

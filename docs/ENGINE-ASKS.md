@@ -10,6 +10,8 @@ All documents and markings in this repo are fictional examples.
 
 The kit is built to the finding contract in [CONTRACT.md](CONTRACT.md). Where the engine differs today, the gap is tracked internally. This page is the checklist; the detail lives with the engine. Listed 17 Oct 2026 from the design session; docs/ is the source of truth. Suggested order: stable ids → layered markings → `asks` → readings → `depends_on` → person's acts → trace shape → artifacts → fallback → Live mode.
 
+The readiness profile is adopted in the kit contract, but coordinated producer/kit/caller migration remains pending. The producer target is a complete `document.evaluation`; the kit computes `effectiveReady(doc, host)` using the current host basis and confirmed writes/checks. `effectiveReady` is not an engine field, and an empty `document.blocking[]` is not proof of readiness.
+
 Until these land, the kit renders from a hand-written oracle in the contract's shape (`fixtures/memo.findings.json`). The oracle is what the engine should emit for `fixtures/memo.txt`; the day the engine emits it, the fixture becomes a parity test.
 
 | Need | Why the kit needs it |
@@ -17,7 +19,7 @@ Until these land, the kit renders from a hand-written oracle in the contract's s
 | Markings as layered tokens with typed mask regions | So a marking never breaks inside a token and the unidentified parts are regions, not characters. `packages/kit/src/marking.ts` derives layers from the string until then. |
 | One `asks` field for everything that needs a person | The decision prompt renders one shape. A free answer is always allowed. |
 | Readings carry their rendered marking and the layer they change | The diff form tints the layer that differs; the kit can't compute that from a string. |
-| `depends_on[]` only when readings differ in roll-up; `document.ready` / `blocking[]` | "If ¶5's alternative is taken, the banner becomes…" is only worth showing when it's true. |
+| Finding and artifact/field dependencies, plus `document.evaluation` | `depends_on[]` connects a finding to values its readings can change. Track artifact and field dependencies separately, even when every reading leaves the banner unchanged. A complete evaluation carries its basis, completeness, requirements and snapshot readiness; the kit/host then establishes effective readiness from currentness and confirmed work. |
 | Conservative fallback | An unattended deployment with nobody to ask gets the most restrictive form that keeps every stated equity, e.g. `(S//FGI AUS GBR//NF)`. |
 | Stable finding identity across re-lints | A Word content control tagged `mq:<id>` has to survive the next keystroke. |
 | `DeploymentMode::Live` | Rung depends on the host moment (editing vs finalize); the engine should know it is being asked repeatedly. |

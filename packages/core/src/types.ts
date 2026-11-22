@@ -2,6 +2,10 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import type { NativeEnvelope, NativeSemanticResultsEnvelope } from './native-wire.ts';
+import type { NativeCabRequest } from './native-cab.ts';
+import type { NativeSemanticResultsRequest } from './native-results.ts';
+
 /**
  * The shapes the kit reads and keeps (docs/CONTRACT.md): what Marque emits,
  * the person's acts on it (src/state.ts), and what a host hands the kit.
@@ -144,6 +148,7 @@ export interface Finding {
   needs_person: NeedsPerson;
   blocks: Blocks;
   depends_on?: string[];
+  evaluationBasis?: EvaluationBasis;
   scope?: string | null;
   seen?: boolean;
   // An artifact's own slots: never on a finding, so a finding and an artifact can be told apart by `kind`.
@@ -152,7 +157,6 @@ export interface Finding {
   derived_value?: undefined;
   placement?: undefined;
   fields?: undefined;
-  if_taken?: undefined;
   derivation?: undefined;
 }
 
@@ -164,6 +168,50 @@ export type ArtifactState =
   | 'present_not_required'
   | 'present_not_canonical';
 
+/** Exact inputs an evaluation and any act/preview are about (Fact contract §8). */
+export interface EvaluationBasis {
+  sourceRevisions: Record<string, string>;
+  selectionRevision: string;
+  relationshipRevision: string;
+  contextRevision: string;
+  policyRevision: string;
+  declarationsRevision: string;
+  scope: string;
+  operation: string;
+  evaluationContextRevision: string;
+  targetProfile: string;
+  questionRevisions: Record<string, string>;
+  /** Dependencies for fields/artifacts remain distinct even when the banner is unchanged. */
+  artifactRevisions: Record<string, string>;
+  /** The complete accepted hypothetical replacement set, keyed by its stable target. */
+  replacements: Record<string, HypotheticalReplacement>;
+}
+
+export type HypotheticalReplacement =
+  | { kind: 'reading'; reading: Reading }
+  | { kind: 'free_answer'; value: string }
+  | { kind: 'artifact_field'; field: string; value: string }
+  | { kind: 'artifact'; action: 'apply' | 'remove' };
+
+export interface RequirementStatus {
+  id: string;
+  status: 'unmet' | 'satisfied' | 'permitted' | 'unavailable';
+  mandatory: boolean;
+  scope: string;
+  evidence?: string[];
+  nextAction?: string;
+}
+
+export interface Evaluation {
+  basis: EvaluationBasis;
+  completion: 'complete' | 'incomplete' | 'unavailable';
+  requirements: RequirementStatus[];
+  /** The engine's semantic conclusion, independent of diagnostics and kit attention. */
+  snapshotReady: boolean;
+  /** A hypothetical joint evaluation; unavailable optional previews do not invalidate the base result. */
+  jointPreview?: { status: 'complete' | 'unavailable'; basis: EvaluationBasis };
+}
+
 /** A field a person fills on an artifact (the authority block). */
 export interface ArtifactField {
   state: 'known' | 'derived' | 'blank' | 'waiting';
@@ -174,6 +222,8 @@ export interface ArtifactField {
   waits_on?: string | null;
   /** On a view: the field as the lint gave it, so a later act is checked against that. */
   from?: string;
+  /** Basis of this field result, independently staleable from a banner result. */
+  evaluationBasis?: EvaluationBasis;
 }
 
 export interface DerivationStep {
@@ -201,8 +251,9 @@ export interface Artifact {
   needs_person: NeedsPerson;
   blocks: Blocks;
   depends_on?: string[];
+  evaluationBasis?: EvaluationBasis;
   /** The value if a finding's alternative is taken, by finding id. */
-  if_taken?: Record<string, MarkingLike> | null;
+  jointPreview?: { status: 'complete' | 'unavailable'; basis: EvaluationBasis; result?: DerivedValue };
   fields?: Record<string, ArtifactField>;
   seen?: boolean;
   // A finding's own slots: never on an artifact.
@@ -226,6 +277,85 @@ export interface ActValue {
   fields?: Record<string, string>;
 }
 
+/** A protocol handle carried by an act when the caller actually knows it. */
+export interface ActHandle {
+  chain: string;
+  serial: number;
+}
+
+/** Typed context retained with a caller-owned append. Missing fields stay unknown. */
+export interface ActAppendBinding {
+  documentId?: string;
+  chain?: string;
+  subject?: ActHandle;
+  question?: ActHandle;
+  questionRevision?: number;
+  resultRevision?: number;
+  payloadRef?: string;
+  sourceRevisions?: string[];
+  basis?: EvaluationBasis;
+  basisRef?: string;
+  supersedes?: string | null;
+  takesBack?: string | null;
+}
+
+/** An immutable request to append one act. `requestId` is its retry/idempotency key. */
+export interface ActAppendRequest {
+  requestId: string;
+  /** The kit's finding/artifact id; absent only when the caller has no such mapping. */
+  id?: string;
+  act: Act;
+  value: ActValue | null;
+  at?: string;
+  about?: Snapshot;
+  binding?: ActAppendBinding;
+}
+
+export type ActAppendRefusal =
+  | 'sequence-exhausted'
+  | 'missing-frontier'
+  | 'missing-coverage'
+  | 'history-incomplete'
+  | 'invalid-frontier'
+  | 'missing-target'
+  | 'request-id-conflict'
+  | 'undisclosed-marking';
+
+/** A rejected append remains outside the ordered log, with the original request intact. */
+export interface PendingAct extends ActAppendRequest {
+  sequence: null;
+  state: 'pending_sequence';
+  reason: ActAppendRefusal;
+}
+
+/** A durably captured request whose host append has not yet returned a disposition. */
+export interface StagedAct extends ActAppendRequest {
+  sequence: null;
+  state: 'staged';
+}
+
+export type PendingAppend = PendingAct | StagedAct;
+
+export interface ActHistoryCoverage {
+  state: 'complete' | 'partial' | 'unavailable';
+  /** The declared sequence interval covered by this history lane; null means known empty. */
+  sequenceRange: [number, number] | null;
+}
+
+export type AppendActResult =
+  | { status: 'committed'; state: State; entry: LogEntry; replayed: boolean }
+  | { status: 'refused'; reason: ActAppendRefusal; state: State; pending?: PendingAct };
+
+/** A committed act notification; retries identify the same durable entry and host write intent. */
+export interface ActChangeNotice {
+  id: string;
+  act: Act;
+  value: ActValue | null;
+  requestId: string;
+  entry: LogEntry;
+  replayed: boolean;
+}
+
 /** What an act was about when it was taken: markings, rule and place, never body text. */
 export interface Snapshot {
   rule: string | null;
@@ -244,14 +374,20 @@ export interface Snapshot {
   blocks: Blocks;
   state?: ArtifactState;
   fields?: Record<string, ArtifactField>;
+  evaluationBasis?: EvaluationBasis;
 }
 
 export interface LogEntry {
+  /** One-based protocol sequence. Legacy JSON may omit the separate sequence frontier. */
+  sequence: number;
+  /** Present on entries created by the checked append transition; absent on legacy rows. */
+  requestId?: string;
   id: string;
   act: Act;
   value: ActValue | null;
   at: string;
   about?: Snapshot;
+  binding?: ActAppendBinding;
 }
 
 export interface State {
@@ -259,6 +395,12 @@ export interface State {
   seen: { id: string; result: string | null }[];
   /** How many log lines the current lint already reflects. */
   linted?: number;
+  /** Last issued protocol sequence, independent of retained log length. Missing in legacy JSON. */
+  actSequence?: number;
+  /** Coverage is separate from the issuance frontier and must not be inferred from `log.length`. */
+  actHistoryCoverage?: ActHistoryCoverage;
+  /** Durably staged or refused requests; never included in `log` or engine history. */
+  pendingAppends?: PendingAppend[];
 }
 
 /** What view() adds: the person's acts overlaid. Every slot is optional, so Marque's own finding is a view too. */
@@ -293,11 +435,154 @@ export interface Withdrawn {
 }
 
 export interface DocumentState {
-  ready: boolean;
+  /** Legacy presentation ids are retained for cards; never used as readiness authority. */
   blocking: string[];
+  evaluation?: Evaluation;
+  /** A CAB-only native evaluation cannot authorize whole-document readiness. */
+  native_evaluation?: NativeEnvelope | undefined;
+  /** Source-free native result rows disclosed for one host grant only. */
+  native_semantic_results?: NativeSemanticResultsEnvelope | undefined;
   artifacts: ArtifactView[];
   pending?: string[];
+  /** Accepted physical changes remain host-confirmation obligations after a re-lint. */
+  awaitingWrites?: string[];
   withdrawn?: Withdrawn[];
+  /** Read-only, content-free evidence retained by the ordinary lint projection. */
+  intake?: DocumentIntake;
+}
+
+/** A transformation the engine recorded while inspecting source bytes. */
+export type TransformationKind = 'normalized_ascii_case' | 'missing_opening_delimiter_at_boundary';
+
+export interface PerformedTransformation {
+  kind: TransformationKind;
+  /** Original UTF-8 byte range, including zero-width insertion points. */
+  span: [number, number];
+  /** Index of the source candidate that owns the operation. */
+  observation: number;
+}
+
+/** The ordinary lint projection's bounded transformation receipt fields. */
+export type IntakeStatus = 'complete' | 'partial' | 'refused' | 'unavailable';
+export type IntakeResource =
+  | 'input_bytes'
+  | 'input_records'
+  | 'input_members'
+  | 'items'
+  | 'support_edges'
+  | 'work'
+  | 'retained_bytes'
+  | 'output_bytes';
+
+/** Minimal candidate ownership reference used to validate read-only receipts. */
+export interface IntakeCandidateReference {
+  observation: number;
+  span: [number, number];
+  kind?: string;
+  outcome?: string;
+  /** The admitted common level; `r` is foreign Restricted, not a US ladder level. */
+  hypothesis?: { kind: 'classification'; classification: string } | null;
+  /** A typed reason or lexical fact. Source bytes and owner-code values are not part of this projection. */
+  reason?: string | null;
+  evidence?: IntakeCandidateEvidence[];
+  /** Candidate's source contribution group; not a source identity or owner value. */
+  source_group?: number | null;
+}
+
+export type IntakeForeignSystem = 'fgi' | 'joint';
+export type IntakeForeignClassificationLevel = 'unclassified' | 'confidential' | 'secret' | 'top_secret' | 'restricted';
+export type IntakeForeignOwnerCategory =
+  | 'fgi_ownership'
+  | 'fgi_unregistered_ownership'
+  | 'joint_ownership'
+  | 'joint_unregistered_ownership';
+
+export type IntakeCandidateEvidence =
+  | {
+      kind: 'known_lexical_token';
+      span: [number, number];
+      polarity: 'supports';
+      category: 'classification';
+      system: IntakeForeignSystem;
+      level: IntakeForeignClassificationLevel;
+    }
+  | {
+      kind: 'known_lexical_token';
+      span: [number, number];
+      polarity: 'supports';
+      category: IntakeForeignOwnerCategory;
+    }
+  | {
+      kind: 'unresolved_owner' | 'unexamined_control_token';
+      span: [number, number];
+      polarity: 'opposes_well_formedness';
+    }
+  | { kind: 'known_classification_lexeme' | 'known_no_foreign_control'; span: [number, number]; polarity: 'supports' };
+
+export type IntakeSemanticValue =
+  | { kind: 'classification'; classification: string }
+  | { kind: 'receive' | 'show' | 'unknown_audience_member' | 'known_empty_foreign_receive' }
+  | { kind: 'no_foreign' }
+  | { kind: 'originator_controlled' };
+
+export interface IntakeSourceOccurrence {
+  index: number;
+  source_group: number;
+  span: [number, number];
+  outcome: string;
+  value: IntakeSemanticValue | null;
+  reason?: string;
+}
+
+export interface IntakeSemanticClaim {
+  occurrence: number;
+  value: IntakeSemanticValue;
+}
+
+export type IntakeAudienceClaim = {
+  claim: number;
+  source_group: number;
+} & (
+  | { kind: 'receive' | 'show'; member: string }
+  | { kind: 'unknown_member' | 'known_empty_foreign_receive'; member: null }
+) &
+  (
+    | { support: 'authored' | 'rel_receive_implies_show' | 'eyes_receive_implies_show'; occurrence: number }
+    | { support: 'implied_usa' | 'examined_absence'; occurrence: null }
+  );
+
+export interface IntakeAudienceEvidence {
+  status: 'complete' | 'partial' | 'unavailable' | (string & {});
+  assertion_count?: number;
+  assertion_count_emitted?: number;
+  claim_count?: number;
+  claim_count_emitted?: number;
+  assertions?: unknown[];
+  claims?: IntakeAudienceClaim[];
+}
+
+export interface DocumentIntake {
+  status: IntakeStatus | (string & {});
+  transformation_count?: number;
+  transformations?: PerformedTransformation[];
+  candidate_inventory_status?: IntakeStatus | (string & {});
+  scope_inventory_status?: IntakeStatus | 'incomplete' | (string & {});
+  policy_facet_status?: string;
+  candidate_count?: number;
+  candidate_count_emitted?: number;
+  candidate_count_examined?: number;
+  candidate_count_unexamined?: number;
+  source_group_count?: number;
+  source_group_count_total?: number;
+  source_occurrence_count?: number;
+  source_occurrence_count_emitted?: number;
+  source_occurrences?: IntakeSourceOccurrence[];
+  claim_count?: number;
+  claim_count_emitted?: number;
+  claims?: IntakeSemanticClaim[];
+  audience_evidence?: IntakeAudienceEvidence;
+  candidates?: IntakeCandidateReference[];
+  projection_cutoff?: { phase?: string | null; resource?: IntakeResource | (string & {}) | null } | null;
 }
 
 /** The engine's document, or a view of it (docView). */
@@ -382,10 +667,41 @@ export type Tab = 'findings' | 'history';
 export type EngineState = 'ok' | 'checking' | 'failed' | (string & {});
 
 /** The thing the kit never decides. Every callback is optional; a missing one makes its control inert, not absent. */
+/** Host-issued display for one act at a particular current disclosure revision. */
+export interface HistoryDisclosure {
+  documentId: string;
+  chain: string;
+  basis: EvaluationBasis;
+  disclosureRevision: string;
+  entries: Array<
+    { requestId: string; sequence: number; subjectId: string } & (
+      | { status: 'unavailable' }
+      | { status: 'available'; text?: string; marking?: MarkingLike }
+    )
+  >;
+}
 export interface Host {
+  /** Independently supplied current scope for the read-only native CAB result. */
+  nativeCabRequest?: NativeCabRequest | undefined;
+  /** Independently supplied current host context and result-specific disclosure grant. */
+  nativeSemanticResultsRequest?: NativeSemanticResultsRequest | undefined;
+  /** The host's current viewer/disclosure revision, independently of any historical payload. */
+  currentDisclosureRevision?: string | undefined;
+  historyDisclosure?: HistoryDisclosure | undefined;
   moment?: Moment | undefined;
   engine?: EngineState | undefined;
   readOnly?: boolean | undefined;
+  /** Host-measured current outgoing source/context/policy basis. It cannot repair an incomplete evaluation. */
+  currentBasis?: EvaluationBasis | undefined;
+  /** Required writes/placements for this operation, supplied by the host. */
+  requiredWrites?: string[] | undefined;
+  requiredAcceptanceChecks?: string[] | undefined;
+  /** Host-confirmed writes and named acceptance checks for this exact current basis. */
+  confirmedWrites?: string[] | undefined;
+  /** Each check value is its host acknowledgement token bound to this current basis. */
+  acceptanceChecks?: Record<string, string> | undefined;
+  /** Known caller binding captured with an append request; unknown fields are omitted. */
+  actBinding?: ActAppendBinding | undefined;
   vocab?: Vocab | undefined;
   /** Under the width floor: rows only. */
   narrow?: boolean | undefined;
@@ -407,6 +723,12 @@ export interface Host {
   onRetry?: () => void;
   onReport?: () => void;
   onClose?: () => void;
-  onChange?: (state: State, act: { id: string; act: Act; value: ActValue | null } | null) => void;
+  /** The committed entry and retry key let the host resume its durable pending write, including after replay. */
+  onChange?: (state: State, act: ActChangeNotice | null) => void;
+  /**
+   * The host must durably stage this exact request before attempting append. Persist the checked result;
+   * commits also persist a recoverable host-write intent before acknowledgement.
+   */
+  onAppend?: (request: ActAppendRequest) => Promise<AppendActResult>;
   onTheme?: (report: ThemeReport | null) => void;
 }
