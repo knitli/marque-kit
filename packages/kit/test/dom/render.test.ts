@@ -80,8 +80,18 @@ describe('ordinary lint transformation receipts', () => {
     transformations: [{ kind: 'normalized_ascii_case', span: [7, 9] as [number, number], observation: 0 }],
     candidate_count_emitted: 1,
     candidates: [{ observation: 0, span: [6, 17], private: 'candidate evidence must not be rendered' }],
-    source_occurrences: [{ value: 'GRANTED SECRET evidence must stay masked' }],
-    claims: [{ value: 'grant evidence must not be rendered' }],
+    source_occurrences: [
+      {
+        index: 0,
+        source_group: 0,
+        span: [0, 1],
+        outcome: 'admitted',
+        value: { kind: 'classification', classification: 'GRANTED SECRET evidence must stay masked' },
+      },
+    ],
+    claims: [
+      { occurrence: 0, value: { kind: 'classification', classification: 'grant evidence must not be rendered' } },
+    ],
   };
 
   test('shows only the read-only kind, original byte span, and owning observation', () => {
