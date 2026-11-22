@@ -15,7 +15,7 @@ import type {
 /** Host-supplied scope and currentness: this is a read of one CAB snapshot. */
 export interface NativeCabRequest {
   kind: 'cab_snapshot';
-  /** Independently supplied expected evaluation chain for v2 findings. */
+  /** Independently supplied expected evaluation chain for findings. */
   expectedChain?: string;
   operation: 'base';
   target: NativeTarget;
@@ -31,7 +31,14 @@ const sameTarget = (a: NativeTarget, b: NativeTarget): boolean =>
   a.document_id === b.document_id &&
   a.revision_id === b.revision_id &&
   a.contribution_id === b.contribution_id &&
-  a.scope_locator === b.scope_locator;
+  sameLocator(a.scope_locator, b.scope_locator);
+const sameLocator = (a: NativeTarget['scope_locator'], b: NativeTarget['scope_locator']): boolean => {
+  if (typeof a === 'string') return a === b;
+  if (typeof b !== 'object' || b === null || a.kind !== b.kind) return false;
+  return a.kind === 'typed'
+    ? b.kind === 'typed' && a.value === b.value
+    : b.kind === 'text' && !!b.value && a.value.start === b.value.start && a.value.end === b.value.end;
+};
 const sameProfile = (a: NativeProfile | null, b: NativeProfile): boolean =>
   !!a &&
   !!b &&
@@ -55,7 +62,7 @@ export function readCabSnapshot(doc: Doc, request: NativeCabRequest): NativeEval
   if (!basis || basis.basis.operation !== 'base' || !sameProfile(basis.basis.profile, request.profile)) return null;
   let current;
   try {
-    current = parseNativeBasisJson(request.currentBasisJson, request.maxBasisBytes);
+    current = parseNativeBasisJson(request.currentBasisJson, request.maxBasisBytes, envelope.version);
   } catch {
     return null;
   }
@@ -99,12 +106,12 @@ export function readCabSnapshot(doc: Doc, request: NativeCabRequest): NativeEval
   if (basis.accepted_answers.some((a) => !sameTarget(a.target, request.target))) return null;
   if (e.requirements.some((r) => r.scope && !scopes.get(r.scope.contribution_id)?.has(r.scope.scope_id))) return null;
   if (e.host_work.rows.some((r) => !sameTarget(r.target, request.target))) return null;
-  if (envelope.version === 2 && !validV2(envelope.evaluation, request, scopes, basisKey)) return null;
+  if (envelope.version !== 1 && !validFindings(envelope.evaluation, request, scopes, basisKey)) return null;
   return e;
 }
 
 type Scopes = Map<string, Set<string>>;
-function validV2(v: NativeEvaluationV2, request: NativeCabRequest, scopes: Scopes, basisKey: string): boolean {
+function validFindings(v: NativeEvaluationV2, request: NativeCabRequest, scopes: Scopes, basisKey: string): boolean {
   if (!request.expectedChain || v.chain !== request.expectedChain) return false;
   const artifacts = new Set<string>();
   for (const artifact of v.artifacts) {

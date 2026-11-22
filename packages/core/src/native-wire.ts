@@ -4,7 +4,13 @@
 import { hasUnpairedSurrogate } from './marking.ts';
 import type { Layer, Marking, Mask, Token } from './types.ts';
 
-export type NativeTarget = { document_id: string; revision_id: string; contribution_id: string; scope_locator: string };
+export type NativeTargetLocator = Exclude<NativeLocator, { kind: 'unlocated' }>;
+export type NativeTarget = {
+  document_id: string;
+  revision_id: string;
+  contribution_id: string;
+  scope_locator: string | NativeTargetLocator;
+};
 export type NativeField = 'classified_by' | 'agency_and_office_of_origin' | 'classification_reason' | 'declassify_on';
 export type NativeProfile = {
   profile: 'original_us_nsi_cab_required_field_missing_after_examination';
@@ -183,7 +189,11 @@ export type NativeEnvelopeV2 = Omit<NativeEnvelopeV1, 'schema' | 'version' | 'ev
   version: 2;
   evaluation: NativeEvaluationV2;
 };
-export type NativeEnvelope = NativeEnvelopeV1 | NativeEnvelopeV2;
+export type NativeEnvelopeV3 = Omit<NativeEnvelopeV2, 'schema' | 'version'> & {
+  schema: 'knitli.native-cab-findings.v3';
+  version: 3;
+};
+export type NativeEnvelope = NativeEnvelopeV1 | NativeEnvelopeV2 | NativeEnvelopeV3;
 
 export type NativeSemanticResultMeaning = { status: 'available'; field: NativeField } | { status: 'unavailable' };
 export type NativeSemanticResultSupportKind = (typeof SUPPORT_KINDS)[number];
@@ -265,13 +275,25 @@ const safeDecimal = (x: unknown, where: string): string => {
 };
 const FIELD = ['classified_by', 'agency_and_office_of_origin', 'classification_reason', 'declassify_on'] as const;
 const field = (x: unknown, where: string) => oneOf(x, FIELD, where);
-function target(x: unknown, where: string): NativeTarget {
+function target(x: unknown, where: string, v3: boolean): NativeTarget {
   const o = keys(x, ['document_id', 'revision_id', 'contribution_id', 'scope_locator'], where);
+  let scopeLocator: NativeTarget['scope_locator'];
+  if (!v3) scopeLocator = str(o.scope_locator, where);
+  else {
+    const parsed = locator(o.scope_locator, `${where}.scope_locator`);
+    if (
+      parsed.kind === 'unlocated' ||
+      (parsed.kind === 'typed' && parsed.value.length === 0) ||
+      (parsed.kind === 'text' && parsed.value.start === parsed.value.end)
+    )
+      return fail(`${where}.scope_locator`);
+    scopeLocator = parsed;
+  }
   return {
     document_id: str(o.document_id, where),
     revision_id: str(o.revision_id, where),
     contribution_id: str(o.contribution_id, where),
-    scope_locator: str(o.scope_locator, where),
+    scope_locator: scopeLocator,
   };
 }
 function locator(x: unknown, where: string): NativeLocator {
@@ -316,7 +338,7 @@ function support(x: unknown, where: string): NativeSupport {
     index: safeDecimal(o.index, where),
   };
 }
-function basis(x: unknown, where: string): NativeBasis {
+function basis(x: unknown, where: string, v3: boolean): NativeBasis {
   const o = keys(
     x,
     ['source_revisions', 'scopes', 'operation', 'profile', 'context_revision', 'field_revisions'],
@@ -335,7 +357,7 @@ function basis(x: unknown, where: string): NativeBasis {
   const fields = arr(o.field_revisions, where).map((v) => {
     const f = keys(v, ['target', 'field', 'revision', 'placement'], where);
     return {
-      target: target(f.target, where),
+      target: target(f.target, where, v3),
       field: field(f.field, where),
       revision: str(f.revision, where),
       placement: f.placement === null ? null : locator(f.placement, where),
@@ -350,7 +372,7 @@ function basis(x: unknown, where: string): NativeBasis {
     field_revisions: fields,
   };
 }
-function artifactField(x: unknown, where: string): NativeArtifactField {
+function artifactField(x: unknown, where: string, v3: boolean): NativeArtifactField {
   const o = keys(
     x,
     [
@@ -379,10 +401,10 @@ function artifactField(x: unknown, where: string): NativeArtifactField {
     placement: o.placement === null ? null : locator(o.placement, where),
     supports: arr(o.supports, where).map((v) => support(v, where)),
     revision: safeDecimal(o.revision, where),
-    basis: basis(o.basis, where),
+    basis: basis(o.basis, where, v3),
   };
 }
-function hostRow(x: unknown, where: string): NativeHostWorkRow {
+function hostRow(x: unknown, where: string, v3: boolean): NativeHostWorkRow {
   const o = keys(x, ['target', 'proposal', 'field', 'placement', 'evidence_ref', 'status'], where);
   let proposal: NativeHostWorkRow['proposal'] = null;
   if (o.proposal !== null) {
@@ -394,7 +416,7 @@ function hostRow(x: unknown, where: string): NativeHostWorkRow {
     };
   }
   return {
-    target: target(o.target, where),
+    target: target(o.target, where, v3),
     proposal,
     field: o.field === null ? null : field(o.field, where),
     placement: o.placement === null ? null : locator(o.placement, where),
@@ -406,7 +428,7 @@ function hostRow(x: unknown, where: string): NativeHostWorkRow {
     ),
   };
 }
-function evaluationBasis(x: unknown, where: string): NativeEvaluationBasis {
+function evaluationBasis(x: unknown, where: string, v3: boolean): NativeEvaluationBasis {
   const b = keys(x, ['basis', 'accepted_answers'], where);
   const answers = arr(b.accepted_answers, where).map((v) => {
     const a = keys(
@@ -426,25 +448,25 @@ function evaluationBasis(x: unknown, where: string): NativeEvaluationBasis {
       question_chain: str(a.question_chain, where),
       question_serial: safeDecimal(a.question_serial, where),
       question_revision: safeDecimal(a.question_revision, where),
-      target: target(a.target, where),
+      target: target(a.target, where, v3),
       field: field(a.field, where),
       value_reference: str(a.value_reference, where),
       occurrence_locator: locator(a.occurrence_locator, where),
     };
   });
-  return { basis: basis(b.basis, where), accepted_answers: answers };
+  return { basis: basis(b.basis, where, v3), accepted_answers: answers };
 }
-function evaluation(x: unknown, where: string, v2 = false): NativeEvaluation {
+function evaluation(x: unknown, where: string, hasFindings: boolean, v3: boolean): NativeEvaluation {
   const o = keys(
     x,
-    v2
+    hasFindings
       ? ['basis', 'coverage', 'readiness', 'requirements', 'artifacts', 'host_work', 'findings', 'chain', 'handles']
       : ['basis', 'coverage', 'readiness', 'requirements', 'artifacts', 'host_work'],
     where,
   );
   let nativeBasis: NativeEvaluation['basis'] = null;
   if (o.basis !== null) {
-    nativeBasis = evaluationBasis(o.basis, where);
+    nativeBasis = evaluationBasis(o.basis, where, v3);
   }
   const c = keys(o.coverage, ['status', 'reason'], where);
   const cv = oneOf(c.status, ['complete', 'partial', 'unavailable'] as const, where);
@@ -515,10 +537,10 @@ function evaluation(x: unknown, where: string, v2 = false): NativeEvaluation {
     }
     return {
       id,
-      target: target(a.target, where),
+      target: target(a.target, where, v3),
       obligation: oneOf(a.obligation, ['required', 'conditional_unresolved', 'not_required'] as const, where),
-      fields: arr(a.fields, where).map((f) => artifactField(f, where)),
-      basis: basis(a.basis, where),
+      fields: arr(a.fields, where).map((f) => artifactField(f, where, v3)),
+      basis: basis(a.basis, where, v3),
     };
   });
   const h = keys(o.host_work, ['coverage', 'cause', 'rows'], where);
@@ -548,7 +570,7 @@ function evaluation(x: unknown, where: string, v2 = false): NativeEvaluation {
     host_work: {
       coverage: oneOf(h.coverage, ['not_requested', 'complete', 'partial', 'unavailable'] as const, where),
       cause,
-      rows: arr(h.rows, where).map((row) => hostRow(row, where)),
+      rows: arr(h.rows, where).map((row) => hostRow(row, where, v3)),
     },
   };
 }
@@ -601,6 +623,7 @@ function meaning(x: unknown): NativeMeaning {
 function parseFindings(
   e: Record<string, unknown>,
   base: NativeEvaluation,
+  v3: boolean,
 ): Pick<NativeEvaluationV2, 'chain' | 'handles' | 'findings'> {
   const o = keys(e.findings, ['unrepresented', 'status', 'coverage', 'items'], 'findings');
   const omitted = arr(o.unrepresented, 'unrepresented');
@@ -653,7 +676,7 @@ function parseFindings(
         field: field(q.field, 'question'),
         prompt: str(q.prompt, 'question'),
         meaning: meaning(q.meaning),
-        basis: basis(q.basis, 'question'),
+        basis: basis(q.basis, 'question', v3),
       };
     }
     let result: NativeFinding['result'] = null;
@@ -766,12 +789,14 @@ export function parseNativeJson(text: string, maxBytes: number): NativeEnvelope 
     'envelope',
   );
   const v2 = o.schema === 'knitli.native-cab-findings.v2' && o.version === 2;
-  if (!v2 && !(o.schema === 'knitli.native-evaluation.v1' && o.version === 1)) fail('schema version');
+  const v3 = o.schema === 'knitli.native-cab-findings.v3' && o.version === 3;
+  if (!v2 && !v3 && !(o.schema === 'knitli.native-evaluation.v1' && o.version === 1)) fail('schema version');
   if (o.route_scope !== 'cab_snapshot' || o.whole_document_finalize !== 'unsupported') fail('scope');
   const omittedValues = arr(o.omitted_lanes, 'omitted_lanes');
-  const expected = v2
-    ? OMITTED.filter((lane) => lane !== 'findings' && lane !== 'evaluation_chain' && lane !== 'handle_watermarks')
-    : OMITTED;
+  const expected =
+    v2 || v3
+      ? OMITTED.filter((lane) => lane !== 'findings' && lane !== 'evaluation_chain' && lane !== 'handle_watermarks')
+      : OMITTED;
   if (omittedValues.length !== expected.length || omittedValues.some((value, i) => value !== expected[i]))
     fail('omitted lanes contract');
   const omitted = expected.slice();
@@ -780,15 +805,17 @@ export function parseNativeJson(text: string, maxBytes: number): NativeEnvelope 
     whole_document_finalize: 'unsupported' as const,
     omitted_lanes: omitted,
   };
-  const base = evaluation(o.evaluation, 'evaluation', v2);
-  const result: NativeEnvelope = v2
-    ? {
-        ...common,
-        schema: 'knitli.native-cab-findings.v2',
-        version: 2,
-        evaluation: { ...base, ...parseFindings(object(o.evaluation, 'evaluation'), base) },
-      }
-    : { ...common, schema: 'knitli.native-evaluation.v1', version: 1, evaluation: base };
+  const base = evaluation(o.evaluation, 'evaluation', v2 || v3, v3);
+  const result: NativeEnvelope =
+    v2 || v3
+      ? {
+          ...common,
+          ...(v3
+            ? { schema: 'knitli.native-cab-findings.v3' as const, version: 3 as const }
+            : { schema: 'knitli.native-cab-findings.v2' as const, version: 2 as const }),
+          evaluation: { ...base, ...parseFindings(object(o.evaluation, 'evaluation'), base, v3) },
+        }
+      : { ...common, schema: 'knitli.native-evaluation.v1', version: 1, evaluation: base };
   freezeTree(result);
   accepted.add(result);
   return result;
@@ -945,6 +972,6 @@ export function parseNativeSourceMarkingJson(text: string, maxBytes: number): Na
   return result;
 }
 /** Parse a separately supplied host currentness basis using the same schema. */
-export function parseNativeBasisJson(text: string, maxBytes: number): NativeEvaluationBasis {
-  return evaluationBasis(parseJson(text, maxBytes), 'current basis');
+export function parseNativeBasisJson(text: string, maxBytes: number, version: 1 | 2 | 3 = 2): NativeEvaluationBasis {
+  return evaluationBasis(parseJson(text, maxBytes), 'current basis', version === 3);
 }
