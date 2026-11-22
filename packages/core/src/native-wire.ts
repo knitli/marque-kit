@@ -119,8 +119,28 @@ export type NativeMeaning = {
   answer_kinds: { kind: 'cab_field_replacement'; field: NativeField }[];
   answer_effects: string[];
 };
+export type NativeFindingIdentity =
+  | { status: 'issued'; subject: NativeSubject }
+  | {
+      status: 'unavailable';
+      reason: 'prior_unexamined' | 'resource';
+      resource: NativeResource;
+    }
+  | {
+      status: 'unavailable';
+      reason: 'subject_watermark_missing' | 'subject_serial_exhausted' | 'invalid_handle_set' | 'identity_unresolved';
+    };
+export type NativeResource =
+  | 'input_bytes'
+  | 'input_records'
+  | 'input_members'
+  | 'items'
+  | 'support_edges'
+  | 'work'
+  | 'retained_bytes'
+  | 'output_bytes';
 export type NativeFinding = {
-  subject: NativeSubject;
+  identity: NativeFindingIdentity;
   outcome: 'needs_fact' | 'unavailable';
   needs_person: 'none' | 'optional' | 'required';
   blocks: 'never' | 'finalize' | 'now';
@@ -200,6 +220,21 @@ const nullableString = (x: unknown, where: string): string | null => (x === null
 const arr = (x: unknown, where: string): unknown[] => (Array.isArray(x) ? x : fail(where));
 const oneOf = <T extends string>(x: unknown, choices: readonly T[], where: string): T =>
   choices.includes(x as T) ? (x as T) : fail(`${where} tag`);
+const resource = (x: unknown, where: string): NativeResource =>
+  oneOf(
+    x,
+    [
+      'input_bytes',
+      'input_records',
+      'input_members',
+      'items',
+      'support_edges',
+      'work',
+      'retained_bytes',
+      'output_bytes',
+    ] as const,
+    where,
+  );
 const safeDecimal = (x: unknown, where: string): string => {
   if (typeof x !== 'string' || x.length > 16) return fail(`${where} decimal`);
   const n = Number(x);
@@ -499,6 +534,33 @@ function subject(x: unknown): NativeSubject {
   const o = keys(x, ['chain', 'serial'], 'subject');
   return { chain: str(o.chain, 'subject'), serial: safeDecimal(o.serial, 'subject') };
 }
+function findingIdentity(x: unknown): NativeFindingIdentity {
+  const o = object(x, 'finding identity');
+  const status = oneOf(o.status, ['issued', 'unavailable'] as const, 'finding identity status');
+  if (status === 'issued') {
+    const issued = keys(o, ['status', 'subject'], 'issued finding identity');
+    return { status, subject: subject(issued.subject) };
+  }
+  const reason = oneOf(
+    o.reason,
+    [
+      'prior_unexamined',
+      'resource',
+      'subject_watermark_missing',
+      'subject_serial_exhausted',
+      'invalid_handle_set',
+      'identity_unresolved',
+    ] as const,
+    'finding identity reason',
+  );
+  const needsResource = reason === 'prior_unexamined' || reason === 'resource';
+  const unavailable = needsResource
+    ? keys(o, ['status', 'reason', 'resource'], 'resource-limited finding identity')
+    : keys(o, ['status', 'reason'], 'unavailable finding identity');
+  return needsResource
+    ? { status, reason, resource: resource(unavailable.resource, 'finding identity resource') }
+    : { status, reason };
+}
 function meaning(x: unknown): NativeMeaning {
   const o = keys(x, ['requested_fact', 'scope', 'answer_kinds', 'answer_effects'], 'meaning');
   return {
@@ -529,7 +591,7 @@ function parseFindings(
     const f = keys(
       v,
       [
-        'subject',
+        'identity',
         'outcome',
         'needs_person',
         'blocks',
@@ -582,7 +644,7 @@ function parseFindings(
       };
     }
     return {
-      subject: subject(f.subject),
+      identity: findingIdentity(f.identity),
       outcome: oneOf(f.outcome, ['needs_fact', 'unavailable'] as const, 'outcome'),
       needs_person: oneOf(f.needs_person, ['none', 'optional', 'required'] as const, 'needs person'),
       blocks: oneOf(f.blocks, ['never', 'finalize', 'now'] as const, 'blocks'),
