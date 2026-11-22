@@ -35,7 +35,7 @@ export interface OfficeWordHost {
     documentId: string,
     chain: string,
   ): Promise<Omit<NativeCabRequest, 'maxBasisBytes' | 'expectedChain'> | null>;
-  /** Revoke before document, viewer, grant, permission, provider, layout, formatting or accepted-answer changes. */
+  /** Revoke before target or source, viewer, grant, permission, provider, layout, formatting or answer changes. */
   watchOrdinaryCabInvalidation?(
     documentId: string,
     chain: string,
@@ -50,6 +50,12 @@ export interface OfficeWordHost {
     chain: string,
     viewerId: string,
   ): Promise<OfficeOrdinaryCabPreviewGrant | null>;
+  /** Independently grant this viewer the exact current linked source and raw disclosure. */
+  readOrdinaryCabSourceLinkGrant?(
+    documentId: string,
+    chain: string,
+    viewerId: string,
+  ): Promise<OfficeOrdinaryCabSourceLinkGrant | null>;
   /** Independent current owner, source text and layout revision. */
   readNativeCabPlacementScope?(documentId: string, chain: string): Promise<OfficeCabPlacementScope | null>;
   /** Revoke before any selected source, selection, viewer, grant or provider changes. */
@@ -146,7 +152,35 @@ export interface OfficeOrdinaryCabPreviewGrant {
   answersJson: string;
   /** Independently observed source examination for this exact current target. */
   sourceExaminationJson: string;
+  /** When present, a separate matching source grant is required before preview. */
+  sourceLinkGrantId?: string;
   disclosedFields: NativeField[];
+}
+
+/** Independent authority for a linked source; raw-output permission includes commitments to its inputs. */
+export interface OfficeOrdinaryCabSourceLinkGrant {
+  documentId: string;
+  chain: string;
+  viewerId: string;
+  grantId: string;
+  permissionRevision: string;
+  authorizeRawInput: true;
+  authorizeRawOutput: true;
+  current: {
+    documentId: string;
+    revisionId: string;
+    contributionId: string;
+    scopeLocator: [number, number];
+    text: string;
+    layoutRevision: string;
+    facePage: number;
+    owner: {
+      role: 'transmittal' | 'attachment';
+      parentDocumentId: string | null;
+      intrinsicClassificationLocator: [number, number];
+    };
+  };
+  sourceLinkJson: string;
 }
 
 export interface OfficeOrdinaryCabProvider {
