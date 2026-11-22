@@ -478,13 +478,100 @@ export type IntakeResource =
 export interface IntakeCandidateReference {
   observation: number;
   span: [number, number];
+  kind?: string;
+  outcome?: string;
+  /** The admitted common level; `r` is foreign Restricted, not a US ladder level. */
+  hypothesis?: { kind: 'classification'; classification: string } | null;
+  /** A typed reason or lexical fact. Source bytes and owner-code values are not part of this projection. */
+  reason?: string | null;
+  evidence?: IntakeCandidateEvidence[];
+  /** Candidate's source contribution group; not a source identity or owner value. */
+  source_group?: number | null;
+}
+
+export type IntakeForeignSystem = 'fgi' | 'joint';
+export type IntakeForeignClassificationLevel = 'unclassified' | 'confidential' | 'secret' | 'top_secret' | 'restricted';
+export type IntakeForeignOwnerCategory =
+  | 'fgi_ownership'
+  | 'fgi_unregistered_ownership'
+  | 'joint_ownership'
+  | 'joint_unregistered_ownership';
+
+export type IntakeCandidateEvidence =
+  | {
+      kind: 'known_lexical_token';
+      span: [number, number];
+      polarity: 'supports';
+      category: 'classification';
+      system: IntakeForeignSystem;
+      level: IntakeForeignClassificationLevel;
+    }
+  | {
+      kind: 'known_lexical_token';
+      span: [number, number];
+      polarity: 'supports';
+      category: IntakeForeignOwnerCategory;
+    }
+  | { kind: 'unresolved_owner'; span: [number, number]; polarity: 'opposes_well_formedness' }
+  | { kind: 'known_classification_lexeme' | 'known_no_foreign_control'; span: [number, number]; polarity: 'supports' };
+
+export type IntakeSemanticValue =
+  | { kind: 'classification'; classification: string }
+  | { kind: 'no_foreign' }
+  | { kind: 'originator_controlled' };
+
+export interface IntakeSourceOccurrence {
+  index: number;
+  source_group: number;
+  span: [number, number];
+  outcome: string;
+  value: IntakeSemanticValue | null;
+}
+
+export interface IntakeSemanticClaim {
+  occurrence: number;
+  value: IntakeSemanticValue;
+}
+
+export interface IntakeAudienceClaim {
+  claim: number;
+  source_group: number;
+  kind: 'receive';
+  member: 'USA' | (string & {});
+  support: 'authored' | 'implied_usa' | (string & {});
+  occurrence: number | null;
+}
+
+export interface IntakeAudienceEvidence {
+  status: 'complete' | 'partial' | 'unavailable' | (string & {});
+  assertion_count?: number;
+  assertion_count_emitted?: number;
+  claim_count?: number;
+  claim_count_emitted?: number;
+  assertions?: unknown[];
+  claims?: IntakeAudienceClaim[];
 }
 
 export interface DocumentIntake {
   status: IntakeStatus | (string & {});
   transformation_count?: number;
   transformations?: PerformedTransformation[];
+  candidate_inventory_status?: IntakeStatus | (string & {});
+  scope_inventory_status?: IntakeStatus | 'incomplete' | (string & {});
+  policy_facet_status?: string;
+  candidate_count?: number;
   candidate_count_emitted?: number;
+  candidate_count_examined?: number;
+  candidate_count_unexamined?: number;
+  source_group_count?: number;
+  source_group_count_total?: number;
+  source_occurrence_count?: number;
+  source_occurrence_count_emitted?: number;
+  source_occurrences?: IntakeSourceOccurrence[];
+  claim_count?: number;
+  claim_count_emitted?: number;
+  claims?: IntakeSemanticClaim[];
+  audience_evidence?: IntakeAudienceEvidence;
   candidates?: IntakeCandidateReference[];
   projection_cutoff?: { phase?: string | null; resource?: IntakeResource | (string & {}) | null } | null;
 }
