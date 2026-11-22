@@ -1,7 +1,7 @@
 {
   "name": "@knitli/marque-kit-core",
   "version": "0.1.0",
-  "description": "The kit's logic with no DOM: the contract as types, the state log, and the rungs. Runs where a page can't, such as Outlook's send handler.",
+  "description": "The kit's logic with no DOM: the contract as types, the state log, the rungs, and markings as HTML strings. Runs where a page can't, such as a server or Outlook's send handler.",
   "license": "AGPL-3.0-only",
   "author": "Knitli Inc.",
   "repository": {
@@ -19,6 +19,11 @@
       "source": "./src/attention.ts",
       "types": "./dist/attention.d.ts",
       "default": "./dist/attention.js"
+    },
+    "./marking": {
+      "source": "./src/marking.ts",
+      "types": "./dist/marking.d.ts",
+      "default": "./dist/marking.js"
     },
     "./state": {
       "source": "./src/state.ts",
@@ -46,6 +51,6 @@
     "vite-plus": "catalog:"
   },
   "engines": {
-    "node": "^26"
+    "node": ">=20"
   }
 }

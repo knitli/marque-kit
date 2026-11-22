@@ -10,7 +10,7 @@ Guidance for working in this repo. The kit is the human-facing half of Marque; t
 
 ## What this is
 
-A UI kit for hosts that show Marque findings to a person: a web page, a Word or Outlook task pane, Marque's own surfaces. TypeScript and plain CSS, no framework, no runtime dependencies; `vp pack` builds each package's `dist/` (DECISIONS #20). A pnpm workspace (DECISIONS #22): `packages/core` (`@knitli/marque-kit-core`) is the logic with no DOM: the contract in types (`packages/core/src/types.ts`), the state log, and the rungs and sections (`attention.ts`); `packages/kit` (`@knitli/marque-kit`) builds the DOM and ships the CSS; `packages/web`, `packages/word` and `packages/outlook` will draw the inline marks in each host; `apps/office-addin` is the Office add-in: so far the Word pane on the sample memo, with jump and cursor-follow. The three adapter packages are placeholders. `docs/` is the design it implements; `fixtures/` is the memo every example uses; `demo/` renders it.
+A UI kit for hosts that show Marque findings to a person: a web page, a Word or Outlook task pane, Marque's own surfaces. TypeScript and plain CSS, no framework, no runtime dependencies; `vp pack` builds each package's `dist/` (DECISIONS #20). A pnpm workspace (DECISIONS #22): `packages/core` (`@knitli/marque-kit-core`) is the logic with no DOM: the contract in types (`packages/core/src/types.ts`), the state log, the rungs and sections (`attention.ts`), and the marking's structure and HTML string (`marking.ts`, DECISIONS #26); `packages/kit` (`@knitli/marque-kit`) builds the DOM and ships the CSS; `packages/web`, `packages/word` and `packages/outlook` will draw the inline marks in each host; `apps/office-addin` is the Office add-in: so far the Word pane on the sample memo, with jump and cursor-follow. The three adapter packages are placeholders. `docs/` is the design it implements; `fixtures/` is the memo every example uses; `demo/` renders it.
 
 ## Fixed, by decision (docs/DECISIONS.md)
 
@@ -27,7 +27,9 @@ These are not style preferences. Each has a dated maintainer decision behind it;
 - **Theme is free; behavior is fixed.** Hosts may set `--mq-*` tokens. They may not change the rungs, the shapes' meanings, the fit rules, the free answer, "not my call", or the override record.
 - **Judge the text, never the person.** Messages say what the marking is and what Marque did. Never "you forgot".
 
-## Markings (packages/kit/src/marking.ts, docs/THEME.md "Fit" and "Long markings")
+## Markings (packages/core/src/marking.ts, packages/kit/src/marking.ts, docs/THEME.md "Fit" and "Long markings")
+
+- One structure, two outputs: core's `tree()` is the marking; the kit's `render()` builds it as DOM and core's `html()` writes it as an escaped string for server-rendered, no-JS pages under a strict CSP (DECISIONS #26). Change the structure in `tree()`, never in one renderer. `test/dom/marking.test.ts` holds them equal. Classes and attributes only; never an inline style.
 
 - A marking is `.mq-mark > .mq-l (layer) > .mq-i (token)`; all three `nowrap`; `<wbr>` between layers and between tokens. Break order: between layers (`//`) → after a list comma → between tokens → before `/`. **Never inside a token**: `REL TO`, `TOP SECRET`, `SI-G`, `DISPLAY ONLY`.
 - If it had to wrap, `settle()` adds `.stacked`: one layer per line, hanging indent .65em. CSS alone wraps greedily and orphans `GBR)`.

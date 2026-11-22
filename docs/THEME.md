@@ -336,6 +336,81 @@ fonts, sizesmark font resolves to a monospace or falls back; size-xs ≥ 12px, s
 
 ---
 
+## Hosting offline — fonts under a strict CSP
+The kit names four fonts and ships none of them. `theme.css` has no `@font-face` and fetches nothing. A host that wants the finished look serves the fonts itself, from its own origin. That works offline, air-gapped, and under a policy as strict as `default-src 'none'; style-src 'self'; font-src 'self'`.
+
+**The four fonts, and what each token falls back to.** The fallback is what a page shows when the font isn't there. Nothing breaks; the kit just looks plainer.
+
+| Token | Font | Used for | Falls back to |
+|---|---|---|---|
+| `--mq-font-display` | Archivo | questions, headings, buttons | `system-ui`, then `sans-serif` |
+| `--mq-font-body` | Literata | everything else | Georgia, then `serif` |
+| `--mq-font-mark` | OCR-B | markings, stamps, labels, citations | `ui-monospace`, SF Mono, Menlo, Consolas, then `monospace` (added by `.mq-mark`, not the token) |
+| `--mq-font-code` | Fira Code | the gate's report, config views | `ui-monospace`, then `monospace` |
+
+The fallback for the mark font is always a monospace. A marking set in a proportional font would still never break inside a token, but its columns would no longer line up. At `mount()` the theme gate measures the mark font and falls back if it isn't monospace. A page that only uses `html()` and `enhance()` doesn't run the gate, so the host keeps the mark font monospace itself.
+
+`--mq-display-width` (112) is Archivo's width axis. It needs the variable build of Archivo, with the `wdth` axis. A static Archivo, or any other font, ignores it.
+
+**How to host them.**
+
+1. Put the font files (WOFF2) on your own server, beside your other static files. Not a CDN, and not `data:` URLs: `font-src 'self'` allows neither.
+2. Declare them in a stylesheet your server serves, also from `'self'`. Not in a `<style>` element and not in a `style="…"` attribute: `style-src 'self'` blocks both.
+3. Load that stylesheet before `theme.css` and `kit.css`.
+
+```css
+/* /static/fonts.css — served from your own origin */
+@font-face {
+  font-family: 'Archivo';
+  src: url('/static/fonts/archivo-variable.woff2') format('woff2');
+  font-weight: 100 900;   /* the ranges your file covers */
+  font-stretch: 62% 125%; /* the variable build's wdth axis */
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Literata';
+  src: url('/static/fonts/literata-variable.woff2') format('woff2');
+  font-weight: 200 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'OCR-B';
+  src: url('/static/fonts/ocr-b.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Fira Code';
+  src: url('/static/fonts/fira-code-variable.woff2') format('woff2');
+  font-weight: 300 700;
+  font-display: swap;
+}
+```
+
+```html
+<link rel="stylesheet" href="/static/fonts.css">
+<link rel="stylesheet" href="/static/marque-kit/theme.css">
+<link rel="stylesheet" href="/static/marque-kit/kit.css">
+```
+
+If you declare the families with the names above, set no tokens: the shipped values already name them. If your files use other family names, or you want your own fonts, set the tokens in your own stylesheet, loaded after `theme.css`, on the kit root:
+
+```css
+/* your own stylesheet, after theme.css */
+.mq, [data-mq-theme='light'] {
+  --mq-font-display: 'Agency Sans', system-ui, sans-serif;
+  --mq-font-mark: 'Agency Mono'; /* the monospace fallback is added for you */
+}
+```
+
+The file names, weights and ranges above are examples. Use the ones your files declare.
+
+**Licenses.** Archivo, Literata and Fira Code are published under the SIL Open Font License, which allows a host to bundle and serve them. OCR-B is not settled: there are several versions of it under different terms, and the kit doesn't yet say which one it is designed against. Until the maintainer settles it, a host chooses its own OCR-B, or none (the mark font then falls back to a monospace). Whichever it chooses, check how it draws arrows: `theme.css` notes that the OCR-B the kit was drawn with swaps U+2190 and U+2192, which is why the kit draws its arrow in CSS.
+
+**Where the tokens come from.** Every `--mq-*` token is set on the kit root, `.mq`, and on any element with `data-mq-theme="light"`. `dark` and `auto` only change the colors, on top of a `.mq` root. A page that only shows markings can put `data-mq-theme="light"` on the element that holds them. That gives the tokens without the root's own ground, body font and container.
+
+
+---
+
 ## Markings that fit
 v0.1 set every marking nowrap, which is Knitli's law for a marking in a sentence and the wrong law for a marking in a 320px pane: it broke out of every container. v0.2 keeps the part that matters — never break inside a token, never truncate, never shrink — and adds the part that was missing: when a marking doesn't fit, it is set one layer per line, the way a banner is read.
 

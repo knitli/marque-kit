@@ -195,6 +195,15 @@ FVEY — Five Eyes: AUS, CAN, GBR, NZL, USA. Members · §Annex A
 At rest a marking looks like a marking. Hover or focus a token that has help and it takes a dotted rule in act-ink; the tier-1 tooltip opens after 300ms, dark on light and light on dark, and never covers the marking itself. Keyboard: Tab reaches each token; Escape closes.
 Spoken form
 Screen readers get the marking read as words, not as punctuation: "Secret, releasable to U-S-A and F-V-E-Y" — built from the vocabulary's names, trigraphs spelled. The visible text stays verbatim; the spoken form is an aria-label.
+As a string, for a page with no script
+A host that renders pages on a server can write a marking as HTML: `html(marking, o)` from `@knitli/marque-kit-core/marking`. It takes the same options as `render()` and gives the same structure, element for element: the layers and tokens, the `<wbr>`s, the four states, three sizes and four forms, both masks, the spoken form, and `data-help` on each token with help. The two are built from one tree, so they can't drift; a test holds them equal on the memo's markings in every form, state, size and mask.
+
+It is classes and attributes only. No inline style, no script, every value escaped, so it shows under a strict Content Security Policy (`style-src 'self'`) and with script off. Load `theme.css` and `kit.css`, and put the markings inside the kit root (`.mq`) or an element with `data-mq-theme="light"`.
+
+With script off, a marking still never breaks inside a token. It wraps at the same break points, but greedily, as CSS alone does; where a column is known to be narrow, pass `stacked: true`. A fold needs script to open, so a page with none uses the full form (the default) or the summary.
+
+With script on, the page brings the markings to life. `enhance(root)` from `@knitli/marque-kit/marking` stacks each one that had to wrap, measures again when the width changes, and opens folds on click, Enter or Space. A folded marking carries `data-model`, what its full form shows (masks stay masks), so the fold opens without asking the server. `tips(root, vocab)` from `@knitli/marque-kit/help` gives each token its tier-1 help, as it does for markings the kit drew.
+
 Fixed, whatever the theme
 ·Mark font with a forced monospace fallback; 0.04em tracking; LTR; no filter, opacity or shadow.
 ·Breaks only between layers, list items and tokens; stacks one layer per line when it must wrap; one-character hanging indent.
