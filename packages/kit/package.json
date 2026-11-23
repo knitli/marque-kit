@@ -48,9 +48,9 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vp pack",
+    "build": "vp pack --clean --dts",
     "test": "node --conditions=source --test 'test/*.test.ts' && vp test",
-    "prepack": "vp pack"
+    "prepack": "vp pack --clean --dts"
   },
   "dependencies": {
     "@knitli/marque-kit-core": "workspace:*"

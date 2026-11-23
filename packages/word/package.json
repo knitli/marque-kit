@@ -4,6 +4,11 @@
   "description": "The Word adapter: inline marks as content controls and underline styles, selection-follow, and the document's Purview label.",
   "license": "AGPL-3.0-only",
   "author": "Knitli Inc.",
+  "devDependencies": {
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "typescript": "catalog:"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/knitli/marque-kit.git",
@@ -20,5 +25,9 @@
   },
   "engines": {
     "node": "^26"
+  },
+  "scripts": {
+    "build": "vp pack --clean --dts",
+    "prepack": "vp pack --clean --dts"
   }
 }

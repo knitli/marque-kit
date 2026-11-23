@@ -55,9 +55,9 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vp pack",
+    "build": "vp pack --clean --dts",
     "test": "node --conditions=source --test 'test/*.test.ts'",
-    "prepack": "vp pack"
+    "prepack": "vp pack --clean --dts"
   },
   "devDependencies": {
     "@types/node": "catalog:",
@@ -66,6 +66,6 @@
     "vite-plus": "catalog:"
   },
   "engines": {
-    "node": ">=20"
+    "node": "^26"
   }
 }

@@ -4,6 +4,11 @@
   "description": "The Outlook adapter: marks as spans in the compose body, classification headers, the Purview label, and the send gate.",
   "license": "AGPL-3.0-only",
   "author": "Knitli Inc.",
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/knitli/marque-kit.git",
@@ -20,5 +25,9 @@
   },
   "engines": {
     "node": "^26"
+  },
+  "scripts": {
+    "build": "vp pack --clean --dts",
+    "prepublish": "vp pack --clean --dts"
   }
 }
