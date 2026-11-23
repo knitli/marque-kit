@@ -5,7 +5,6 @@
 [tools]
 node = "26"
 pnpm = "12.14"
-viteplus = "latest"
 python = "3.13"
 hk = { version = "2.8.1", workflow = "release.yml" }
 pkl = "0.32.2"
@@ -14,11 +13,16 @@ yq = "4.54.1"
 "npm:knip" = "6.42.1"
 jactionlint = "2.3.0"
 
+[env]
+VITEPLUS_VERSION = "1.6.0"
+HK_MISE = 1
+
 [tools.'pypi:reuse']
-version = "latest"
+version = "6.3.0"
 uvx = true
 extras = ["charset-normalizer"]
 python = "3.13"
+uvx_args = ["--build"]
 
 [tool_alias]
 jactionlint = "actionlint"
@@ -44,26 +48,24 @@ auto_sync = true
 run_auto_install = true
 
 [deps]
-pnpm = { auto = true, sources = ["package.json", "pnpm-lock.yaml"], run = "pnpm i -y" }
+pnpm = { auto = true, sources = [
+  "package.json",
+  "pnpm-lock.yaml",
+], run = "pnpm i -y" }
 
 [tasks]
 
 [tasks.fix]
 run = "vp check --fix"
-tools.viteplus = "latest"
+tools.viteplus = "{{ env.VITEPLUS_VERSION }}"
 
 [tasks.check]
 run = "vp check"
-tools.viteplus = "latest"
+tools.viteplus = "{{ env.VITEPLUS_VERSION }}"
 
 [tasks.fmt]
 run = "vp fmt --write"
-tools.viteplus = "latest"
+tools.viteplus = "{{ env.VITEPLUS_VERSION }}"
 
 [tasks.pre-commit]
 run = "hk run pre-commit"
-
-[env]
-HK_MISE = "1"
-MISE_EXPERIMENTAL = "1"
-MISE_YES = "1"

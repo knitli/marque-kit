@@ -7,8 +7,8 @@ packages:
   - apps/*
 
 catalog:
-  "@types/node": ^26.6.6
-  "@types/office-js": ^1.0.615
+  '@types/node': ^26.6.6
+  '@types/office-js': ^1.0.615
   happy-dom: 21.0.4
   # `vite` is an alias for vite-plus-core and must track `vite-plus` exactly:
   # two core copies break typecheck with duplicate UserConfig identities.
@@ -16,9 +16,9 @@ catalog:
   vite-plus: 1.6.0
   typescript: ^7.0.2
 overrides:
-  vite@*: "catalog:"
+  vite@*: 'catalog:'
 peerDependencyRules:
   allowAny:
     - vite
   allowedVersions:
-    vite: "*"
+    vite: '*'
