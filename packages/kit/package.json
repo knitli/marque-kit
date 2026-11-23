@@ -53,7 +53,7 @@
     "prepack": "vp pack --clean --dts"
   },
   "dependencies": {
-    "@knitli/marque-kit-core": "workspace:*"
+    "@knitli/marque-kit-core": "workspace:^"
   },
   "devDependencies": {
     "@types/node": "catalog:",

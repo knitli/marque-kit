@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "node",
+  "bootstrap-sha": "9c75f0b335e5fc269db04abff6cb12e556e89f84",
+  "include-component-in-tag": true,
+  "include-v-in-tag": true,
+  "bump-minor-pre-major": true,
+  "packages": {
+    "packages/core": {
+      "component": "core"
+    },
+    "packages/kit": {
+      "component": "kit"
+    },
+    "packages/web": {
+      "component": "web"
+    },
+    "packages/word": {
+      "component": "word"
+    },
+    "packages/outlook": {
+      "component": "outlook"
+    }
+  }
+}

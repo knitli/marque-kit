@@ -246,7 +246,7 @@ importers:
   packages/kit:
     dependencies:
       '@knitli/marque-kit-core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
     devDependencies:
       '@types/node':
