@@ -1,0 +1,7 @@
+{
+  "packages/core": "0.2.0",
+  "packages/kit": "0.2.0",
+  "packages/web": "0.1.0",
+  "packages/word": "0.1.0",
+  "packages/outlook": "0.1.0"
+}

@@ -13,6 +13,9 @@ version = 1
 [[annotations]]
 path = [
   "**/package.json",
+  "**/CHANGELOG.md",
+  ".release-please-manifest.json",
+  "release-please-config.json",
   "pnpm-lock.yaml",
   "mise.lock",
   "fixtures/memo.txt",
