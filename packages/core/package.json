@@ -1,6 +1,6 @@
 {
   "name": "@knitli/marque-kit-core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "The kit's logic with no DOM: the contract as types, the state log, the rungs, and markings as HTML strings. Runs where a page can't, such as a server or Outlook's send handler.",
   "license": "AGPL-3.0-only",
   "author": "Knitli Inc.",

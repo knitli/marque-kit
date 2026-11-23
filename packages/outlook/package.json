@@ -1,6 +1,6 @@
 {
   "name": "@knitli/marque-kit-outlook",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "The Outlook adapter: marks as spans in the compose body, classification headers, the Purview label, and the send gate.",
   "license": "AGPL-3.0-only",
   "author": "Knitli Inc.",

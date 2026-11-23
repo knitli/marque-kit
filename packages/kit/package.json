@@ -1,6 +1,6 @@
 {
   "name": "@knitli/marque-kit",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Marque UI kit: the finding card, decision prompt, pane, inline marks and the theme layer. TypeScript and plain CSS; no framework, no runtime dependencies outside the workspace.",
   "license": "AGPL-3.0-only",
   "author": "Knitli Inc.",
