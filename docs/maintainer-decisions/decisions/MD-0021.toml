@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+schema = 1
+id = "MD-0021"
+title = "The DOM is tested under happy-dom"
+status = "active"
+decided_at = 2026-10-24
+recorded_at = 2026-10-24
+authority = "direct"
+decision = """
+The DOM is tested under happy-dom. `vp test` (the Vitest Vite+ bundles) runs `test/dom/` with `happy-dom` as a dev dependency; the other tests stay plain node. Nothing ships with it: no runtime dependency, no second build step.
+"""
+rationale = "`render.ts` is where most decided rules reach a person (question first, the free answer and \"Not my call\", no Undo on a fix the person must own, overrides shown, gold only on must-act); untested, a refactor could drop one with CI green."
+rejected = []
+examples = []
+
+[scope]
+areas = ["kit.testing"]
+paths = ["packages/kit/vite.config.ts", "packages/kit/package.json", "packages/kit/test/dom/**"]
+rule_ids = []
+profiles = ["all"]
+applies_when = "DOM behavior is tested."
+excludes = []
+
+[[evidence]]
+kind = "repository"
+path = "docs/DECISIONS.md"
+commit = "a6b2499940f30b66ce745361598e2bfdfc0fe7f7"
+note = "Row 21 of the kit's decision table, as first recorded."
+
+[lifecycle]
+supersedes = []
+superseded_by = []
+review_by = ""
+
+[enforcement]
+mode = "ci"
+guards = [".github/workflows/ci.yml"]

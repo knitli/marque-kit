@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+schema = 1
+id = "MD-0008"
+title = "Tooltip vs popover"
+status = "active"
+decided_at = 2026-10-14
+recorded_at = 2026-10-21
+authority = "direct"
+decision = """
+Tooltip vs popover. Read-only reveals are tooltips; anything with an action is a popover with focus management. In Office hosts the pane follows the cursor.
+"""
+rationale = "Office hosts can't draw over the document."
+rejected = []
+examples = []
+
+[scope]
+areas = ["kit.help", "kit.office"]
+paths = [
+  "packages/kit/src/help.ts",
+  "packages/kit/src/render.ts",
+  "apps/office-addin/src/taskpane.ts",
+  "packages/word/src/**",
+]
+rule_ids = []
+profiles = ["all"]
+applies_when = "A reveal or overlay is added, or an Office host's pane follows the document."
+excludes = []
+
+[[evidence]]
+kind = "repository"
+path = "docs/DECISIONS.md"
+commit = "fe5a5d051f33451885700d5db9bcc65c587b3407"
+note = "Row 8 of the kit's decision table, as first recorded."
+
+[lifecycle]
+supersedes = []
+superseded_by = []
+review_by = ""
+
+[enforcement]
+mode = "test"
+guards = ["packages/kit/test/dom/render.test.ts"]

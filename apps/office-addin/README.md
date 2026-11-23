@@ -17,7 +17,7 @@ The add-in a Word or Outlook user installs. It is an app, not a library: it ship
 The sample route is read-only: the kit's pane shows the fictional memo findings (`fixtures/`) and never writes to the open document. Where `WordApi 1.3` and `WordApiHiddenDocument 1.3` are supported, **Open sample in a new document** creates a separate fictional memo; use Home → **Markings** there to navigate it. Other hosts keep the static sample view.
 
 - **Jump.** When the fictional sample memo is open, selecting a row jumps to its marking in Word; for the missing portion mark, the start of ¶4. On another document, sample spans do not match and the pane does not edit it.
-- **Cursor-follow** (DECISIONS #8). The cursor landing in a paragraph with a finding opens that finding's card, through the kit's `update({ open })`.
+- **Cursor-follow** (MD-0008). The cursor landing in a paragraph with a finding opens that finding's card, through the kit's `update({ open })`.
 
 `src/locate.ts` turns the engine's UTF-8 byte spans into what Word can find: a paragraph, the text, and which occurrence of it. `test/locate.test.ts` holds it to the memo.
 

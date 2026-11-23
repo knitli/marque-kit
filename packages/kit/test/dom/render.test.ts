@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-only
 
-// The decided rules (docs/DECISIONS.md) as they reach the DOM, on the memo.
+// The decided rules (docs/maintainer-decisions/) as they reach the DOM, on the memo.
 // `pnpm test` (vp test, happy-dom)
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -262,7 +262,7 @@ describe('ordinary lint transformation receipts', () => {
   });
 });
 
-describe('the pane follows the cursor (DECISIONS #8)', () => {
+describe('the pane follows the cursor (MD-0008)', () => {
   test('update({ open }) opens that card and leaves focus in the document; null closes it', async () => {
     // happy-dom lays nothing out: give the pane and its parent room for a card (the kit's floor is 240px).
     const box = document.createElement('div'),
@@ -622,7 +622,7 @@ test('a citation without the manual’s words cites and quotes nothing', () => {
   expect(c.querySelector('.mq-cite')).toBeTruthy();
 });
 
-describe('the undo window (DECISIONS #23)', () => {
+describe('the undo window (MD-0023)', () => {
   const setup = () => {
     const box = document.createElement('div'),
       root = document.createElement('div');
@@ -1403,7 +1403,7 @@ describe('host-acknowledged append', () => {
   });
 });
 
-describe('History (DECISIONS #24)', () => {
+describe('History (MD-0024)', () => {
   const setup = () => {
     const box = document.createElement('div'),
       root = document.createElement('div');

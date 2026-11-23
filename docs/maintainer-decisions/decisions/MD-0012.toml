@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+schema = 1
+id = "MD-0012"
+title = "Pathological markings block finalize"
+status = "active"
+decided_at = 2026-10-16
+recorded_at = 2026-10-21
+authority = "direct"
+decision = """
+Pathological markings block finalize.
+"""
+rationale = "A marking Marque couldn't read doesn't go out unexamined."
+rejected = []
+examples = []
+
+[scope]
+areas = ["kit.attention", "kit.gate"]
+paths = ["packages/core/src/attention.ts", "packages/kit/src/render.ts"]
+rule_ids = []
+profiles = ["all"]
+applies_when = "A marking the engine could not read reaches finalize."
+excludes = []
+
+[[evidence]]
+kind = "repository"
+path = "docs/DECISIONS.md"
+commit = "fe5a5d051f33451885700d5db9bcc65c587b3407"
+note = "Row 12 of the kit's decision table, as first recorded."
+
+[lifecycle]
+supersedes = []
+superseded_by = []
+review_by = ""
+
+[enforcement]
+mode = "documentation"
+guards = []

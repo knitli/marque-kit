@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+schema = 1
+id = "MD-0013"
+title = "Caller edits are the caller's call; Marque offers a conservative fallback"
+status = "active"
+decided_at = 2026-10-16
+recorded_at = 2026-10-21
+authority = "direct"
+decision = """
+Caller edits are the caller's call; Marque offers a conservative fallback. When the host can't perform an edit the recommendation is to block, but it's an integration decision. When Marque can't fully resolve but understands enough, it computes the most restrictive form that keeps every stated equity — for the JOINT case `(S//FGI AUS GBR//NF)`. The kit shows that fallback on the Blocking card as what happens if nobody answers.
+"""
+rationale = "An unattended deployment with nobody to ask needn't be babysat."
+rejected = []
+examples = []
+
+[scope]
+areas = ["kit.prompt", "kit.gate"]
+paths = ["packages/kit/src/render.ts", "fixtures/memo.findings.json", "docs/DERIVATION.md"]
+rule_ids = []
+profiles = ["all"]
+applies_when = "A finding has a computed fallback, or the host cannot perform an edit."
+excludes = []
+
+[[evidence]]
+kind = "repository"
+path = "docs/DECISIONS.md"
+commit = "fe5a5d051f33451885700d5db9bcc65c587b3407"
+note = "Row 13 of the kit's decision table, as first recorded."
+
+[lifecycle]
+supersedes = []
+superseded_by = []
+review_by = ""
+
+[enforcement]
+mode = "documentation"
+guards = []

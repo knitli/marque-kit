@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+schema = 1
+id = "MD-0001"
+title = "Knitli's design system guides the kit"
+status = "active"
+decided_at = 2026-10-13
+recorded_at = 2026-10-21
+authority = "direct"
+decision = """
+Knitli's design system guides the kit. The Marque system is a lineage, not a source; nothing from it is carried over as-is.
+"""
+rationale = "Its gold-as-accent, saturated red, lifting cards and typed arrows contradict decisions Knitli has since made."
+rejected = []
+examples = []
+
+[scope]
+areas = ["kit.theme"]
+paths = ["packages/kit/src/theme.css", "packages/kit/src/kit.css"]
+rule_ids = []
+profiles = ["all"]
+applies_when = "The kit's visual language changes."
+excludes = []
+
+[[evidence]]
+kind = "repository"
+path = "docs/DECISIONS.md"
+commit = "fe5a5d051f33451885700d5db9bcc65c587b3407"
+note = "Row 1 of the kit's decision table, as first recorded."
+
+[lifecycle]
+supersedes = []
+superseded_by = []
+review_by = ""
+
+[enforcement]
+mode = "documentation"
+guards = []

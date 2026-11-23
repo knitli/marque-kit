@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+schema = 1
+id = "MD-0017"
+title = "Advisory when the safe reading is one the author wrote; Action required when the safe form is one nobody wrote"
+status = "active"
+decided_at = 2026-10-17
+recorded_at = 2026-10-21
+authority = "direct"
+decision = """
+Advisory when the safe reading is one the author wrote; Action required when the safe form is one nobody wrote. A portion marked both NOFORN and REL TO resolves to NOFORN and offers the REL TO back as an Advisory. The JOINT fallback is a form nobody wrote, so it is a fallback, not a reading; the question stays Action required when a person is there.
+"""
+rationale = "The person resolves their own contradiction, not a release decision."
+rejected = []
+examples = []
+
+[scope]
+areas = ["kit.attention"]
+paths = ["packages/core/src/attention.ts", "fixtures/memo.findings.json", "docs/DERIVATION.md"]
+rule_ids = []
+profiles = ["all"]
+applies_when = "A finding's rung depends on whether the safe form was written by the author."
+excludes = []
+
+[[evidence]]
+kind = "repository"
+path = "docs/DECISIONS.md"
+commit = "fe5a5d051f33451885700d5db9bcc65c587b3407"
+note = "Row 17 of the kit's decision table, as first recorded."
+
+[lifecycle]
+supersedes = []
+superseded_by = []
+review_by = ""
+
+[enforcement]
+mode = "test"
+guards = ["packages/kit/test/dom/render.test.ts"]

@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+schema = 1
+id = "MD-0022"
+title = "One repo, several packages"
+status = "active"
+decided_at = 2026-10-24
+recorded_at = 2026-10-24
+authority = "direct"
+decision = """
+One repo, several packages. A pnpm workspace: `@knitli/marque-kit-core` (`packages/core`) holds the logic with no DOM, `@knitli/marque-kit` (`packages/kit`) builds the DOM, and each host gets an adapter package (`packages/web`, `packages/word`, `packages/outlook`) and, where it needs one, an app (`apps/office-addin`). Packages import each other by name; a `source` export condition points tests, typecheck and the demo at `src/`. Depending on another package in this workspace is not a runtime dependency. The kit stays an embeddable widget with a framework-neutral `mount()`, the way Stripe Elements is; framework wrappers are thin packages over it, added when a host asks. Supersedes "its own repo and package" in MD-0019.
+"""
+rationale = "Word and Outlook need adapters the web doesn't, and Outlook's send handler may run without a DOM; one package can't serve all three, and separate repos would split one contract."
+rejected = []
+examples = []
+
+[scope]
+areas = ["kit.packaging"]
+paths = ["pnpm-workspace.yaml", "package.json", "packages/*/package.json", "apps/*/package.json"]
+rule_ids = []
+profiles = ["all"]
+applies_when = "Packages are added, split or depend on one another."
+excludes = []
+
+[[evidence]]
+kind = "repository"
+path = "docs/DECISIONS.md"
+commit = "2c638a2ce20c3233c0d9f34508b0bb74cd3949fc"
+note = "Row 22 of the kit's decision table, as first recorded."
+
+[lifecycle]
+supersedes = ["MD-0019"]
+superseded_by = []
+review_by = ""
+
+[enforcement]
+mode = "documentation"
+guards = []

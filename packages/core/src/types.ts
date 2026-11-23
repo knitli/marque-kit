@@ -707,7 +707,7 @@ export interface Host {
   narrow?: boolean | undefined;
   /** The id whose card is open. */
   open?: string | null | undefined;
-  /** What the pane shows once anything is done: the findings, or the History of acts (DECISIONS #24). */
+  /** What the pane shows once anything is done: the findings, or the History of acts (MD-0024). */
   tab?: Tab | undefined;
   /** The person's acts, oldest first. History lists them; without any, there are no tabs. */
   log?: readonly LogEntry[] | undefined;

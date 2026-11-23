@@ -13,7 +13,7 @@ Attention lives in the kit, computed from the engine's semantic facts and host m
 
 _Design specification for @knitli/marque-kit. Edit here._
 
-**Adoption and migration status:** the readiness model was adopted on 14 November 2026 and is recorded in Marque MD-0043. Coordinated engine/kit/caller migration and acceptance evidence remain pending, so this is the target contract rather than a conformance claim. An operation can remain unready while host work is pending even when `needs_person=none` and no person-facing action is shown.
+**Adoption and migration status:** the readiness model was adopted on 14 November 2026. Coordinated engine/kit/caller migration and acceptance evidence remain pending, so this is the target contract rather than a conformance claim. An operation can remain unready while host work is pending even when `needs_person=none` and no person-facing action is shown.
 
 
 ---
@@ -30,7 +30,7 @@ The kit derives the attention rung from Marque's `needs_person` and `blocks`, pl
 | `choices` / `needs_fact` | Multiple readings or a needed fact remain unresolved. | Block only when the underlying requirement is mandatory and no permitted disposition satisfies it. The kit offers a free answer and “Not my call.” |
 | `withheld` | No automatic result is offered, with a reason. | The reason and unmet requirement determine blocking; repair absence does not reduce diagnostic severity. |
 | `covered_by` | Another finding owns the overlapping correction. | Preserve the causal link; clear only when the owner's confirmed result satisfies the requirement. |
-| `kept_as_written` (kit view) | The person declined one proposed edit and kept the text. | Never a waiver. Preserve MD-0039 protection, normal-severity reporting and protective page/banner resolution. |
+| `kept_as_written` (kit view) | The person declined one proposed edit and kept the text. | Never a waiver: protection is never lowered, and normal-severity reporting and protective page/banner resolution still apply. |
 
 The authored NF/REL reading and synthesized JOINT fallback remain distinct. The former may leave an optional intent question; the latter is not what the author wrote and remains a required question when a person is present. An unattended fallback is permitted only under policy and does not itself prove a host write. Required writes and artifact placement need confirmation followed by a complete current evaluation. A banner dependency is distinct from artifact-field dependencies: unchanged banner does not eliminate a changed CAB field or other artifact value.
 

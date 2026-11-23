@@ -8,148 +8,65 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 The parts a host shows a person when Marque finds something: the finding card, the decision prompt, the pane, the inline mark in the document, the banner and authority-block cards, the finalize gate, the derivation panel, the audit receipt, and the theme layer under all of them.
 
-TypeScript and plain CSS. No framework, no runtime dependencies; each package's `dist/` is built with `vp pack`. It runs in a web page, a Word or Outlook task pane, and anything else with a DOM. A marking can also be written as an HTML string on a server, for pages that work with no script and a strict Content Security Policy.
+TypeScript and plain CSS. No framework, no runtime dependencies. It runs in a web page, a Word or Outlook task pane, and anything else with a DOM. A marking can also be written as an HTML string on a server, for pages that work with no script and a strict Content Security Policy.
 
-It is an embeddable widget, not a box of parts. The model is Stripe Elements: one framework-neutral `mount()` that owns its piece of the page, with thin wrappers per framework when a host needs one. Hosts can theme it freely (`--mq-*` tokens), but they can't rearrange it. The rungs, the free answer, "Not my call" and the override record are fixed by decision, so the kit ships whole surfaces rather than primitives to recompose.
+It is an embeddable widget, not a box of parts. The model is Stripe Elements: one framework-neutral `mount()` that owns its piece of the page. Hosts can theme it freely (`--mq-*` tokens), but they can't rearrange it. The rungs, the free answer, "Not my call" and the override record are fixed, so the kit ships whole surfaces rather than primitives to recompose.
 
-## What's here
+## Packages
 
-A pnpm workspace (DECISIONS #22). Packages import each other by name; the `source` export condition points tests, typecheck and the demo at `src/`.
+| Package | Path | Status | What it is |
+|---|---|---|---|
+| [`@knitli/marque-kit-core`](packages/core/README.md) | `packages/core` | published | The logic with no DOM: the contract as types, the state log, the rungs, markings as HTML strings, and readers for the engine's native wire. Runs on a server or in Outlook's send handler. |
+| [`@knitli/marque-kit`](packages/kit/README.md) | `packages/kit` | published | The DOM and the CSS: `mount()`, the components, help, the theme gate, `theme.css` and `kit.css`. |
+| [`@knitli/marque-kit-web`](packages/web/README.md) | `packages/web` | placeholder | Inline marks on a page's own text. |
+| [`@knitli/marque-kit-word`](packages/word/README.md) | `packages/word` | placeholder | Inline marks in Word: content controls, selection-follow. |
+| [`@knitli/marque-kit-outlook`](packages/outlook/README.md) | `packages/outlook` | placeholder | Marks in the compose body, classification headers, the send gate. |
+| [Office add-in](apps/office-addin/README.md) | `apps/office-addin` | private | The Word task pane: the sample memo, plus views that run only behind a trusted provider. |
+
+The placeholders are published so their names and versions exist; they export nothing yet. Every package needs Node 24 or later (`engines: >=24`). Working on the repo needs Node 26.
+
+The rest of the repo:
 
 ```
-packages/core/       @knitli/marque-kit-core: the logic with no DOM, so it runs anywhere, a server and Outlook's send handler included
-  src/marking.ts       the marking's structure, parsed and spoken, and html(): a marking as an escaped HTML string
-  src/types.ts         the contract as types: findings, artifacts, the state log, the vocabulary, the host
-  src/state.ts         checked caller append and the kit's state projection, keyed by finding id
-  src/attention.ts     rung(), sections(), markClass(): which of the five rungs a finding sits on, and the pane's
-                       four sections; what Outlook's send gate decides with
-  test/                the fixtures held to the types; the rung table and the state layer, against the memo; html()
-packages/kit/        @knitli/marque-kit: the DOM and the CSS
-  src/theme.css        the theme layer: --mq-* tokens (light default, dark, auto), how a marking fits,
-                       the four shapes that carry meaning, control states, print, forced colors
-  src/kit.css          the components, built only on theme.css
-  src/marking.ts       the marking primitive: layers, tokens, four forms, never breaks inside a token; render() builds
-                       core's structure as DOM, enhance() brings html() markings from a server to life
-  src/render.ts        finding JSON → DOM: card(), row(), pane(), status(), artifact(), gate(), derivation(),
-                       receipt(), and mount(): the pane wired to the kit's state, the one call a host needs
-  src/help.ts          help in three tiers (tooltip, Why?, the manual section) and the vocabulary lookup;
-                       writes no help text of its own, it renders the engine's
-  src/theme.ts         the theme gate at mount: contrast and size floors, falling back to shipped values
-  test/                the parser, the theme gate, lookup and citation landing under plain node
-  test/dom/            the decided rules as they reach the DOM (card, gate, receipt), under vp test and happy-dom
-packages/web/        @knitli/marque-kit-web: inline marks on a page's own text (placeholder)
-packages/word/       @knitli/marque-kit-word: inline marks as content controls, selection-follow, the Purview label (placeholder)
-packages/outlook/    @knitli/marque-kit-outlook: marks in the compose body, classification headers, the send gate (placeholder)
-apps/office-addin/   the Word and Outlook add-in: manifest, task pane, Office.js ↔ engine ↔ kit; so far the Word pane on the memo
-fixtures/memo.txt            a six-paragraph memo with five things wrong (fictional example; markings are illustrative, not real classified material)
-fixtures/memo.findings.json  what Marque should say about it, in the contract's shape
-fixtures/memo.vocab.json     the engine's vocab and help JSON, for tiers 1–2 and lookup
-fixtures/memo.manual.json    the CAPCO-2016 sections the memo cites, for tier 3
-fixtures/extract.py          regenerates the fixtures from source data; fails if a quote doesn't land
-demo/index.html    the memo on the left, the pane on the right; answer ¶3 and watch the banner move
-docs/              the design, extracted from the canvas: CONTRACT, DERIVATION, MODEL, THEME,
-                   COMPONENTS, DECISIONS, ENGINE-ASKS
+docs/        the design the code implements (reading order below), and the decision registry
+tools/       decision-lint: checks the decision registry and each PR's impact block
+fixtures/    the fictional six-paragraph memo every example uses, what Marque should say about it
+             (memo.findings.json), the vocab and help JSON, the cited manual sections, and their extractors
+demo/        the memo on the left, the pane on the right; answer ¶3 and watch the banner move
+evidence/    verification notes for runs paired with a specific engine build; not rerun by CI
 ```
 
 ## Run it
 
 ```sh
+pnpm install
 pnpm check        # format, lint and typecheck (vp check)
-pnpm test         # every package: node ≥ 26 runs test/*.test.ts directly; in the kit, vp test runs test/dom/ (happy-dom)
-pnpm build        # each package's dist/: the modules, their .d.ts, and the kit's two stylesheets
+pnpm test         # every package: node runs test/*.test.ts; in the kit, vp test runs test/dom/ under happy-dom
+pnpm build        # each package's dist/: modules, .d.ts, and the kit's two stylesheets
 pnpm demo         # vp dev; open /demo/
 ```
 
-A host connects the pane to its trusted workspace. `trustedWorkspace` below is the host's own storage adapter, not an API supplied by this kit:
-
-```js
-import { mount } from '@knitli/marque-kit';
-const state = await trustedWorkspace.loadState(documentId);
-const p = mount(el, {
-  doc,
-  state,
-  actBinding: await trustedWorkspace.currentActBinding(documentId),
-  vocab,
-  moment: 'editing',
-  onAppend: async (request) => {
-    // Persist the exact request before attempting its ordered append, so an uncertain outcome
-    // can be retried after a pane restart with the same requestId.
-    await trustedWorkspace.stageAppend(documentId, request);
-    // The workspace atomically consumes the staged row with the checked result.
-    // On commit it also persists a recoverable write-outbox item before returning;
-    // on refusal it retains the unsequenced request and returns the refusal without writing.
-    const result = await trustedWorkspace.append(documentId, request);
-    return result; // { status: 'committed', state, entry, replayed } or { status: 'refused', state, reason, pending? }
-  },
-  onChange: (state, notice) => {
-    if (notice) {
-      // Run/recover only this request's still-pending write. The host deduplicates
-      // by requestId, acknowledges the real write, then evaluates the document.
-      void trustedWorkspace.resumePendingWrite(documentId, notice.requestId, notice.entry);
-    } else {
-      // Bookkeeping such as `seen`; committed state was already persisted by append.
-      void trustedWorkspace.saveState(documentId, state);
-    }
-  },
-  onHelp,
-  onJump,
-});
-p.update({ doc });              // after a re-lint; async hosts add { linted: n, seq }
-p.update({ moment: 'finalize' }); // the host's moment; the kit never guesses it
-p.update({ open: id });         // an Office host's cursor in a marking: its card opens, focus stays put
-p.destroy();                    // when the pane goes away
-```
-
-The trusted workspace must keep committed history, pending refusals, and the write outbox private to that host. A refused request stays outside ordered history; the same request key can be retried after the host repairs unknown history, while sequence exhaustion is terminal for that chain. A replay reports the original entry with `replayed: true`; the host resumes only its still-pending write by `requestId`, and does not create a second log row. A physical write is not confirmed until the host acknowledges it and a fresh evaluation reflects it. Do not store this interaction log in document metadata, a seal or a portable sidecar.
-
-The demo uses the same checked append helper over an in-memory variable so a normal answer can be demonstrated. Its state resets on reload and is not a trusted durable workspace. `@knitli/marque-kit/help` has what a host needs to answer `onHelp` and `onLookup`. The contract's types and state log are `@knitli/marque-kit-core/types` and `@knitli/marque-kit-core/state`. At mount the kit measures the host's `--mq-*` tokens against the contrast and size floors (`@knitli/marque-kit/theme`); a failing token falls back to the shipped value, and the report is `p.theme` and `onTheme(report)`. Under forced colors the system palette stands and only sizes and the mark font are measured. When the room the host gives the pane is under 240px, the report says `narrow: true` and the kit shows rows only: opening one calls `onOpen(f)` for the host to show it its own way.
-
-The demo runs under `vp dev`, which serves the TypeScript source as modules.
-
-### A marking from a server
-
-A page rendered on a server can show a marking with no script at all. `html()` writes the same structure `render()` builds, as an escaped string with classes and attributes only (DECISIONS #26):
-
-```js
-// on the server (Node 20 or later; no DOM)
-import { html } from '@knitli/marque-kit-core/marking';
-const cell = `<td>${html('(S//REL TO USA, GBR)', { help: ['REL TO', 'GBR'] })}</td>`;
-```
-
-Serve `theme.css` and `kit.css` from your own origin, and put the markings inside `.mq` or an element with `data-mq-theme="light"`. With script off, the marking never breaks inside a token. Where script runs, enhance it:
-
-```js
-// in the browser, from a script file ('self')
-import { enhance } from '@knitli/marque-kit/marking';
-import { tips } from '@knitli/marque-kit/help';
-const table = document.querySelector('#entries');
-enhance(table);      // stack markings that wrap, re-measure on resize, open folds
-tips(table, vocab);  // tier-1 help on each token
-```
-
-### Hosting offline
-
-The kit fetches nothing. `theme.css` names Archivo, Literata, OCR-B and Fira Code but ships no `@font-face`, so an offline or air-gapped host serves the fonts itself: font files and a stylesheet with the `@font-face` rules, both from its own origin, which satisfies `font-src 'self'` and `style-src 'self'`. A font that isn't there falls back (system sans, Georgia, a monospace for markings); nothing breaks. [docs/THEME.md, "Hosting offline"](docs/THEME.md) has the steps, the `--mq-font-*` tokens and the fallbacks. Which OCR-B to use is still an open question.
-
-The published packages need Node 20 or later where they're installed. Node 26 is only for working on this repo.
+Packages import each other by name. The `source` export condition points tests, typecheck and the demo at `src/`, so nothing needs building first. To embed the kit, start with [packages/kit/README.md](packages/kit/README.md). To render a marking on a server, see [packages/core/README.md](packages/core/README.md).
 
 ## The idea in one paragraph
 
-Marque emits findings. Each finding says what it found, what it did or needs, whether a person is required (`needs_person`) and whether it stops the document going out (`blocks`). The kit turns that into one of five rungs of attention — Quiet, Noticeable, Advisory, Action required, Blocking — using the host's moment (editing or finalize), and shows each rung with a shape, not just a color: a thin underline means changed, a blue dotted line means you *can* act, a gold double rule means you *must*, a dashed outline means something is missing. Gold is the only thing that asks for a person. The question comes first on a card; the marking is context; every question can be answered by typing; "not my call" is always there; and an override is recorded, never hidden.
+Marque emits findings. Each finding says what it found, what it did or needs, whether a person is required (`needs_person`) and whether it stops the document going out (`blocks`). The kit turns that into one of five rungs of attention (Quiet, Noticeable, Advisory, Action required, Blocking) using the host's moment (editing or finalize). It shows each rung with a shape, not just a color: a thin underline means changed, a blue dotted line means you *can* act, a gold double rule means you *must*, a dashed outline means something is missing. Gold is the only thing that asks for a person. The question comes first on a card; the marking is context; every question can be answered by typing; "not my call" is always there; and an override is recorded, never hidden.
 
 ## Reading order
 
-1. [docs/CONTRACT.md](docs/CONTRACT.md): the finding shape the kit renders.
+1. [docs/CONTRACT.md](docs/CONTRACT.md): the finding shape the kit renders, and the host loop.
 2. [docs/DERIVATION.md](docs/DERIVATION.md): how `needs_person` × `blocks` × moment becomes a rung, and which slots each rung shows.
 3. [docs/MODEL.md](docs/MODEL.md): attention, the two layers of state, where findings attach, the decision prompt, the three hosts, help in three tiers.
-4. [docs/THEME.md](docs/THEME.md): the tokens, the fit rules, the four forms of a long marking, the contrast gate.
+4. [docs/THEME.md](docs/THEME.md): the tokens, the fit rules, the four forms of a long marking, the contrast gate, hosting fonts offline.
 5. [docs/COMPONENTS.md](docs/COMPONENTS.md): every component with its states.
-6. [docs/DECISIONS.md](docs/DECISIONS.md): what the maintainer settled, dated, with the reason.
-7. [docs/ENGINE-ASKS.md](docs/ENGINE-ASKS.md): what the engine doesn't emit yet, as issues.
+6. [docs/maintainer-decisions/](docs/maintainer-decisions/decision-index.md): the binding decisions, `MD-0001`…`MD-0026`, checked by `tools/decision-lint`.
+7. [docs/ENGINE-ASKS.md](docs/ENGINE-ASKS.md): what the engine doesn't emit yet.
+
+[AGENTS.md](AGENTS.md) holds the rules for working here: what is fixed, the marking and copy rules, and the checks to run. [RELEASING.md](RELEASING.md) covers versions and publishing.
 
 ## Where it came from
 
-Designed on a canvas, 13–21 Oct 2026. Design history is in docs/DECISIONS.md. All documents and markings in this repo are fictional examples.
+Designed on a canvas, 13–21 Oct 2026. All documents and markings in this repo are fictional examples.
 
 The kit depends on Knitli's design-system *values* (vendored into `theme.css`), not its component bundle. Where a value departs from Knitli, the CSS says so and why.
 

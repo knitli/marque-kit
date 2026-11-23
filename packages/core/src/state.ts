@@ -25,7 +25,7 @@
  *   declined         "Not my call"; still Action required, routed by the host
  *
  * view() overlays the log on Marque's findings. An answer is generated, not
- * applied (docs/DECISIONS.md #4): it shows on the card but keeps the document
+ * applied (MD-0004): it shows on the card but keeps the document
  * from being ready until the host applies it and re-lints. `linted` counts the
  * log lines the current lint already reflects; answers before it are the
  * engine's to report now, so they are never replayed over a newer finding.

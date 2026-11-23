@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+schema = 1
+id = "MD-0024"
+title = "History lists every act, newest first, and the answer still in force can be taken back"
+status = "active"
+decided_at = 2026-10-25
+recorded_at = 2026-10-25
+authority = "direct"
+decision = """
+History lists every act, newest first, and the answer still in force can be taken back. Once anything is done the pane has two tabs, Findings and History. History keeps every act, overrides and take-backs included. "Take back" is on the answer or override a finding still stands on, written or not: it is a take-back (`changed`, null), and it returns to Findings with that card open, the question asked again. Routing acts (later, not my call) have nothing to take back. An artifact's apply or removal can be taken back only until it is written, and a typed field not yet: core has no reversal for either. Only the act in force shows its marking, from the latest view, so a code concealed since is masked there too.
+"""
+rationale = "Past the 8-second window (MD-0023), the person still needs a way back that doesn't depend on Word's undo or on finding the card again. Overrides are never hidden."
+rejected = []
+examples = []
+
+[scope]
+areas = ["kit.state", "kit.pane"]
+paths = ["packages/kit/src/render.ts", "packages/kit/src/kit.css", "packages/core/src/types.ts"]
+rule_ids = []
+profiles = ["all"]
+applies_when = "The History tab or take-back changes."
+excludes = []
+
+[[evidence]]
+kind = "repository"
+path = "docs/DECISIONS.md"
+commit = "1da7441820858f9ea3c555341989f9336a0fe901"
+note = "Row 24 of the kit's decision table, as first recorded."
+
+[lifecycle]
+supersedes = []
+superseded_by = []
+review_by = ""
+
+[enforcement]
+mode = "test"
+guards = ["packages/kit/test/dom/render.test.ts"]

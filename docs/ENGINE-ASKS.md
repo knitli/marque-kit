@@ -33,4 +33,4 @@ Until these land, the kit renders from a hand-written oracle in the contract's s
 
 Listed 21 Oct 2026 from the kit build (help tiers and lookup).
 
-Decisions that bound these, already taken (dated in [DECISIONS.md](DECISIONS.md)): attention is computed kit-side from `needs_person` and `blocks`; no requirement asks the engine to emit a rung. Markings are not document content; nothing here touches document text.
+Decisions that bound these, already taken ([maintainer-decisions](maintainer-decisions/decision-index.md)): attention is computed kit-side from `needs_person` and `blocks`; no requirement asks the engine to emit a rung. Markings are not document content; nothing here touches document text.

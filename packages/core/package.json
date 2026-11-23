@@ -66,6 +66,6 @@
     "vite-plus": "catalog:"
   },
   "engines": {
-    "node": "^26"
+    "node": ">=24"
   }
 }

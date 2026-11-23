@@ -4,17 +4,26 @@ SPDX-FileCopyrightText: 2026 Knitli Inc.
 SPDX-License-Identifier: AGPL-3.0-only
 -->
 
-# CLAUDE.md
+# AGENTS.md
 
-Guidance for working in this repo. The kit is the human-facing half of Marque; the engine is a separate Knitli project. The kit contract in docs/CONTRACT.md is the public boundary.
+Guidance for anyone working in this repo, person or coding agent. `CLAUDE.md` is a symlink to this file; edit this one. The kit is the human-facing half of Marque; the engine is a separate Knitli project. The kit contract in docs/CONTRACT.md is the public boundary.
 
 ## What this is
 
-A UI kit for hosts that show Marque findings to a person: a web page, a Word or Outlook task pane, Marque's own surfaces. TypeScript and plain CSS, no framework, no runtime dependencies; `vp pack` builds each package's `dist/` (DECISIONS #20). A pnpm workspace (DECISIONS #22): `packages/core` (`@knitli/marque-kit-core`) is the logic with no DOM: the contract in types (`packages/core/src/types.ts`), the state log, the rungs and sections (`attention.ts`), and the marking's structure and HTML string (`marking.ts`, DECISIONS #26); `packages/kit` (`@knitli/marque-kit`) builds the DOM and ships the CSS; `packages/web`, `packages/word` and `packages/outlook` will draw the inline marks in each host; `apps/office-addin` is the Office add-in: so far the Word pane on the sample memo, with jump and cursor-follow. The three adapter packages are placeholders. `docs/` is the design it implements; `fixtures/` is the memo every example uses; `demo/` renders it.
+A UI kit for hosts that show Marque findings to a person: a web page, a Word or Outlook task pane, Marque's own surfaces. TypeScript and plain CSS, no framework, no runtime dependencies; `vp pack` builds each package's `dist/`. A pnpm workspace:
 
-## Fixed, by decision (docs/DECISIONS.md)
+| Path | Package | What it is |
+|---|---|---|
+| `packages/core` | `@knitli/marque-kit-core` | The logic with no DOM: the contract as types (`types.ts`), the state log (`state.ts`), the rungs and sections (`attention.ts`), the marking's structure and HTML string (`marking.ts`), and readers for the engine's native wire (`native-wire.ts`, `native-cab.ts`, `native-results.ts`). |
+| `packages/kit` | `@knitli/marque-kit` | The DOM and the CSS: `render.ts` (card, pane, gate, receipt, `mount()`), `marking.ts`, `help.ts`, `theme.ts`, `theme.css`, `kit.css`. |
+| `packages/web`, `packages/word`, `packages/outlook` | `@knitli/marque-kit-{web,word,outlook}` | Host adapters for inline marks. Placeholders: published, but export nothing yet. |
+| `apps/office-addin` | private | The Word task pane: the sample memo with jump and cursor-follow, plus read-only and confirm-only views that run only behind a separately installed trusted provider. See its README. |
 
-These are not style preferences. Each has a dated maintainer decision behind it; change the decision first, then the code.
+Each package has a README; keep it current when its exports change. `docs/` is the design the code implements. `fixtures/` is the memo every example uses. `demo/` renders it. `evidence/` holds the verification notes for engine-paired runs (local inputs, hashes, commands); they record a past run and are not rerun by CI.
+
+## Fixed, by decision
+
+These are not style preferences. Each is a binding maintainer decision, recorded in [docs/maintainer-decisions/](docs/maintainer-decisions/decision-index.md) as `MD-NNNN`. Source comments and tests cite those IDs. If a change conflicts with an active record, stop and get a new ruling from the maintainer; don't change the code first. Engine behavior is decided in the Marque engine project; this repo doesn't cite its records.
 
 - **Five rungs, computed in the kit.** `rung()` in `packages/core/src/attention.ts` is the published derivation ([docs/DERIVATION.md](docs/DERIVATION.md)): `needs_person` × `blocks` × host moment. The engine never emits a rung; severity never sets one.
 - **Gold = must act. Blue = can act.** Nothing else is gold. Gold appears on Action required and Blocking only.
@@ -29,7 +38,7 @@ These are not style preferences. Each has a dated maintainer decision behind it;
 
 ## Markings (packages/core/src/marking.ts, packages/kit/src/marking.ts, docs/THEME.md "Fit" and "Long markings")
 
-- One structure, two outputs: core's `tree()` is the marking; the kit's `render()` builds it as DOM and core's `html()` writes it as an escaped string for server-rendered, no-JS pages under a strict CSP (DECISIONS #26). Change the structure in `tree()`, never in one renderer. `test/dom/marking.test.ts` holds them equal. Classes and attributes only; never an inline style.
+- One structure, two outputs: core's `tree()` is the marking; the kit's `render()` builds it as DOM and core's `html()` writes it as an escaped string for server-rendered, no-JS pages under a strict CSP. Change the structure in `tree()`, never in one renderer. `test/dom/marking.test.ts` holds them equal. Classes and attributes only; never an inline style.
 
 - A marking is `.mq-mark > .mq-l (layer) > .mq-i (token)`; all three `nowrap`; `<wbr>` between layers and between tokens. Break order: between layers (`//`) → after a list comma → between tokens → before `/`. **Never inside a token**: `REL TO`, `TOP SECRET`, `SI-G`, `DISPLAY ONLY`.
 - If it had to wrap, `settle()` adds `.stacked`: one layer per line, hanging indent .65em. CSS alone wraps greedily and orphans `GBR)`.
@@ -44,7 +53,7 @@ These are not style preferences. Each has a dated maintainer decision behind it;
 - Plain language, for the classifier reading it. No rule ids, type names or spec numbers in user-facing text.
 - A recognized marking is quoted exactly, in the mark font, never paraphrased.
 - Stamps are words ("Needs you", "Changed", "Done"), never icons alone.
-- Citations: `CAPCO §H.8 p151` with the verbatim `short` quote. **Verify every citation against the cited manual before it lands.** A citation that can't be traced to a real passage is removed, not left pending. The maintainer's note on §H.3 p57 is in docs/DECISIONS.md.
+- Citations: `CAPCO §H.8 p151` with the verbatim `short` quote. **Verify every citation against the cited manual before it lands.** A citation that can't be traced to a real passage is removed, not left pending. The maintainer's note on §H.3 p57: JOINT can be a banner, but not on a U.S. document, because like non-U.S. classification it yields to unilateral U.S. classification; the banner carries FGI with the co-owner codes.
 - EO 13526 §1.4 has eight categories, (a)–(h).
 
 ## The memo (fixtures/)
@@ -75,13 +84,15 @@ Banner derived: `SECRET//FGI AUS GBR//NOFORN`, or `…//REL TO USA, GBR` if ¶5'
 - Never show a generated value as applied; the host applies.
 - Never hide an override.
 - Never fabricate or copy a citation without re-verifying it at the new site.
-- Never add a framework, a second build step, or a runtime dependency without a decision in docs/DECISIONS.md.
+- Never add a framework, a second build step, or a runtime dependency without a maintainer decision (MD-0020, MD-0022).
 - Never touch the DOM at runtime in `packages/core`: Outlook's send handler may run it without one. DOM types are fine; `document`, `window` and element constructors are not.
 - Never type a contract slot as `any`, or widen one to quiet the checker. A shape the engine emits goes in `packages/core/src/types.ts` first.
 
 ## Working here
 
-- `pnpm check` (format, lint, typecheck) and `pnpm test` (in each package, node runs `test/*.test.ts` as written; in the kit, `vp test` runs `test/dom/` under happy-dom, DECISIONS #21) before a commit. A rule that shows in the DOM gets a test in `packages/kit/test/dom/render.test.ts`. `pnpm fix` formats. `pnpm build` writes each package's `dist/`. Workspace packages import each other by name; the `source` export condition points them at `src/`, so tests, typecheck and the demo run on source. `pnpm demo` to look. Markdown and the two extracted fixtures aren't formatted: a renumbered list changes what a doc says. CI (`.github/workflows/ci.yml`) runs check, test and build on every PR and push to `main`.
+- Before changing code, run `python3 tools/decision-lint/decision-lint.py applicable --paths <files>` and read every record it returns. Every PR body carries the `[maintainer_decision_impact]` TOML block that `decision-lint.py changed` prints; the `Maintainer decisions` workflow checks it (bot PRs from dependabot, github-actions and release-please are exempt). See [docs/maintainer-decisions/decisions/README.md](docs/maintainer-decisions/decisions/README.md).
+- Read the package's README before changing its public surface, and update it in the same change.
+- `pnpm check` (format, lint, typecheck) and `pnpm test` (in each package, node runs `test/*.test.ts` as written; in the kit, `vp test` runs `test/dom/` under happy-dom) before a commit. A rule that shows in the DOM gets a test in `packages/kit/test/dom/render.test.ts`. `pnpm fix` formats. `pnpm build` writes each package's `dist/`. Workspace packages import each other by name; the `source` export condition points them at `src/`, so tests, typecheck and the demo run on source. `pnpm demo` to look. Every package needs Node 24 or later (`engines: >=24`); Node 20 and 22 are end of life. The repo's own tooling and CI run Node 26. Markdown and the two extracted fixtures aren't formatted: a renumbered list changes what a doc says. CI (`.github/workflows/ci.yml`) runs check, test and build on every PR and push to `main`; `.github/workflows/maintainer-decisions.yml` runs `decision-lint` (Python 3.11 or later, stdlib only).
 - Commits on `main` (squash-merge PR titles) are Conventional Commits: release-please versions each package under `packages/` from the commits that touch its path and writes its `CHANGELOG.md`. See RELEASING.md.
 - Check contrast when a token changes: the pairs and floors are `PAIRS` and `SIZES` in `packages/kit/src/theme.ts`, stated at the bottom of `packages/kit/src/theme.css` (`mq.theme.check`). AA 4.5 on text pairs, 3.0 on lines and focus. `packages/kit/test/theme.test.ts` fails when `kit.css` or `theme.css` paints a pairing that isn't measured there or excused in the test with a reason; a new color use means deciding which.
 - The docs under `docs/` are the source of truth. Design specification for `@knitli/marque-kit`. Edit here.

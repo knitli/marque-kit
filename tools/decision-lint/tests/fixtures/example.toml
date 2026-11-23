@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+schema = 1
+id = "MD-0042"
+title = "A test fixture: the pane keeps a typed answer"
+status = "active"
+decided_at = 2026-08-12
+recorded_at = 2026-08-15
+authority = "direct"
+
+decision = """
+A fictional decision used only by the decision-lint tests. Every prompt keeps
+the typed answer field, whatever options it shows.
+"""
+rationale = "Fixture text; not a decision of this repository."
+rejected = ["Hide the typed field when options are offered"]
+examples = []
+
+[scope]
+areas = ["kit.prompt", "kit.pane"]
+paths = ["packages/kit/**", "packages/core/**"]
+rule_ids = []
+profiles = ["all"]
+applies_when = "A prompt is rendered."
+excludes = []
+
+[[evidence]]
+kind = "repository"
+path = "docs/example.md"
+commit = "0000000000000000000000000000000000000000"
+note = "Fixture locator; never resolved by these tests."
+
+[lifecycle]
+supersedes = []
+superseded_by = []
+review_by = ""
+
+[enforcement]
+mode = "semantic"
+guards = []

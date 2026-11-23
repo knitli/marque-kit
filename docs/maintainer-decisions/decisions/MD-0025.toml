@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+schema = 1
+id = "MD-0025"
+title = "Public, dual-licensed, and under the `@knitli` scope"
+status = "active"
+decided_at = 2026-11-04
+recorded_at = 2026-11-04
+authority = "direct"
+decision = """
+Public, dual-licensed, and under the `@knitli` scope. The kit ships as `@knitli/marque-kit` dual-licensed AGPL-3.0-only or commercial (LICENSE.md); trademark is separate (TRADEMARK.md); code contributions require the CLA (CONTRIBUTING.md, CLA.md). The root workspace and Office add-in app stay private. Supersedes the Marque Commercial License placeholder.
+"""
+rationale = "AGPL-3.0-only keeps the kit open; the commercial option covers hosts that need it."
+rejected = []
+examples = []
+
+[scope]
+areas = ["kit.licensing"]
+paths = [
+  "LICENSE.md",
+  "LICENSES/**",
+  "CLA.md",
+  "CONTRIBUTING.md",
+  "TRADEMARK.md",
+  "REUSE.toml",
+  "packages/*/LICENSE.txt",
+]
+rule_ids = []
+profiles = ["all"]
+applies_when = "Licensing, the package scope or contribution terms change."
+excludes = []
+
+[[evidence]]
+kind = "repository"
+path = "docs/DECISIONS.md"
+commit = "a329e8de90eb15c105a5b260483d515ed9ec3b14"
+note = "Row 25 of the kit's decision table, as first recorded."
+
+[lifecycle]
+supersedes = []
+superseded_by = []
+review_by = ""
+
+[enforcement]
+mode = "documentation"
+guards = []
