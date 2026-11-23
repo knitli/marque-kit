@@ -1,6 +1,6 @@
 {
   "name": "@knitli/marque-kit-workspace",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Marque's UI kit and its host flavors: core logic, the DOM kit, and the web, Word and Outlook adapters.",
   "license": "AGPL-3.0-only",
