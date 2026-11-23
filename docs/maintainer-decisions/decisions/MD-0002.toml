@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+schema = 1
+id = "MD-0002"
+title = "Gold means a person must act; blue means a person can"
+status = "active"
+decided_at = 2026-10-13
+recorded_at = 2026-10-21
+authority = "direct"
+decision = """
+Gold means a person must act; blue means a person can. Action required and Blocking are gold; Advisory is a blue dotted underline on the marking; Noticeable a thin neutral underline; Quiet has no mark.
+"""
+rationale = "Two colors, two meanings, nothing else. The engine's `most_restrictive` ranking is the Advisory rung's data: \"safe reading taken, intent unknown.\""
+rejected = []
+examples = []
+
+[scope]
+areas = ["kit.theme", "kit.attention"]
+paths = ["packages/kit/src/theme.css", "packages/kit/src/kit.css", "packages/core/src/attention.ts"]
+rule_ids = []
+profiles = ["all"]
+applies_when = "A color is used to signal attention."
+excludes = []
+
+[[evidence]]
+kind = "repository"
+path = "docs/DECISIONS.md"
+commit = "fe5a5d051f33451885700d5db9bcc65c587b3407"
+note = "Row 2 of the kit's decision table, as first recorded."
+
+[lifecycle]
+supersedes = []
+superseded_by = []
+review_by = ""
+
+[enforcement]
+mode = "test"
+guards = ["packages/kit/test/dom/render.test.ts", "packages/kit/test/theme.test.ts"]

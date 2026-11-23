@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+schema = 1
+id = "MD-0006"
+title = "Theme is free; behavior is fixed"
+status = "active"
+decided_at = 2026-10-14
+recorded_at = 2026-10-21
+authority = "direct"
+decision = """
+Theme is free; behavior is fixed. Hosts change type, color, radii, placement, icons, motion and their own strings. They don't change the five rungs, the two-layer state, fact-not-syntax questions, the always-present "not my call", stale-question withdrawal, re-check at finalize, markings quoted exactly, or text-not-person judgment.
+"""
+rationale = "The behavior is what makes a Marque host a Marque host."
+rejected = []
+examples = []
+
+[scope]
+areas = ["kit.theme", "kit.behavior"]
+paths = ["packages/kit/src/theme.ts", "packages/kit/src/theme.css", "packages/kit/src/kit.css", "docs/THEME.md"]
+rule_ids = []
+profiles = ["all"]
+applies_when = "A host customization point is added or a behavior is exposed to hosts."
+excludes = []
+
+[[evidence]]
+kind = "repository"
+path = "docs/DECISIONS.md"
+commit = "fe5a5d051f33451885700d5db9bcc65c587b3407"
+note = "Row 6 of the kit's decision table, as first recorded."
+
+[lifecycle]
+supersedes = []
+superseded_by = []
+review_by = ""
+
+[enforcement]
+mode = "test"
+guards = ["packages/kit/test/theme.test.ts"]

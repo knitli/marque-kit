@@ -100,7 +100,7 @@ import type {
 export { rung, markClass, sections } from '@knitli/marque-kit-core/attention';
 export type { Attention, Sections } from '@knitli/marque-kit-core/attention';
 
-/** How long an act's Undo stays in its card's place, while nobody is on it (DECISIONS #23). */
+/** How long an act's Undo stays in its card's place, while nobody is on it (MD-0023). */
 export const UNDO_MS = 8000;
 /** What the undo strip says was done, by act. */
 const DONE: Record<Act, string> = {
@@ -168,7 +168,7 @@ export interface Update {
   /** The host's request counter. */
   seq?: number | undefined;
   /** Open this finding's or artifact's card, as if the person had: an Office host's cursor landing
-   *  in a marking (DECISIONS #8). null closes it. Focus stays where it is, in the document. */
+   *  in a marking (MD-0008). null closes it. Focus stays where it is, in the document. */
   open?: string | null | undefined;
 }
 /** A mounted pane. */
@@ -1338,7 +1338,7 @@ export function pane(doc: Doc | null, host: Host = {}): HTMLDivElement {
     p.append(ro);
   }
 
-  // Once anything is done, it can be looked back on: the findings or the History (DECISIONS #24).
+  // Once anything is done, it can be looked back on: the findings or the History (MD-0024).
   const out = host.log?.length ? tabbed(p, host) : p;
   const findings = !host.log?.length || host.tab !== 'history';
   if (!findings) out.append(history(doc, host.log!, host));

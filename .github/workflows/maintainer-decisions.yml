@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
+name: Maintainer decision enforcement
+
+on:
+  push:
+    branches: [main]
+  # Run the workflow definition from the trusted base branch. The job below
+  # likewise executes only the base branch's checker, tests, and registry.
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maintainer-decisions-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  maintainer-decisions:
+    name: Maintainer decisions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Fetch untrusted PR commit as data
+        if: github.event_name == 'pull_request_target' && !contains(fromJSON('["dependabot[bot]", "github-actions[bot]", "release-please[bot]"]'), github.event.pull_request.user.login)
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: git fetch origin "pull/${PR_NUMBER}/head"
+
+      - name: Registry and fixture validation
+        run: |
+          python3 tools/decision-lint/decision-lint.py lint
+          python3 -m unittest discover -s tools/decision-lint/tests -p 'test_*.py'
+
+      # Dependency bumps and release PRs carry no decision impact block.
+      - name: Validate PR decision impact
+        if: github.event_name == 'pull_request_target' && !contains(fromJSON('["dependabot[bot]", "github-actions[bot]", "release-please[bot]"]'), github.event.pull_request.user.login)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH" > "$RUNNER_TEMP/pr-body.md"
+          python3 tools/decision-lint/decision-lint.py check-pr \
+            --base "$BASE_SHA" \
+            --head "$HEAD_SHA" \
+            --body-file "$RUNNER_TEMP/pr-body.md"

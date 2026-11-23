@@ -13,7 +13,7 @@ The shape of a finding the kit consumes and the engine builds to. Each slot has 
 
 _Design specification for @knitli/marque-kit. Edit here._
 
-**Adoption and migration status:** the readiness model was adopted on 14 November 2026 and is recorded in Marque MD-0043. Coordinated contract/runtime migration across engine, kit and internal callers remains pending; this document states the target and does not claim end-to-end conformance.
+**Adoption and migration status:** the readiness model was adopted on 14 November 2026. Coordinated contract/runtime migration across engine, kit and internal callers remains pending; this document states the target and does not claim end-to-end conformance.
 
 
 ---
@@ -133,7 +133,7 @@ The kit captures; the host transaction appends and writes; Marque re-lints. `pac
 2. The host writes what the act asks for. The kit never edits the document.
 3. The host re-lints and calls `update({ doc, linted, seq })`. `linted` is `state.log.length` when that lint began, and `seq` is the host's request counter. A synchronous host can omit both. A response whose `linted` is behind the checkpoint, or whose `seq` is older than the last one shown, is stale and ignored. Updates with the same `seq` may deliver partial results followed by the rest; the checkpoint never moves back. Partial results may refresh findings but cannot establish readiness or confirm unreturned scope.
 
-**Between steps 1 and 3**, accepted work that requires a write is generated, not applied (DECISIONS #4).
+**Between steps 1 and 3**, accepted work that requires a write is generated, not applied (MD-0004).
 - The card shows the answer as its headline, the marking it proposes, and “Waiting to be written” on an artifact.
 - `document.pending` lists accepted writes awaiting application or confirming evaluation; effective readiness stays false while any remain. A valid answer that changes no physical text still needs engine evaluation of its assertions; a local overlay is not confirmation.
 - The kit's projection merges its own outstanding work with incoming `document.pending` and `document.awaitingWrites`, preserving host-owned work. The host removes a pending item only after application and a confirming current evaluation; an awaiting-write token remains until that write is acknowledged and evaluated.

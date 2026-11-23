@@ -9,7 +9,7 @@
  * The Word task pane: real actions require the installation's trusted provider;
  * without one, the sample findings remain read-only.
  * Jump selects a finding's marking in the document; the cursor landing in a
- * paragraph with a finding opens its card (DECISIONS #8).
+ * paragraph with a finding opens its card (MD-0008).
  *
  * Not yet: the engine (findings come from fixtures/, re-lints are a stand-in), the
  * authority block, help popovers and the lookup (their controls stay inert), the

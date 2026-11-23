@@ -24,3 +24,4 @@ claudedocs/
 .dev.log
 release-assets/
 .mise/
+__pycache__/

@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+schema = 1
+id = "MD-0019"
+title = "The kit is its own repo and package"
+status = "superseded"
+decided_at = 2026-10-21
+recorded_at = 2026-10-21
+authority = "direct"
+decision = """
+The kit is its own repo and package (`@knitli/marque-kit`), plain CSS and ES modules, no framework (superseded by MD-0020 and MD-0022). It depends on Knitli's token values, not its component bundle.
+"""
+rationale = "Hosts are Word, Outlook and the web; the kit has to drop into all three."
+rejected = []
+examples = []
+
+[scope]
+areas = ["kit.packaging"]
+paths = ["package.json", "packages/*/package.json"]
+rule_ids = []
+profiles = ["all"]
+applies_when = "Packaging or the token source changes."
+excludes = []
+
+[[evidence]]
+kind = "repository"
+path = "docs/DECISIONS.md"
+commit = "fe5a5d051f33451885700d5db9bcc65c587b3407"
+note = "Row 19 of the kit's decision table, as first recorded."
+
+[lifecycle]
+supersedes = []
+superseded_by = ["MD-0020", "MD-0022"]
+review_by = ""
+
+[enforcement]
+mode = "documentation"
+guards = []

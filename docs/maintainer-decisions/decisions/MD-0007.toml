@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+schema = 1
+id = "MD-0007"
+title = "Judge the text, never the person"
+status = "active"
+decided_at = 2026-10-14
+recorded_at = 2026-10-21
+authority = "direct"
+decision = """
+Judge the text, never the person. `basis = system_ideal` is a tone switch — "Marque adds this; nobody was required to." Never an error voice.
+"""
+rationale = "Default rules honor the system as designed, not the concessions made for the humans who apply it."
+rejected = []
+examples = []
+
+[scope]
+areas = ["kit.copy"]
+paths = ["packages/kit/src/render.ts", "packages/kit/src/help.ts", "fixtures/memo.findings.json"]
+rule_ids = []
+profiles = ["all"]
+applies_when = "User-facing copy is written."
+excludes = []
+
+[[evidence]]
+kind = "repository"
+path = "docs/DECISIONS.md"
+commit = "fe5a5d051f33451885700d5db9bcc65c587b3407"
+note = "Row 7 of the kit's decision table, as first recorded."
+
+[lifecycle]
+supersedes = []
+superseded_by = []
+review_by = ""
+
+[enforcement]
+mode = "documentation"
+guards = []

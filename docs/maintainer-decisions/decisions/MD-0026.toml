@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+schema = 1
+id = "MD-0026"
+title = "A marking can be rendered as a string, for a page with no script"
+status = "active"
+decided_at = 2026-11-09
+recorded_at = 2026-11-22
+authority = "direct"
+decision = """
+A marking can be rendered as a string, for a page with no script. `html()` in `@knitli/marque-kit-core/marking` writes a marking as HTML with no DOM, for hosts that render pages on a server, work with script off, and run under a strict Content Security Policy: classes and attributes only, no inline style, every value escaped. `render()` builds its elements from the same tree, so the DOM and the string have the same structure, and a test holds them equal. `enhance()` and `tips()` bring server markup to life where script runs. The fit rules hold either way; without script a marking wraps greedily at the same break points. Amended 23 Nov 2026: Node support is not part of this decision. The packages' engines field sets it.
+"""
+rationale = "Imprint renders every page on the server, works without JavaScript, runs offline under `script-src 'self'; style-src 'self'`. A marking that needs a DOM to exist shows nothing there. One tree keeps a second renderer from drifting from the first."
+rejected = []
+examples = []
+
+[scope]
+areas = ["kit.marking"]
+paths = ["packages/core/src/marking.ts", "packages/kit/src/marking.ts", "packages/kit/test/dom/marking.test.ts"]
+rule_ids = []
+profiles = ["all"]
+applies_when = "A marking is rendered without a DOM, or the marking structure changes."
+excludes = []
+
+[[evidence]]
+kind = "repository"
+path = "docs/DECISIONS.md"
+commit = "e5cf1fe4b640e324361b550598b54a7aa857d012"
+note = "Row 26 of the kit's decision table, as first recorded."
+
+[lifecycle]
+supersedes = []
+superseded_by = []
+review_by = ""
+
+[enforcement]
+mode = "test"
+guards = ["packages/kit/test/dom/marking.test.ts"]

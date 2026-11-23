@@ -331,7 +331,7 @@
   color: var(--mq-text-muted);
 }
 
-/* Findings and History (DECISIONS #24): the chosen tab is underlined, the other muted. */
+/* Findings and History (MD-0024): the chosen tab is underlined, the other muted. */
 .mq-tabs {
   display: flex;
   gap: calc(var(--mq-unit) * 4);

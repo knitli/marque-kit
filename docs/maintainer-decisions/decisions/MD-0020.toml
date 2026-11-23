@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+schema = 1
+id = "MD-0020"
+title = "The kit is written in TypeScript and built"
+status = "active"
+decided_at = 2026-10-22
+recorded_at = 2026-10-22
+authority = "direct"
+decision = """
+The kit is written in TypeScript and built. Source is `src/*.ts`, strict, with the contract in `src/types.ts`; `vp pack` (tsdown) builds `dist/`: ES modules, `.d.ts` and the two stylesheets. Erasable syntax only, so node runs the tests and Vite serves the demo from source. Still no framework and no runtime dependency. Supersedes "no build" in MD-0019.
+"""
+rationale = "Hosts integrate against the contract's shapes; types make them checkable, and make the kit sustainable to change."
+rejected = []
+examples = []
+
+[scope]
+areas = ["kit.packaging"]
+paths = ["tsconfig.json", "vite.config.ts", "packages/*/vite.config.ts", "packages/*/package.json"]
+rule_ids = []
+profiles = ["all"]
+applies_when = "The language, build or erasable-syntax rule changes."
+excludes = []
+
+[[evidence]]
+kind = "repository"
+path = "docs/DECISIONS.md"
+commit = "05f967ad17f2badf5d624d4df03166c4d9519d81"
+note = "Row 20 of the kit's decision table, as first recorded."
+
+[lifecycle]
+supersedes = ["MD-0019"]
+superseded_by = []
+review_by = ""
+
+[enforcement]
+mode = "ci"
+guards = [".github/workflows/ci.yml"]

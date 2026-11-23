@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+schema = 1
+id = "MD-0016"
+title = "Attention lives in the kit, computed from the engine's facts"
+status = "active"
+decided_at = 2026-10-16
+recorded_at = 2026-10-21
+authority = "direct"
+decision = """
+Attention lives in the kit, computed from the engine's facts. The derivation table (docs/DERIVATION.md) is the published spec.
+"""
+rationale = "Marque gives answers and identifies problems; what gets done depends on the caller."
+rejected = []
+examples = []
+
+[scope]
+areas = ["kit.attention"]
+paths = ["packages/core/src/attention.ts", "docs/DERIVATION.md"]
+rule_ids = []
+profiles = ["all"]
+applies_when = "Attention logic moves between the engine and the kit."
+excludes = []
+
+[[evidence]]
+kind = "repository"
+path = "docs/DECISIONS.md"
+commit = "fe5a5d051f33451885700d5db9bcc65c587b3407"
+note = "Row 16 of the kit's decision table, as first recorded."
+
+[lifecycle]
+supersedes = []
+superseded_by = []
+review_by = ""
+
+[enforcement]
+mode = "test"
+guards = ["packages/core/test/state.test.ts"]
