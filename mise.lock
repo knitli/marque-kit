@@ -216,9 +216,10 @@ url_api = "https://api.github.com/repos/pnpm/pnpm/releases/assets/643957404"
 provenance = "github-attestations"
 
 [[tools."pypi:reuse"]]
-version = "6.2.0"
+version = "6.3.0"
 backend = "pypi:reuse"
-specifiers = ["latest"]
+specifiers = ["6.3.0"]
+uv = { path = ".mise/locks/pypi-reuse/6.3.0~5b31d62c", digest = "sha256:aaecc398e6c7d9dd543a162160a52252720e51eeb788e2c90f8cbb345911d07a" }
 
 [tools."pypi:reuse".options]
 extras = "charset-normalizer"
@@ -266,9 +267,9 @@ url = "https://github.com/astral-sh/python-build-standalone/releases/download/20
 provenance = "github-attestations"
 
 [[tools.viteplus]]
-version = "1.5.0"
+version = "1.6.0"
 backend = "npm:vite-plus"
-specifiers = ["latest"]
+specifiers = ["1.6.0"]
 
 [[tools.yq]]
 version = "4.54.1"

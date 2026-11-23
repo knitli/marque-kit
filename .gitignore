@@ -23,3 +23,4 @@ claudedocs/
 # the Office pane logs here in dev (apps/office-addin/vite.config.ts)
 .dev.log
 release-assets/
+.mise/
