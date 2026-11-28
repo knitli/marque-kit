@@ -20,7 +20,7 @@ Until these land, the kit renders from a hand-written oracle in the contract's s
 | One `asks` field for everything that needs a person | The decision prompt renders one shape. A free answer is always allowed. |
 | Readings carry their rendered marking and the layer they change | The diff form tints the layer that differs; the kit can't compute that from a string. |
 | Finding and artifact/field dependencies, plus `document.evaluation` | `depends_on[]` connects a finding to values its readings can change. Track artifact and field dependencies separately, even when every reading leaves the banner unchanged. A complete evaluation carries its basis, completeness, requirements and snapshot readiness; the kit/host then establishes effective readiness from currentness and confirmed work. |
-| Conservative fallback | An unattended deployment with nobody to ask gets the most restrictive form that keeps every stated equity, e.g. `(S//FGI AUS GBR//NF)`. |
+| Conservative fallback | An unattended deployment with nobody to ask gets the most restrictive form that keeps every stated equity. |
 | Stable finding identity across re-lints | A Word content control tagged `mq:<id>` has to survive the next keystroke. |
 | `DeploymentMode::Live` | Rung depends on the host moment (editing vs finalize); the engine should know it is being asked repeatedly. |
 | CAB per-field state; Classified By from identity; dates discovered; OCA reasons from EO 13526 §1.4 | The authority-block card shows known / blank / waiting per field, not one blank block. |

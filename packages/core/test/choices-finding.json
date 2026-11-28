@@ -1,0 +1,257 @@
+{
+  "id": "f-p3-ownership",
+  "rule": {
+    "scheme": "capco",
+    "predicate": "portion.fgi.joint-owner-list"
+  },
+  "severity": "error",
+  "basis": "guidance_binding",
+  "anchor": {
+    "kind": "span",
+    "portion": 3,
+    "span": [244, 280]
+  },
+  "marking": {
+    "as_written": {
+      "text": "(//JOINT S AUS GBR//REL TO USA, GBR)",
+      "layers": [
+        {
+          "tokens": [
+            {
+              "t": "(//JOINT "
+            },
+            {
+              "t": "S "
+            },
+            {
+              "t": "AUS "
+            },
+            {
+              "t": "GBR"
+            }
+          ]
+        },
+        {
+          "tokens": [
+            {
+              "t": "//REL TO "
+            },
+            {
+              "t": "USA, "
+            },
+            {
+              "t": "GBR)"
+            }
+          ]
+        }
+      ],
+      "masks": []
+    },
+    "shape": "recognized"
+  },
+  "says": {
+    "text": "Paragraph 3 can't be right as written: a joint marking always includes the U.S., and every joint producer must be able to receive it.",
+    "template": "joint_owner_list",
+    "citation": {
+      "source": "capco_2016",
+      "section": "H.3",
+      "page": 55,
+      "short": "USA is always included in the JOINT marking [LIST], as USA is always a co-owner/producer."
+    },
+    "help": ["JOINT", "REL TO"]
+  },
+  "outcome": {
+    "kind": "choices",
+    "result": null,
+    "because": null,
+    "readings": [
+      {
+        "asserts": {
+          "ownership": "jointly_owned",
+          "owners": ["AUS", "GBR", "USA"]
+        },
+        "reading": "The U.S., the UK and Australia produced it together",
+        "result": {
+          "text": "(//JOINT S AUS GBR USA//REL TO USA, AUS, GBR)",
+          "layers": [
+            {
+              "tokens": [
+                {
+                  "t": "(//JOINT "
+                },
+                {
+                  "t": "S "
+                },
+                {
+                  "t": "AUS "
+                },
+                {
+                  "t": "GBR "
+                },
+                {
+                  "t": "USA"
+                }
+              ]
+            },
+            {
+              "tokens": [
+                {
+                  "t": "//REL TO "
+                },
+                {
+                  "t": "USA, "
+                },
+                {
+                  "t": "AUS, "
+                },
+                {
+                  "t": "GBR)"
+                }
+              ]
+            }
+          ],
+          "masks": []
+        },
+        "changes": ["classification"]
+      },
+      {
+        "asserts": {
+          "ownership": "foreign_owned",
+          "owners": ["AUS", "GBR"]
+        },
+        "reading": "The UK and Australia, without the U.S.",
+        "result": {
+          "text": "(//AUS GBR S//REL TO USA, AUS, GBR)",
+          "layers": [
+            {
+              "tokens": [
+                {
+                  "t": "(//AUS "
+                },
+                {
+                  "t": "GBR "
+                },
+                {
+                  "t": "S"
+                }
+              ]
+            },
+            {
+              "tokens": [
+                {
+                  "t": "//REL TO "
+                },
+                {
+                  "t": "USA, "
+                },
+                {
+                  "t": "AUS, "
+                },
+                {
+                  "t": "GBR)"
+                }
+              ]
+            }
+          ],
+          "masks": []
+        },
+        "changes": ["classification"]
+      },
+      {
+        "asserts": {
+          "ownership": "foreign_owned_with_foreign_content",
+          "owners": ["GBR"],
+          "fgi": ["AUS"]
+        },
+        "reading": "It's British, with some Australian information",
+        "result": {
+          "text": "(//GBR S//FGI AUS//REL TO USA, GBR)",
+          "layers": [
+            {
+              "tokens": [
+                {
+                  "t": "(//GBR "
+                },
+                {
+                  "t": "S"
+                }
+              ]
+            },
+            {
+              "tokens": [
+                {
+                  "t": "//FGI "
+                },
+                {
+                  "t": "AUS"
+                }
+              ]
+            },
+            {
+              "tokens": [
+                {
+                  "t": "//REL TO "
+                },
+                {
+                  "t": "USA, "
+                },
+                {
+                  "t": "GBR)"
+                }
+              ]
+            }
+          ],
+          "masks": []
+        },
+        "changes": ["classification", "fgi"]
+      }
+    ],
+    "fallback": {
+      "result": {
+        "text": "(S//FGI AUS GBR//NF)",
+        "layers": [
+          {
+            "tokens": [
+              {
+                "t": "(S"
+              }
+            ]
+          },
+          {
+            "tokens": [
+              {
+                "t": "//FGI "
+              },
+              {
+                "t": "AUS "
+              },
+              {
+                "t": "GBR"
+              }
+            ]
+          },
+          {
+            "tokens": [
+              {
+                "t": "//NF)"
+              }
+            ]
+          }
+        ],
+        "masks": []
+      },
+      "basis": "most_restrictive_preserving_equities"
+    },
+    "reason": "plural_unranked"
+  },
+  "asks": {
+    "kind": "options",
+    "text": "Who collected or produced this information?",
+    "options": "outcome.readings",
+    "field": null,
+    "free_answer": true
+  },
+  "needs_person": "required",
+  "blocks": "finalize",
+  "depends_on": []
+}
