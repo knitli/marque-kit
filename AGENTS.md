@@ -31,7 +31,7 @@ These are not style preferences. Each is a binding maintainer decision, recorded
 - **Question first.** When a finding asks, the question is the card's heading; the marking is context; `says.text` explains; `Why?` and the citation sit in the footer.
 - **A free answer is always possible. "Not my call" is always there.** Every prompt has the typed field and the routing button, whatever the options.
 - **No Undo on a fix the person must own. An override is recorded.** "Keep as written" exists on Noticeable and Advisory; the audit reports the finding as-is.
-- **Advisory when the safe reading is one the author wrote; Action required when the safe form is one nobody wrote.** The NF/REL TO portion is Advisory (REL TO offered back). The JOINT fallback `(S//FGI AUS GBR//NF)` is a fallback, not a reading.
+- **Advisory when the safe reading is one the author wrote; Action required when the safe form is one nobody wrote.** The NF/REL TO portion is Advisory (REL TO offered back). A synthesized fallback is not a reading.
 - **Light is the default theme.** No attribute, or `data-mq-theme="light"`, on the kit root (`.mq`). `dark` and `auto` are opt-in. The theme attribute goes on the root, not on `<html>`.
 - **Theme is free; behavior is fixed.** Hosts may set `--mq-*` tokens. They may not change the rungs, the shapes' meanings, the fit rules, the free answer, "not my call", or the override record.
 - **Judge the text, never the person.** Messages say what the marking is and what Marque did. Never "you forgot".
@@ -66,7 +66,7 @@ All documents and markings in this repo are fictional examples.
 |---|---|---|---|
 | 1 | `(U)` | — | — |
 | 2 | `(S//REL TO USA FVEY)` | comma added (§H.8 p151) | Noticeable |
-| 3 | `(//JOINT S AUS GBR//REL TO USA, GBR)` | ownership question, three readings + fallback (§H.3 p55) | Action required / Blocking |
+| 3 | `(//JOINT S AUS GBR//REL TO USA, GBR)` | U.S. added to the joint owners, Australia to the release list (§H.3 p55) | Noticeable |
 | 4 | none | portion mark absent (§C p25); only the author knows | Action required / Blocking |
 | 5 | `(S//NF/REL TO USA, GBR)` | NOFORN kept, REL TO offered back (§H.8 p145); banner becomes NOFORN (§H.3 p57) | Advisory |
 | 6 | `(C//REL TO USA,  GBR)` | extra space removed | Quiet |

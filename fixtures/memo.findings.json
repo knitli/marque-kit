@@ -3,7 +3,7 @@
   "note": "Hand-written oracle in the kit contract shape (docs/CONTRACT.md). All documents and markings are fictional examples.",
   "source": "fixtures/memo.txt",
   "document": {
-    "blocking": ["f-p3-ownership", "f-p4-portion-mark-absent", "a-cab"],
+    "blocking": ["f-p4-portion-mark-absent", "a-cab"],
     "artifacts": [
       {
         "id": "a-banner",
@@ -276,7 +276,7 @@
         "shape": "recognized"
       },
       "says": {
-        "text": "Paragraph 3 can't be right as written: a joint marking always includes the U.S., and every joint producer must be able to receive it.",
+        "text": "Added the U.S. to paragraph 3's joint owners and Australia to its release list.",
         "template": "joint_owner_list",
         "citation": {
           "source": "capco_2016",
@@ -287,198 +287,55 @@
         "help": ["JOINT", "REL TO"]
       },
       "outcome": {
-        "kind": "choices",
-        "result": null,
-        "because": null,
-        "readings": [
-          {
-            "asserts": {
-              "ownership": "jointly_owned",
-              "owners": ["AUS", "GBR", "USA"]
-            },
-            "reading": "The U.S., the UK and Australia produced it together",
-            "result": {
-              "text": "(//JOINT S AUS GBR USA//REL TO USA, AUS, GBR)",
-              "layers": [
+        "kind": "applied",
+        "result": {
+          "text": "(//JOINT S AUS GBR USA//REL TO USA, AUS, GBR)",
+          "layers": [
+            {
+              "tokens": [
                 {
-                  "tokens": [
-                    {
-                      "t": "(//JOINT "
-                    },
-                    {
-                      "t": "S "
-                    },
-                    {
-                      "t": "AUS "
-                    },
-                    {
-                      "t": "GBR "
-                    },
-                    {
-                      "t": "USA"
-                    }
-                  ]
+                  "t": "(//JOINT "
                 },
                 {
-                  "tokens": [
-                    {
-                      "t": "//REL TO "
-                    },
-                    {
-                      "t": "USA, "
-                    },
-                    {
-                      "t": "AUS, "
-                    },
-                    {
-                      "t": "GBR)"
-                    }
-                  ]
+                  "t": "S "
+                },
+                {
+                  "t": "AUS "
+                },
+                {
+                  "t": "GBR "
+                },
+                {
+                  "t": "USA"
                 }
-              ],
-              "masks": []
+              ]
             },
-            "changes": ["classification"]
-          },
-          {
-            "asserts": {
-              "ownership": "foreign_owned",
-              "owners": ["AUS", "GBR"]
-            },
-            "reading": "The UK and Australia, without the U.S.",
-            "result": {
-              "text": "(//AUS GBR S//REL TO USA, AUS, GBR)",
-              "layers": [
+            {
+              "tokens": [
                 {
-                  "tokens": [
-                    {
-                      "t": "(//AUS "
-                    },
-                    {
-                      "t": "GBR "
-                    },
-                    {
-                      "t": "S"
-                    }
-                  ]
+                  "t": "//REL TO "
                 },
                 {
-                  "tokens": [
-                    {
-                      "t": "//REL TO "
-                    },
-                    {
-                      "t": "USA, "
-                    },
-                    {
-                      "t": "AUS, "
-                    },
-                    {
-                      "t": "GBR)"
-                    }
-                  ]
+                  "t": "USA, "
+                },
+                {
+                  "t": "AUS, "
+                },
+                {
+                  "t": "GBR)"
                 }
-              ],
-              "masks": []
-            },
-            "changes": ["classification"]
-          },
-          {
-            "asserts": {
-              "ownership": "foreign_owned_with_foreign_content",
-              "owners": ["GBR"],
-              "fgi": ["AUS"]
-            },
-            "reading": "It's British, with some Australian information",
-            "result": {
-              "text": "(//GBR S//FGI AUS//REL TO USA, GBR)",
-              "layers": [
-                {
-                  "tokens": [
-                    {
-                      "t": "(//GBR "
-                    },
-                    {
-                      "t": "S"
-                    }
-                  ]
-                },
-                {
-                  "tokens": [
-                    {
-                      "t": "//FGI "
-                    },
-                    {
-                      "t": "AUS"
-                    }
-                  ]
-                },
-                {
-                  "tokens": [
-                    {
-                      "t": "//REL TO "
-                    },
-                    {
-                      "t": "USA, "
-                    },
-                    {
-                      "t": "GBR)"
-                    }
-                  ]
-                }
-              ],
-              "masks": []
-            },
-            "changes": ["classification", "fgi"]
-          }
-        ],
-        "fallback": {
-          "result": {
-            "text": "(S//FGI AUS GBR//NF)",
-            "layers": [
-              {
-                "tokens": [
-                  {
-                    "t": "(S"
-                  }
-                ]
-              },
-              {
-                "tokens": [
-                  {
-                    "t": "//FGI "
-                  },
-                  {
-                    "t": "AUS "
-                  },
-                  {
-                    "t": "GBR"
-                  }
-                ]
-              },
-              {
-                "tokens": [
-                  {
-                    "t": "//NF)"
-                  }
-                ]
-              }
-            ],
-            "masks": []
-          },
-          "basis": "most_restrictive_preserving_equities"
+              ]
+            }
+          ],
+          "masks": []
         },
-        "reason": "plural_unranked"
+        "because": null,
+        "readings": [],
+        "reason": null
       },
-      "asks": {
-        "kind": "options",
-        "text": "Who collected or produced this information?",
-        "options": "outcome.readings",
-        "field": null,
-        "free_answer": true
-      },
-      "needs_person": "required",
-      "blocks": "finalize",
+      "asks": null,
+      "needs_person": "none",
+      "blocks": "never",
       "depends_on": []
     },
     {

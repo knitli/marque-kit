@@ -8,13 +8,14 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { docView, empty, linted, record, snapshot } from '@knitli/marque-kit-core/state';
+import { withChoices } from '../../../packages/core/test/choices-doc.ts';
 import type { Act, ActValue, Doc, State } from '@knitli/marque-kit-core/types';
 import { written } from '../src/locate.ts';
 import { banner, edits, held, made, relint } from '../src/write.ts';
 
 const read = (f: string): string => readFileSync(new URL(`../../../fixtures/${f}`, import.meta.url), 'utf8');
 const memo = read('memo.txt');
-const doc = JSON.parse(read('memo.findings.json')) as Doc;
+const doc = withChoices(JSON.parse(read('memo.findings.json')) as Doc);
 const P3 = 'f-p3-ownership',
   P4 = 'f-p4-portion-mark-absent',
   P5 = 'f-p5-noforn-rel-conflict',

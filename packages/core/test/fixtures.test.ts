@@ -120,3 +120,19 @@ for (const invalid of [
 ]) {
   assert.notEqual(check({ 'bad-audience.mts': source('IntakeAudienceClaim', JSON.stringify(invalid)) }), '');
 }
+
+assert.equal(
+  check({
+    'choices.mts': source('Finding', readFileSync(join(root, 'packages/core/test/choices-finding.json'), 'utf8')),
+  }),
+  '',
+  'the choices finding used by the flow tests fits the contract',
+);
+{
+  const doc = JSON.parse(memo) as { document: { blocking: string[] }; findings: Record<string, any>[] };
+  const p3 = doc.findings.find((f) => f.id === 'f-p3-ownership')!;
+  assert.equal(p3.outcome.kind, 'applied', 'a joint marking missing the U.S. is corrected, not asked about');
+  assert.equal(p3.outcome.result.text, '(//JOINT S AUS GBR USA//REL TO USA, AUS, GBR)');
+  assert.deepEqual([p3.asks, p3.needs_person, p3.blocks], [null, 'none', 'never']);
+  assert.ok(!doc.document.blocking.includes('f-p3-ownership'));
+}

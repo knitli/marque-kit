@@ -55,7 +55,7 @@ _M · U_
 **says.citation**
 **says.caveat**
 says.help[]
-CAPCO-2016 §H.3 · p. 57
+CAPCO-2016 §H.3 · p. 55
 Typed citation → the chip. The ISM caveat, when present, must show. help[] lists which tokens in the marking have help entries — the tooltip hooks. Today: citation · caveat as is; help lives on a separate vocab endpoint.
 _M · (U) · I_
 

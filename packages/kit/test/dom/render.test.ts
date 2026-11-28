@@ -10,6 +10,7 @@ import { describe, expect, test, vi } from 'vite-plus/test';
 import { render as mark, masked } from '../../src/marking.ts';
 import { artifact, card, gate, mount, pane, receipt, rung, UNDO_MS } from '../../src/render.ts';
 import { why } from '../../src/help.ts';
+import { withChoices } from '../../../core/test/choices-doc.ts';
 import {
   appendAct,
   acceptedReplacements,
@@ -30,9 +31,9 @@ import type {
 } from '@knitli/marque-kit-core/types';
 
 // By path: under happy-dom, URL is the page's, and won't open a file.
-const memo = JSON.parse(
-  readFileSync(join(import.meta.dirname, '../../../../fixtures/memo.findings.json'), 'utf8'),
-) as Doc;
+const memo = withChoices(
+  JSON.parse(readFileSync(join(import.meta.dirname, '../../../../fixtures/memo.findings.json'), 'utf8')) as Doc,
+);
 const P2 = 'f-p2-rel-to-separator',
   P3 = 'f-p3-ownership',
   P4 = 'f-p4-portion-mark-absent',

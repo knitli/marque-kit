@@ -438,7 +438,7 @@ Esc
 Marks information that may not be released in any form to a foreign government, person, or organization — even a close ally — without the originator's permission.
 
 Here
-Paragraph 4 carries NF, so the document banner does too. The document cannot go to the UK while it stands.
+Paragraph 5 carries NF, so the document banner does too. The document cannot go to the UK while it stands.
 
 
 Tip
@@ -471,7 +471,7 @@ Marks information that may not be released in any form to a foreign government, 
 
 
 In this document
-Paragraph 4 carries NF, so the banner does too. The document cannot go to the UK while it stands.
+Paragraph 5 carries NF, so the banner does too. The document cannot go to the UK while it stands.
 
 
 Practical

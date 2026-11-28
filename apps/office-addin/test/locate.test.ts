@@ -39,7 +39,7 @@ const fixes = doc.findings.flatMap((f) =>
     ? [{ span: f.anchor.span, result: f.outcome.result.text }]
     : [],
 );
-assert.equal(fixes.length, 3, '¶2 and ¶6 fixed, ¶5 the safe reading');
+assert.equal(fixes.length, 4, '¶2, ¶3 and ¶6 fixed, ¶5 the safe reading');
 const after = written(read('memo.txt'), fixes);
 const ps = after.text.replace(/\n$/, '').split('\n');
 for (const f of doc.findings) {
@@ -50,4 +50,5 @@ for (const f of doc.findings) {
   if (want) assert.equal(at.text, want, `${f.id}: what the document now says there`);
 }
 assert.ok(after.text.includes('(S//REL TO USA, FVEY)') && !after.text.includes('USA,  GBR'), 'the fixes are in');
+assert.ok(after.text.includes('(//JOINT S AUS GBR USA//REL TO USA, AUS, GBR)'), '¶3 has the U.S. added');
 console.log('locate: ok');

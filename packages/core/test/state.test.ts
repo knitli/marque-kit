@@ -8,6 +8,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { rung, sections } from '../src/attention.ts';
+import { withChoices } from './choices-doc.ts';
 import {
   appendAcknowledgementIssue,
   appendAct,
@@ -195,7 +196,9 @@ assert.equal(rung({ ...comma, seen: true }), 'quiet');
 assert.equal(rung({ ...comma, outcome: { result: { text: '(S//REL TO  USA FVEY)' } } }), 'quiet');
 
 /* The memo. */
-const doc = JSON.parse(readFileSync(new URL('../../../fixtures/memo.findings.json', import.meta.url), 'utf8')) as Doc;
+const doc = withChoices(
+  JSON.parse(readFileSync(new URL('../../../fixtures/memo.findings.json', import.meta.url), 'utf8')) as Doc,
+);
 
 // Raw14 caller control: its act-history lane is complete only through sequence 1,
 // while the separate caller-issued frontier is already MAX_SAFE_INTEGER.
